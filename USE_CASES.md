@@ -1,10 +1,10 @@
 # 📋 Casos de Uso — FuzzySimulated
 
-> Especificação completa dos 15 casos de uso da plataforma, seguindo o padrão:
+> Especificação completa dos 17 casos de uso da plataforma, seguindo o padrão:
 > ator(es), pré-condições, fluxo principal, fluxos alternativos (com retorno ao fluxo principal) e pós-condições.
 
 **Projeto:** FuzzySimulated  
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional — CESUPA 01/2026  
+**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 01/2026  
 **Repositório:** https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST
 
 ---
@@ -28,6 +28,8 @@
 | [UC13](#uc13) | Visualizar pipeline completo da simulação | Simulador | Usuário, Sistema |
 | [UC14](#uc14) | Consultar histórico de simulações | Histórico | Usuário, Sistema |
 | [UC15](#uc15) | Validar sistema antes de executar | Sistema (automático) | Sistema, Backend |
+| [UC16](#uc16) | Carregar dataset Parquet e executar inferência em lote | Dashboard Batch | Usuário, Backend, Polars |
+| [UC17](#uc17) | Renomear colunas do Parquet via dashboard | Gerenciamento de Variáveis do Dataset | Usuário, Sistema |
 
 ---
 
@@ -120,7 +122,7 @@
 3. **Sistema** exibe diálogo de confirmação: "Tem certeza? Esta ação removerá permanentemente o sistema '[nome]' e todos os seus dados — variáveis, termos, regras e histórico de simulações."
 4. Usuário clica em "Confirmar exclusão".
 5. **Sistema** envia requisição DELETE para `/api/systems/{id}`.
-6. **Backend** executa `DELETE` em `fuzzy_systems`; `ON DELETE CASCADE` propaga automaticamente a exclusão para `fuzzy_variables`, `fuzzy_terms`, `fuzzy_rules` e `simulations`.
+6. **Backend** executa `DELETE` em `fuzzy_systems`; `ON DELETE CASCADE` propaga automaticamente a exclusão para `fuzzy_variables`, `fuzzy_terms`, `fuzzy_rules`, `simulations` e `batch_results`.
 7. **Backend** retorna status HTTP 204 (No Content).
 8. **Sistema** remove o card do Dashboard sem recarregar a página.
 
@@ -143,31 +145,30 @@
 | Campo | Descrição |
 |---|---|
 | **Atores** | Usuário (primário), Sistema (secundário) |
-| **Pré-condições** | Um sistema fuzzy foi criado (UC01) e está aberto no Editor de Variáveis. |
+| **Pré-condições** | Um sistema fuzzy foi criado (UC01). Usuário está no Editor de Variáveis do sistema. |
 
 **Fluxo Principal**
 
-1. Usuário clica em "Adicionar Variável de Entrada" na seção de antecedentes do Editor de Variáveis.
-2. **Sistema** exibe formulário com os campos: Nome da variável (texto, obrigatório), Universo mínimo (número, obrigatório), Universo máximo (número, obrigatório) e Resolução (inteiro, padrão: 501 pontos de discretização).
-3. Usuário preenche os campos. Exemplo: Nome = "Temperatura", mín = 0, máx = 50, resolução = 501.
-4. Usuário clica em "Adicionar".
-5. **Sistema** valida: Nome não vazio; `universe_min < universe_max`; Resolução ≥ 2.
-6. **Sistema** envia POST para `/api/systems/{id}/variables` com `role = 'antecedent'`.
-7. **Backend** persiste o registro em `fuzzy_variables` com `role = 'antecedent'`.
-8. **Backend** retorna o objeto criado com status HTTP 201.
-9. **Sistema** exibe a nova variável na seção "Entradas" do editor, com painel vazio aguardando termos linguísticos.
+1. Usuário clica em "Adicionar Variável de Entrada" no Editor de Variáveis.
+2. **Sistema** exibe formulário com campos: Nome da variável (texto, obrigatório), Universo mínimo (float, obrigatório), Universo máximo (float, obrigatório), Resolução (inteiro, padrão: 501).
+3. Usuário preenche os campos e clica em "Adicionar".
+4. **Sistema** valida: Nome não vazio; Universo mínimo < Universo máximo; Resolução ≥ 2.
+5. **Sistema** envia POST para `/api/systems/{id}/variables` com `role = 'antecedent'`.
+6. **Backend** persiste o registro em `fuzzy_variables`.
+7. **Backend** retorna o objeto criado com HTTP 201.
+8. **Sistema** exibe a nova variável na lista do Editor de Variáveis, pronta para receber termos linguísticos (UC06).
 
 **Fluxos Alternativos**
 
-- **FA1 — `universe_min ≥ universe_max` (passo 5):** Sistema exibe "O limite mínimo deve ser estritamente menor que o máximo." Retorna ao passo 3.
-- **FA2 — Nome vazio (passo 5):** Sistema exibe erro inline. Retorna ao passo 3.
-- **FA3 — Resolução < 2 (passo 5):** Sistema exibe "A resolução mínima é de 2 pontos." Retorna ao passo 3.
-- **FA4 — Nome duplicado no mesmo sistema (passo 5):** Sistema exibe aviso "Já existe uma variável com este nome neste sistema." Permite prosseguir ou renomear. Retorna ao passo 3.
+- **FA1 — Nome já existe neste sistema (passo 4):** Sistema exibe "Já existe uma variável com este nome neste sistema." Retorna ao passo 3.
+- **FA2 — Universo mínimo ≥ máximo (passo 4):** Sistema exibe "O valor mínimo deve ser menor que o máximo." Retorna ao passo 3.
+- **FA3 — Falha no backend (passo 5):** Sistema exibe erro genérico. Retorna ao passo 3.
+- **FA4 — Usuário cancela:** Formulário é fechado sem persistir nada.
 
 **Pós-condições**
 
-- Registro criado em `fuzzy_variables` com `role = 'antecedent'`, vinculado ao `system_id` correto.
-- O Editor de Variáveis exibe a nova entrada pronta para receber termos (UC06).
+- Novo registro em `fuzzy_variables` com `role = 'antecedent'` vinculado ao sistema.
+- A variável aparece listada no Editor de Variáveis, aguardando termos linguísticos.
 
 ---
 
@@ -178,29 +179,29 @@
 | Campo | Descrição |
 |---|---|
 | **Atores** | Usuário (primário), Sistema (secundário) |
-| **Pré-condições** | Um sistema fuzzy foi criado (UC01) e está aberto no Editor de Variáveis. |
+| **Pré-condições** | Um sistema fuzzy foi criado (UC01). Usuário está no Editor de Variáveis. Não existe ainda uma variável consequente cadastrada (o sistema Mamdani permite apenas uma). |
 
 **Fluxo Principal**
 
-1. Usuário clica em "Adicionar Variável de Saída" na seção de consequentes do Editor de Variáveis.
-2. **Sistema** exibe o mesmo formulário de UC04 (Nome, Universo mínimo, Universo máximo, Resolução).
-3. Usuário preenche os campos. Exemplo: Nome = "Conforto", mín = 0, máx = 100, resolução = 501.
-4. Usuário clica em "Adicionar".
-5. **Sistema** aplica as mesmas validações de UC04 (passo 5).
-6. **Sistema** envia POST para `/api/systems/{id}/variables` com `role = 'consequent'`.
-7. **Backend** persiste em `fuzzy_variables` com `role = 'consequent'`.
-8. **Backend** retorna o objeto criado com status HTTP 201.
-9. **Sistema** exibe a nova variável na seção "Saídas" do editor.
+1. Usuário clica em "Adicionar Variável de Saída" no Editor de Variáveis.
+2. **Sistema** exibe formulário idêntico ao de UC04.
+3. Usuário preenche os campos e clica em "Adicionar".
+4. **Sistema** valida: Nome não vazio; Universo mínimo < Universo máximo; ausência de consequente já cadastrado.
+5. **Sistema** envia POST para `/api/systems/{id}/variables` com `role = 'consequent'`.
+6. **Backend** persiste o registro em `fuzzy_variables`.
+7. **Backend** retorna o objeto criado com HTTP 201.
+8. **Sistema** exibe a variável de saída em seção separada do Editor de Variáveis.
 
 **Fluxos Alternativos**
 
-- **FA1 — Erros de validação (passo 5):** Comportamento idêntico a UC04. Retorna ao passo 3.
-- **FA2 — Tentativa de adicionar segunda variável consequente (passo 6):** Sistema exibe aviso "A biblioteca logicfuzzy-academic suporta uma variável consequente por sistema nesta versão." Permite prosseguir; comportamento em runtime depende da versão da biblioteca.
+- **FA1 — Já existe uma variável consequente (passo 4):** Sistema bloqueia a ação e exibe "Este sistema já possui uma variável de saída. Remova-a antes de adicionar outra (UC07)." Formulário é fechado.
+- **FA2 — Universo inválido (passo 4):** Mesmo tratamento de UC04-FA2.
+- **FA3 — Falha no backend (passo 5):** Mesmo tratamento de UC04-FA3.
 
 **Pós-condições**
 
-- Registro criado em `fuzzy_variables` com `role = 'consequent'`, vinculado ao `system_id`.
-- O Editor de Variáveis exibe a nova saída pronta para receber termos (UC06).
+- Novo registro em `fuzzy_variables` com `role = 'consequent'` vinculado ao sistema.
+- A variável de saída aparece na seção correspondente do Editor, aguardando termos linguísticos.
 
 ---
 
@@ -211,36 +212,30 @@
 | Campo | Descrição |
 |---|---|
 | **Atores** | Usuário (primário), Sistema (secundário) |
-| **Pré-condições** | Ao menos uma variável (antecedente ou consequente) existe no sistema. Editor de Variáveis está aberto. |
+| **Pré-condições** | A variável (antecedente ou consequente) foi criada. Usuário está no painel de termos da variável no Editor de Variáveis. |
 
 **Fluxo Principal**
 
-1. Usuário localiza a variável desejada no Editor de Variáveis e clica em "Adicionar Termo".
-2. **Sistema** exibe formulário com os campos: Rótulo / Label (texto, obrigatório) e Tipo de função de pertinência (seleção: `trimf`, `trapmf`, `gaussmf`).
-3. Usuário seleciona o tipo de MF. **Sistema** atualiza dinamicamente os campos de parâmetros:
-   - `trimf` → campos a, b, c (onde a ≤ b ≤ c)
-   - `trapmf` → campos a, b, c, d (onde a ≤ b ≤ c ≤ d)
-   - `gaussmf` → campos mean (média) e sigma (desvio padrão, > 0)
-4. Usuário preenche o rótulo e os parâmetros. Exemplo: "Quente", `trimf`, [35, 42, 50].
-5. **Sistema** exibe prévia gráfica da função de pertinência em tempo real durante o preenchimento.
-6. Usuário clica em "Salvar Termo".
-7. **Sistema** valida: Rótulo não vazio; parâmetros respeitam a ordenação exigida pelo tipo de MF; para `gaussmf`, sigma > 0.
-8. **Sistema** envia POST para `/api/variables/{variable_id}/terms`.
-9. **Backend** persiste em `fuzzy_terms` com `params` armazenado como JSONB.
-10. **Backend** retorna o objeto criado com status HTTP 201.
-11. **Sistema** exibe o novo termo listado sob a variável, com o gráfico da MF renderizado.
+1. Usuário clica em "Adicionar Termo" na variável desejada.
+2. **Sistema** exibe formulário com campos: Rótulo (texto, obrigatório), Tipo de função de pertinência (seleção: `trimf`, `trapmf`, `gaussmf`), Parâmetros (campos dinâmicos conforme o tipo escolhido).
+3. Usuário preenche todos os campos e clica em "Adicionar".
+4. **Sistema** valida: Rótulo não vazio; parâmetros numéricos coerentes para o tipo escolhido (ex.: para `trimf`, `a ≤ b ≤ c`); parâmetros dentro do universo de discurso da variável.
+5. **Sistema** envia POST para `/api/variables/{variable_id}/terms`.
+6. **Backend** persiste o registro em `fuzzy_terms` com `params` como JSONB.
+7. **Backend** retorna o objeto criado com HTTP 201.
+8. **Sistema** exibe o novo termo na lista e renderiza uma prévia do gráfico da função de pertinência atualizado.
 
 **Fluxos Alternativos**
 
-- **FA1 — Rótulo vazio (passo 7):** Sistema bloqueia e exibe erro inline. Retorna ao passo 4.
-- **FA2 — Parâmetros fora de ordem, ex.: a > b para trimf (passo 7):** Sistema exibe "Os parâmetros devem respeitar a ordenação a ≤ b ≤ c." Retorna ao passo 4.
-- **FA3 — sigma ≤ 0 para gaussmf (passo 7):** Sistema exibe "O desvio padrão deve ser maior que zero." Retorna ao passo 4.
-- **FA4 — Parâmetros fora do universo de discurso (passo 7):** Sistema exibe aviso não bloqueante "Os parâmetros excedem o universo de discurso [min, max]. Deseja prosseguir?" Usuário confirma ou corrige. Retorna ao passo 6 ou prossegue ao passo 8.
+- **FA1 — Rótulo já existe nesta variável (passo 4):** Sistema exibe "Já existe um termo com este rótulo nesta variável." Retorna ao passo 3.
+- **FA2 — Parâmetros incoerentes (passo 4):** Sistema exibe a regra violada (ex.: "Para trimf, os parâmetros devem satisfazer a ≤ b ≤ c"). Retorna ao passo 3.
+- **FA3 — Parâmetros fora do universo (passo 4):** Sistema exibe aviso "Os parâmetros extrapolam o universo de discurso [min, max]. Confirma mesmo assim?" Usuário pode prosseguir ou ajustar.
+- **FA4 — Falha no backend (passo 5):** Sistema exibe erro. Retorna ao passo 3.
 
 **Pós-condições**
 
-- Registro criado em `fuzzy_terms` associado ao `variable_id` correto.
-- O Editor de Variáveis exibe o novo termo com o gráfico da função de pertinência renderizado.
+- Novo registro em `fuzzy_terms` vinculado à variável.
+- O gráfico de pertinências da variável é atualizado na interface.
 
 ---
 
@@ -251,39 +246,29 @@
 | Campo | Descrição |
 |---|---|
 | **Atores** | Usuário (primário), Sistema (secundário) |
-| **Pré-condições** | Ao menos uma variável ou termo existe no sistema. Editor de Variáveis está aberto. |
+| **Pré-condições** | A variável ou o termo a ser removido existe no sistema. Usuário está no Editor de Variáveis. |
 
-**Fluxo Principal — Remover variável**
+**Fluxo Principal**
 
-1. Usuário localiza a variável que deseja remover no Editor de Variáveis.
-2. Usuário clica em "Remover" ao lado da variável.
-3. **Sistema** exibe diálogo de confirmação: "Remover a variável '[nome]' excluirá todos os seus termos e poderá tornar regras existentes inconsistentes. Confirmar?"
-4. Usuário clica em "Confirmar".
-5. **Sistema** envia DELETE para `/api/variables/{variable_id}`.
-6. **Backend** executa `DELETE` em `fuzzy_variables`; `ON DELETE CASCADE` remove todos os `fuzzy_terms` vinculados.
-7. **Backend** retorna status HTTP 204.
-8. **Sistema** remove o painel da variável do editor sem recarregar a página.
-
-**Fluxo Principal — Remover termo**
-
-1. Usuário localiza o termo que deseja remover dentro de uma variável no editor.
-2. Usuário clica em "Remover" ao lado do termo.
-3. **Sistema** exibe diálogo de confirmação simples: "Remover o termo '[rótulo]'?"
-4. Usuário clica em "Confirmar".
-5. **Sistema** envia DELETE para `/api/terms/{term_id}`.
-6. **Backend** executa `DELETE` em `fuzzy_terms`.
-7. **Backend** retorna status HTTP 204.
-8. **Sistema** remove o termo da listagem sem recarregar a página.
+1. Usuário clica no ícone de remoção ao lado de uma variável ou de um termo linguístico.
+2. **Sistema** exibe diálogo de confirmação informando o que será removido e, no caso de variável, avisa que todos os seus termos associados também serão excluídos.
+3. Usuário confirma a remoção.
+4. **Sistema** envia DELETE para `/api/variables/{id}` (para variável) ou `/api/terms/{id}` (para termo).
+5. **Backend** executa a exclusão; `ON DELETE CASCADE` remove os termos filhos quando a variável é excluída.
+6. **Backend** retorna HTTP 204.
+7. **Sistema** remove o item da listagem sem recarregar a página.
 
 **Fluxos Alternativos**
 
-- **FA1 — Usuário cancela o diálogo (passo 4 de qualquer fluxo):** Diálogo é fechado; nenhuma exclusão ocorre. Retorna ao passo 1 do fluxo correspondente.
-- **FA2 — Falha no backend (passo 5 de qualquer fluxo):** Sistema exibe mensagem de erro. Retorna ao passo 2 do fluxo correspondente.
+- **FA1 — Usuário cancela no diálogo (passo 3):** Diálogo é fechado; nada é excluído.
+- **FA2 — Variável referenciada em regras existentes (passo 4):** Backend retorna aviso. Sistema exibe "Esta variável é referenciada em [N] regras. Removê-la também invalidará essas regras. Confirma?" Usuário decide.
+- **FA3 — Falha no backend (passo 4):** Sistema exibe mensagem de erro. Item permanece na listagem.
 
 **Pós-condições**
 
-- O registro removido e seus dependentes (se houver) não existem mais no banco de dados.
-- O Editor de Variáveis reflete a remoção imediatamente.
+- O registro removido não existe mais no banco de dados.
+- Se uma variável foi removida, todos os seus `fuzzy_terms` também foram excluídos via CASCADE.
+- Regras que referenciavam a variável ou termo removido passam a falhar na validação (UC15).
 
 ---
 
@@ -294,30 +279,33 @@
 | Campo | Descrição |
 |---|---|
 | **Atores** | Usuário (primário), Sistema (secundário) |
-| **Pré-condições** | O sistema possui ao menos uma variável antecedente com ao menos um termo e uma variável consequente com ao menos um termo. Editor de Regras está aberto. |
+| **Pré-condições** | O sistema fuzzy possui ao menos uma variável antecedente com termos e uma variável consequente com termos. Usuário está no Editor de Regras. |
 
 **Fluxo Principal**
 
 1. Usuário clica em "Nova Regra" no Editor de Regras.
-2. **Sistema** exibe o construtor visual de regras com: dropdown por variável antecedente para selecionar o termo ("é [termo]") ou "qualquer"; seletor de operador lógico entre antecedentes (AND / OR); dropdown para o consequente (variável de saída e seu termo); campo de peso (float [0.0, 1.0], padrão: 1.0).
-3. **Sistema** exibe pré-visualização da regra em linguagem natural em tempo real. Exemplo: "SE Temperatura é Quente E Umidade é Alta ENTÃO Conforto é Desconfortável [peso: 1.0]".
-4. Usuário configura a regra e clica em "Adicionar Regra".
-5. **Sistema** valida: ao menos um antecedente foi selecionado (não é "qualquer"); consequente foi selecionado; peso está em [0.0, 1.0].
-6. **Sistema** gera a `rule_text` padronizada e envia POST para `/api/systems/{id}/rules`.
-7. **Backend** persiste em `fuzzy_rules` com `position` = (quantidade atual de regras + 1).
-8. **Backend** retorna o objeto criado com status HTTP 201.
-9. **Sistema** exibe a nova regra ao final da lista no Editor de Regras.
+2. **Sistema** exibe construtor visual de regra com: seletor de variável antecedente, seletor de termo (com opção NOT), conector (AND/OR), e seletor de consequente/termo.
+3. Usuário monta a regra selecionando antecedentes, conectores e consequente.
+4. Usuário opcionalmente ajusta o peso da regra (float entre 0.0 e 1.0; padrão: 1.0).
+5. Usuário clica em "Adicionar Regra".
+6. **Sistema** gera o texto da regra no formato: `IF [var] IS [NOT] [termo] AND/OR ... THEN [var] IS [termo]`.
+7. **Sistema** valida que a regra possui ao menos um antecedente e exatamente um consequente.
+8. **Sistema** envia POST para `/api/systems/{id}/rules` com `rule_text` e `weight`.
+9. **Backend** persiste o registro em `fuzzy_rules`.
+10. **Backend** retorna o objeto criado com HTTP 201.
+11. **Sistema** exibe a nova regra na lista do Editor de Regras na última posição.
 
 **Fluxos Alternativos**
 
-- **FA1 — Nenhum antecedente selecionado (passo 5):** Sistema exibe "Selecione ao menos uma condição antecedente." Retorna ao passo 3.
-- **FA2 — Consequente não selecionado (passo 5):** Sistema exibe "Selecione o termo consequente da regra." Retorna ao passo 3.
-- **FA3 — Peso fora de [0.0, 1.0] (passo 5):** Sistema corrige automaticamente para o limite mais próximo e exibe aviso. Retorna ao passo 4.
-- **FA4 — Falha no backend (passo 6):** Sistema exibe mensagem de erro. Retorna ao passo 4.
+- **FA1 — Nenhum antecedente selecionado (passo 7):** Sistema exibe "A regra precisa de ao menos uma condição (antecedente)." Retorna ao passo 3.
+- **FA2 — Nenhum consequente selecionado (passo 7):** Sistema exibe "A regra precisa de exatamente uma conclusão (consequente)." Retorna ao passo 3.
+- **FA3 — Regra idêntica já existe (passo 8):** Backend retorna conflito. Sistema exibe aviso "Esta regra já existe." Retorna ao passo 3.
+- **FA4 — Falha no backend (passo 8):** Sistema exibe erro. Retorna ao passo 5.
 
 **Pós-condições**
 
-- Novo registro em `fuzzy_rules` associado ao `system_id` com `rule_text`, `weight` e `position` definidos.
+- Novo registro em `fuzzy_rules` vinculado ao sistema.
+- A regra aparece listada no Editor de Regras.
 
 ---
 
@@ -328,30 +316,30 @@
 | Campo | Descrição |
 |---|---|
 | **Atores** | Usuário (primário), Sistema (secundário) |
-| **Pré-condições** | Ao menos uma regra existe no sistema. Editor de Regras está aberto. |
+| **Pré-condições** | Ao menos uma regra existe no sistema. Usuário está no Editor de Regras. |
 
 **Fluxo Principal**
 
-1. Usuário localiza a regra que deseja editar na listagem do Editor de Regras.
-2. Usuário clica em "Editar" ao lado da regra.
-3. **Sistema** busca os dados atuais da regra via GET `/api/rules/{rule_id}`.
-4. **Sistema** exibe o construtor visual pré-preenchido com os valores atuais (antecedentes, operador, consequente e peso).
-5. Usuário altera os campos desejados. A pré-visualização é atualizada em tempo real.
-6. Usuário clica em "Salvar".
-7. **Sistema** aplica as mesmas validações de UC08 (passo 5).
-8. **Sistema** envia PUT para `/api/rules/{rule_id}` com os novos dados.
-9. **Backend** executa `UPDATE` em `fuzzy_rules`, atualizando `rule_text` e os demais campos.
-10. **Backend** retorna o objeto atualizado com status HTTP 200.
-11. **Sistema** atualiza a exibição da regra na listagem.
+1. Usuário clica em "Editar" na regra desejada.
+2. **Sistema** carrega a regra no construtor visual, pré-preenchendo antecedentes, conectores, consequente e peso.
+3. Usuário altera os campos desejados.
+4. Usuário clica em "Salvar".
+5. **Sistema** valida a regra da mesma forma que UC08 (passo 7).
+6. **Sistema** envia PUT para `/api/rules/{id}` com os dados atualizados.
+7. **Backend** executa UPDATE em `fuzzy_rules`.
+8. **Backend** retorna o objeto atualizado com HTTP 200.
+9. **Sistema** atualiza a exibição da regra na lista.
 
 **Fluxos Alternativos**
 
-- **FA1 — Erros de validação (passo 7):** Comportamento idêntico a UC08. Retorna ao passo 5.
-- **FA2 — Usuário cancela (qualquer passo):** Nenhuma alteração é persistida. Editor de Regras exibe os valores anteriores. Retorna ao passo 1.
+- **FA1 — Validação falha (passo 5):** Mesmo tratamento de UC08-FA1/FA2.
+- **FA2 — Usuário cancela:** Construtor é fechado sem persistir alterações.
+- **FA3 — Falha no backend (passo 6):** Sistema exibe erro. Retorna ao passo 4.
 
 **Pós-condições**
 
-- O registro em `fuzzy_rules` reflete os novos valores definidos pelo usuário.
+- O registro em `fuzzy_rules` reflete as alterações do usuário.
+- A lista de regras exibe a versão atualizada.
 
 ---
 
@@ -362,29 +350,27 @@
 | Campo | Descrição |
 |---|---|
 | **Atores** | Usuário (primário), Sistema (secundário) |
-| **Pré-condições** | Ao menos uma regra existe. Editor de Regras está aberto. |
+| **Pré-condições** | Ao menos uma regra existe no sistema. Usuário está no Editor de Regras. |
 
 **Fluxo Principal**
 
-1. Usuário localiza a regra que deseja remover na listagem.
-2. Usuário clica em "Remover" ao lado da regra.
-3. **Sistema** exibe diálogo de confirmação: "Remover esta regra? Esta ação não pode ser desfeita."
-4. Usuário clica em "Confirmar".
-5. **Sistema** envia DELETE para `/api/rules/{rule_id}`.
-6. **Backend** executa `DELETE` em `fuzzy_rules`.
-7. **Backend** reordena o campo `position` das regras restantes.
-8. **Backend** retorna status HTTP 204.
-9. **Sistema** remove a regra da listagem e atualiza a numeração exibida.
+1. Usuário clica no ícone de remoção ao lado de uma regra.
+2. **Sistema** exibe diálogo de confirmação: "Remover esta regra? Esta ação não pode ser desfeita."
+3. Usuário confirma.
+4. **Sistema** envia DELETE para `/api/rules/{id}`.
+5. **Backend** remove o registro de `fuzzy_rules`.
+6. **Backend** retorna HTTP 204.
+7. **Sistema** remove a regra da lista.
 
 **Fluxos Alternativos**
 
-- **FA1 — Usuário cancela o diálogo (passo 4):** Diálogo é fechado; nenhuma exclusão ocorre. Retorna ao passo 1.
-- **FA2 — Falha no backend (passo 5):** Sistema exibe mensagem de erro. A regra permanece na listagem. Retorna ao passo 2.
+- **FA1 — Usuário cancela (passo 3):** Diálogo é fechado; regra permanece.
+- **FA2 — Falha no backend (passo 4):** Sistema exibe erro. Regra permanece na lista.
 
 **Pós-condições**
 
-- O registro em `fuzzy_rules` foi removido.
-- As demais regras têm seus campos `position` atualizados sequencialmente.
+- O registro da regra foi permanentemente removido de `fuzzy_rules`.
+- A lista de regras não exibe mais a regra excluída.
 
 ---
 
@@ -394,38 +380,33 @@
 
 | Campo | Descrição |
 |---|---|
-| **Atores** | Usuário (primário), Sistema / Frontend (secundário), Backend (secundário) |
-| **Pré-condições** | O sistema possui ao menos uma variável antecedente com termos, uma variável consequente com termos e ao menos uma regra cadastrada. A tela Simulador está aberta. |
+| **Atores** | Usuário (primário), Sistema (secundário), Backend (terciário) |
+| **Pré-condições** | O sistema fuzzy passou pela validação de UC15 (ao menos 1 antecedente com termos, 1 consequente com termos, ao menos 1 regra). Usuário está na tela Simulador. |
 
 **Fluxo Principal**
 
-1. Usuário visualiza os campos de input, um para cada variável antecedente, com o universo de discurso indicado como placeholder.
-2. Usuário informa um valor numérico crisp para cada variável antecedente. Exemplo: Temperatura = 38, Umidade = 75.
-3. Usuário clica em "Simular".
-4. **Sistema** aciona UC15 (Validar sistema) antes de prosseguir.
-5. **Sistema** envia POST para `/api/systems/{id}/simulate` com o objeto de inputs.
-6. **Backend** carrega a configuração completa do sistema (variáveis, termos, regras) do banco de dados.
-7. **Backend** executa o pipeline Mamdani via `logicfuzzy-academic`:
-   - **Fuzzificação:** calcula o grau de pertinência de cada input em cada termo de sua variável.
-   - **Avaliação de regras:** para cada regra, aplica o operador lógico (AND = mínimo, OR = máximo) e obtém o grau de ativação α.
-   - **Implicação:** corta a MF do consequente pelo grau de ativação α (implicação mínimo).
-   - **Agregação:** une (máximo) todos os consequentes ativados em um único conjunto fuzzy.
-   - **Defuzzificação:** aplica o método configurado (ex.: centroide) ao conjunto agregado e obtém o valor crisp de saída.
-8. **Backend** persiste a simulação em `simulations` com `inputs` e `outputs` em JSONB e `executed_at` com o timestamp atual.
-9. **Backend** retorna o resultado com status HTTP 201.
-10. **Sistema** exibe o valor de saída defuzzificado em destaque na tela.
-11. **Sistema** aciona UC13 para exibir o pipeline visual completo.
+1. **Sistema** exibe um campo de input para cada variável antecedente do sistema, com o universo de discurso indicado.
+2. Usuário preenche manualmente os valores numéricos para cada input.
+3. Usuário clica em "Executar Simulação".
+4. **Sistema** executa UC15 (validação).
+5. **Sistema** envia POST para `/api/systems/{id}/simulate` com `inputs: { [nome_var]: valor, ... }`.
+6. **Backend** instancia o `MamdaniEngine` do `logicfuzzy-academic`, configura variáveis e regras conforme o banco, injeta os inputs e executa `engine.compute()`.
+7. **Backend** persiste o resultado na tabela `simulations` com `inputs`, `outputs`, `executed_at`.
+8. **Backend** retorna o resultado completo (outputs crisp, dados de fuzzificação, graus de ativação de regras, conjunto agregado) com HTTP 200.
+9. **Sistema** exibe o valor de saída defuzzificado de forma destacada.
+10. **Sistema** renderiza automaticamente o painel de pipeline (UC13).
 
 **Fluxos Alternativos**
 
-- **FA1 — UC15 falha (passo 4):** Simulação bloqueada. Sistema exibe a mensagem de erro de UC15 e orienta o usuário à tela correspondente. Não retorna ao fluxo principal.
-- **FA2 — Input fora do universo de discurso (passo 2):** Sistema exibe aviso visual no campo e clampeia o valor ao limite ao enviar (passo 5). Prossegue ao passo 5 com valor corrigido.
-- **FA3 — Nenhuma regra ativa para os inputs fornecidos (passo 7):** Backend retorna aviso. Sistema exibe "Nenhuma regra foi ativada para estes valores. Ajuste os inputs ou a base de regras." Nenhuma simulação é persistida. Retorna ao passo 2.
-- **FA4 — Falha no backend (passo 5):** Sistema exibe mensagem de erro genérica. Nenhuma simulação é persistida. Retorna ao passo 3.
+- **FA1 — Input fora do universo de discurso (passo 2):** Sistema exibe aviso em tempo real ao lado do campo. Usuário pode prosseguir, mas o backend tratará o valor como inválido e retornará erro `InputOutOfRange`. Retorna ao passo 2.
+- **FA2 — Campo de input vazio (passo 3):** Sistema bloqueia o envio e destaca os campos não preenchidos. Retorna ao passo 2.
+- **FA3 — Validação UC15 falha (passo 4):** Simulação bloqueada; mensagem específica é exibida (ver UC15).
+- **FA4 — Nenhuma regra foi ativada — `NoRulesFired` (passo 6):** Backend retorna erro específico. Sistema exibe "Nenhuma regra foi ativada para estes valores de entrada. O sistema não pôde produzir uma saída." Retorna ao passo 2.
+- **FA5 — Falha no backend (passo 5):** Sistema exibe erro genérico. Retorna ao passo 3.
 
 **Pós-condições**
 
-- Novo registro em `simulations` com `system_id`, `inputs`, `outputs` e `executed_at`.
+- Um novo registro existe em `simulations` com os inputs, outputs e timestamp.
 - O valor de saída defuzzificado é exibido na tela do Simulador.
 - O pipeline visual (UC13) é renderizado automaticamente.
 
@@ -568,3 +549,91 @@
 
 - **Sucesso:** Pipeline de simulação de UC11 é iniciado a partir do passo 6.
 - **Falha:** Usuário recebe mensagem específica indicando qual requisito está faltando e é orientado à tela correspondente para corrigi-lo.
+
+---
+
+## UC16
+
+### Carregar dataset Parquet e executar inferência em lote
+
+| Campo | Descrição |
+|---|---|
+| **Atores** | Usuário (primário), Backend / Axum (secundário), Polars (ator interno) |
+| **Pré-condições** | Um sistema fuzzy válido está selecionado (passou em UC15). O usuário possui um arquivo `.parquet` com colunas numéricas mapeáveis às variáveis antecedentes do sistema. Colunas com nomes inválidos já foram renomeadas via UC17 (opcional). Usuário está no Dashboard Batch. |
+
+**Fluxo Principal**
+
+1. Usuário seleciona um sistema fuzzy no Dashboard Batch.
+2. **Sistema** exibe painel de upload e a lista de variáveis antecedentes do sistema selecionado.
+3. Usuário seleciona o arquivo `.parquet` e clica em "Carregar".
+4. **Sistema** valida localmente: extensão `.parquet`; tamanho ≤ limite configurado (padrão: 50 MB).
+5. **Sistema** lê os nomes das colunas do Parquet (via prévia no frontend) e exibe a interface de mapeamento: para cada variável antecedente do sistema, o usuário seleciona a coluna correspondente no dataset.
+6. Usuário confirma o mapeamento e clica em "Processar em Lote".
+7. **Sistema** envia POST para `/api/batch/upload` com o arquivo e o mapeamento de colunas via multipart form-data.
+8. **Backend** recebe o arquivo e executa em `spawn_blocking` (thread pool separado, sem bloquear o runtime Tokio):
+   - Lê o Parquet com Polars.
+   - Aplica o mapeamento de colunas recebido.
+   - Valida que as colunas mapeadas existem e são numéricas.
+   - Itera sobre cada linha do DataFrame.
+   - Para cada linha: injeta os valores mapeados como inputs no `MamdaniEngine`; executa `engine.compute()`; coleta o output defuzzificado.
+9. **Backend** persiste todos os resultados em `batch_results` em uma transação única.
+10. **Backend** retorna resumo com HTTP 200: linhas processadas, erros (`NoRulesFired`), distribuição dos outputs por faixa.
+11. **Sistema** exibe o resumo no Dashboard Batch: gráfico de distribuição, tabela dos N casos de maior output, total processado vs. erros.
+12. Usuário pode clicar em "Ver todos os resultados" para navegar pela tabela completa de `batch_results`.
+
+**Fluxos Alternativos**
+
+- **FA1 — Arquivo não é um Parquet válido (passo 8):** Backend retorna HTTP 422. Sistema exibe "O arquivo não é um Parquet válido ou está corrompido." Retorna ao passo 3.
+- **FA2 — Coluna mapeada ausente ou não numérica (passo 8):** Backend retorna HTTP 422 com detalhes. Sistema exibe "A coluna '[nome]' não foi encontrada ou não é numérica." Retorna ao passo 5.
+- **FA3 — Linhas com valores nulos ou fora do universo (passo 8):** Backend registra a linha com `error: true` em `batch_results.inputs` e prossegue. O resumo final informa quantas linhas foram puladas.
+- **FA4 — Todas as linhas falharam com `NoRulesFired` (passo 8):** Backend retorna HTTP 200 com `processed: N, errors: N`. Sistema exibe "Nenhuma linha gerou saída válida. Verifique se o sistema fuzzy está configurado para o intervalo de valores do dataset." Retorna ao passo 1.
+- **FA5 — Arquivo excede o limite de tamanho (passo 4):** Sistema exibe "O arquivo excede o tamanho máximo permitido (50 MB)." Não realiza upload. Retorna ao passo 3.
+- **FA6 — Falha na transação de persistência (passo 9):** Backend faz rollback. Sistema exibe "Erro ao salvar os resultados. Nenhum dado parcial foi gravado. Tente novamente." Retorna ao passo 6.
+- **FA7 — Sistema fuzzy não passou em UC15 (passo 1):** Sistema bloqueia a seleção e exibe "O sistema fuzzy selecionado está incompleto. Configure variáveis, termos e regras antes de processar em lote." Não permite prosseguir.
+
+**Pós-condições**
+
+- Os resultados de todas as linhas processadas com sucesso estão persistidos em `batch_results`, vinculados ao `system_id` e ao arquivo fonte (`source_file`).
+- O Dashboard Batch exibe a distribuição dos outputs e os casos de maior criticidade.
+- O usuário pode acessar os resultados em sessões futuras via consulta a `batch_results`.
+
+---
+
+## UC17
+
+### Renomear colunas do Parquet via dashboard
+
+| Campo | Descrição |
+|---|---|
+| **Atores** | Usuário (primário), Sistema / Frontend (secundário) |
+| **Pré-condições** | Um arquivo `.parquet` foi carregado ou está em processo de carregamento no Dashboard Batch (UC16, passo 3–5). O dataset contém colunas com nomes que possuem caracteres especiais, espaços ou abreviações incompatíveis com as variáveis fuzzy do sistema. |
+
+> Este caso de uso é executado dentro do fluxo do UC16, antes do mapeamento de colunas (passo 5). Toda a operação ocorre no frontend — nenhuma persistência no banco de dados é realizada; o mapeamento é mantido em memória durante a sessão de upload.
+
+**Fluxo Principal**
+
+1. Após carregar o arquivo `.parquet` (UC16, passo 3), **Sistema** exibe a tabela de colunas detectadas: nome original da coluna, tipo inferido (float, int, string) e prévia dos primeiros valores.
+2. Usuário identifica uma coluna com nome inválido ou incompatível (ex.: `"impacto financeiro ($)"`, `"imp_fin_2024"`, `"coluna com espaço"`).
+3. Usuário clica no campo de nome editável ao lado da coluna desejada.
+4. **Sistema** habilita o campo de texto com o nome original pré-preenchido.
+5. Usuário digita o novo nome normalizado (ex.: `"impacto_financeiro"`).
+6. **Sistema** valida o novo nome em tempo real: apenas letras, números e underscores são permitidos; o nome não pode estar em branco nem duplicar outro nome já atribuído na sessão.
+7. Usuário confirma pressionando Enter ou clicando fora do campo.
+8. **Sistema** atualiza o nome exibido na tabela com o novo valor e marca a coluna como "renomeada" visualmente.
+9. Usuário repete os passos 3–8 para quantas colunas desejar.
+10. Após concluir as renomeações, usuário prossegue para o mapeamento de colunas (UC16, passo 5), onde os novos nomes já aparecem como opções disponíveis.
+
+**Fluxos Alternativos**
+
+- **FA1 — Nome inválido (caracteres especiais) (passo 6):** Sistema exibe inline "Use apenas letras, números e underscores." O campo fica em estado de erro até correção. Retorna ao passo 5.
+- **FA2 — Nome duplicado (passo 6):** Sistema exibe "Este nome já está em uso por outra coluna." Retorna ao passo 5.
+- **FA3 — Nome em branco (passo 6):** Sistema exibe "O nome não pode ser vazio." Retorna ao passo 5.
+- **FA4 — Usuário deseja desfazer a renomeação (passo 8):** Usuário clica em "Restaurar original" ao lado da coluna. **Sistema** reverte o nome para o valor original do Parquet. Retorna ao passo 1.
+- **FA5 — Usuário não renomeia nenhuma coluna:** Todos os nomes originais são utilizados diretamente no mapeamento de UC16. O UC17 é opcional.
+
+**Pós-condições**
+
+- O mapeamento de renomeação está armazenado em memória no frontend (estrutura `coluna_original → nome_normalizado`).
+- As colunas renomeadas aparecem com seus novos nomes na interface de mapeamento do UC16.
+- Nenhuma alteração é persistida no banco de dados; o arquivo Parquet original não é modificado.
+- Ao encerrar ou cancelar o upload, o mapeamento de renomeação é descartado.
