@@ -69,7 +69,7 @@ CREATE TABLE batch_results (
 
 ## Integração com API Externa — OpenWeather
 
-A [OpenWeather Current Weather API](https://openweathermap.org/current) fornece temperatura (°C) e umidade (%) de qualquer cidade em tempo real, usadas como inputs automáticos do sistema fuzzy no Simulador (UC12).
+A [OpenWeather Current Weather API](https://openweathermap.org/current) fornece temperatura (°C) e umidade (%) de qualquer cidade em tempo real, usadas como inputs automáticos do sistema fuzzy no Simulador (UC05).
 
 ```
 GET https://api.openweathermap.org/data/2.5/weather?q=Belém&appid={API_KEY}&units=metric

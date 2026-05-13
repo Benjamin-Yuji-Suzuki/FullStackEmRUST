@@ -1,3 +1,5 @@
+pub mod server_fns;
+
 use leptos::prelude::*;
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
 use leptos_router::{
@@ -42,11 +44,14 @@ pub fn App() -> impl IntoView {
                 <Sidebar/>
                 <div class="main">
                     <Routes fallback=|| view! { <NotFound/> }>
-                        <Route path=StaticSegment("")      view=Dashboard/>
-                        <Route path=StaticSegment("vars")  view=Variaveis/>
-                        <Route path=StaticSegment("rules") view=Regras/>
-                        <Route path=StaticSegment("sim")   view=Simulador/>
-                        <Route path=StaticSegment("hist")  view=Historico/>
+                        <Route path=StaticSegment("")       view=Dashboard/>
+                        <Route path=StaticSegment("vars")   view=Variaveis/>
+                        <Route path=StaticSegment("rules")  view=Regras/>
+                        <Route path=StaticSegment("sim")    view=Simulador/>
+                        <Route path=StaticSegment("hist")   view=Historico/>
+                        <Route path=StaticSegment("batch")  view=BatchDashboard/>
+                        <Route path=StaticSegment("analysis") view=Analise/>
+                        <Route path=StaticSegment("audit")  view=Auditoria/>
                     </Routes>
                 </div>
             </div>
@@ -96,10 +101,26 @@ fn Sidebar() -> impl IntoView {
                     <i class="ti ti-history nav-icon"></i>
                     "Histórico"
                 </a>
+                <a class="nav-item" href="/batch">
+                    <i class="ti ti-database nav-icon"></i>
+                    "Batch"
+                </a>
+            </nav>
+
+            <nav class="nav-section">
+                <div class="nav-label">"Análise"</div>
+                <a class="nav-item" href="/analysis">
+                    <i class="ti ti-chart-grid-dots nav-icon"></i>
+                    "Superfície & Matriz"
+                </a>
+                <a class="nav-item" href="/audit">
+                    <i class="ti ti-history-toggle nav-icon"></i>
+                    "Auditoria"
+                </a>
             </nav>
 
             <div class="sidebar-footer">
-                <span class="sprint-badge">"⬡ Sprint 1 — Estrutura"</span>
+                <span class="sprint-badge">"⬡ Sprint 2 — CRUDs + API"</span>
                 <div class="sidebar-course">"Disciplina QPS · CESUPA"</div>
             </div>
         </aside>
@@ -129,7 +150,7 @@ fn Topbar(breadcrumb: &'static str) -> impl IntoView {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Dashboard
+// Dashboard (static data — frontend integration via API TBD)
 // ─────────────────────────────────────────────────────────────
 #[component]
 fn Dashboard() -> impl IntoView {
@@ -137,7 +158,6 @@ fn Dashboard() -> impl IntoView {
         <Topbar breadcrumb="Dashboard"/>
         <div class="content">
 
-            // ── timeline sprints
             <div class="sprint-timeline">
                 <div class="sprint-block done">
                     <div class="sprint-num">"Sprint 1"</div>
@@ -159,7 +179,6 @@ fn Dashboard() -> impl IntoView {
                 </div>
             </div>
 
-            // ── KPIs
             <div class="kpi-grid">
                 <KpiCard label="Sistemas"   value="3"  unit="cadastrados"/>
                 <KpiCard label="Variáveis"  value="14" unit="antec. + conseq."/>
@@ -167,12 +186,19 @@ fn Dashboard() -> impl IntoView {
                 <KpiCard label="Simulações" value="81" unit="executadas"/>
             </div>
 
-            // ── lista de sistemas
             <div class="section-header">
-                <div class="section-title">"Sistemas Fuzzy"</div>
-                <button class="btn btn-primary" style="font-size:10px;padding:5px 12px">
-                    <i class="ti ti-plus"></i>"Criar Sistema"
-                </button>
+                <div class="section-title">"Sistemas Fuzzy (UC01)"</div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn" style="font-size:10px;padding:5px 10px">
+                        <i class="ti ti-copy"></i>"Duplicar (UC10)"
+                    </button>
+                    <button class="btn" style="font-size:10px;padding:5px 10px">
+                        <i class="ti ti-upload"></i>"Importar (UC11)"
+                    </button>
+                    <button class="btn btn-primary" style="font-size:10px;padding:5px 12px">
+                        <i class="ti ti-plus"></i>"Criar Sistema"
+                    </button>
+                </div>
             </div>
 
             <div class="systems-grid">
@@ -266,7 +292,7 @@ fn Variaveis() -> impl IntoView {
         <div class="content">
             <div class="section-header" style="margin-bottom:16px">
                 <div>
-                    <div class="section-title" style="margin-bottom:3px">"Variáveis & Termos Linguísticos"</div>
+                    <div class="section-title" style="margin-bottom:3px">"Variáveis & Termos Linguísticos (UC02)"</div>
                     <div style="font-size:11px;color:var(--text3)">
                         "Sistema: " <span style="color:var(--amber)">"Conforto Térmico Urbano"</span>
                     </div>
@@ -403,7 +429,7 @@ fn Regras() -> impl IntoView {
         <div class="content">
             <div class="section-header" style="margin-bottom:16px">
                 <div>
-                    <div class="section-title" style="margin-bottom:3px">"Editor de Regras Fuzzy"</div>
+                    <div class="section-title" style="margin-bottom:3px">"Editor de Regras Fuzzy (UC03)"</div>
                     <div style="font-size:11px;color:var(--text3)">
                         "Sistema: " <span style="color:var(--amber)">"Conforto Térmico Urbano"</span>
                         " · 9 regras"
@@ -535,6 +561,7 @@ fn Simulador() -> impl IntoView {
                     <div class="section-title" style="margin-bottom:3px">"Simulador Mamdani"</div>
                     <div style="font-size:11px;color:var(--text3)">
                         "Sistema: " <span style="color:var(--amber)">"Conforto Térmico Urbano"</span>
+                        " · UC04 · UC05 · UC12 · UC13"
                     </div>
                 </div>
             </div>
@@ -543,7 +570,7 @@ fn Simulador() -> impl IntoView {
                 // ── coluna esquerda: entradas
                 <div>
                     <div class="panel">
-                        <div class="panel-title">"Entradas climáticas"</div>
+                        <div class="panel-title">"Entradas climáticas (UC04)"</div>
 
                         <div class="weather-card">
                             <div class="weather-icon">"🌦"</div>
@@ -552,7 +579,7 @@ fn Simulador() -> impl IntoView {
                                 <div class="weather-vals">
                                     "Temp: " <span>"32.4°C"</span>
                                     " · Umidade: " <span>"88%"</span>
-                                    " · via OpenWeather"
+                                    " · via OpenWeather (UC05)"
                                 </div>
                             </div>
                             <button class="btn" style="margin-left:auto;font-size:10px;padding:5px 10px">
@@ -560,13 +587,10 @@ fn Simulador() -> impl IntoView {
                             </button>
                         </div>
 
-                        // slider temperatura
                         <div class="input-group">
                             <label class="input-label">"Temperatura"</label>
                             <div class="input-row">
-                                <input
-                                    type="range" class="range-input"
-                                    min="0" max="50"
+                                <input type="range" class="range-input" min="0" max="50"
                                     prop:value=move || temp.get()
                                     on:input=move |e| {
                                         let v = event_target_value(&e).parse::<i32>().unwrap_or(25);
@@ -577,13 +601,10 @@ fn Simulador() -> impl IntoView {
                             </div>
                         </div>
 
-                        // slider umidade
                         <div class="input-group">
                             <label class="input-label">"Umidade Relativa"</label>
                             <div class="input-row">
-                                <input
-                                    type="range" class="range-input"
-                                    min="0" max="100"
+                                <input type="range" class="range-input" min="0" max="100"
                                     prop:value=move || hum.get()
                                     on:input=move |e| {
                                         let v = event_target_value(&e).parse::<i32>().unwrap_or(50);
@@ -599,9 +620,19 @@ fn Simulador() -> impl IntoView {
                             "Executar Simulação"
                         </button>
                     </div>
+
+                    <div class="panel" style="margin-top:12px">
+                        <div class="panel-title">"Cenários Salvos (UC12)"</div>
+                        <div style="font-size:11px;color:var(--text3);padding:8px 0">
+                            "Salve combinações de inputs para reuso rápido."
+                        </div>
+                        <button class="btn" style="font-size:10px;padding:4px 10px">
+                            <i class="ti ti-plus"></i>"Salvar Cenário Atual"
+                        </button>
+                    </div>
                 </div>
 
-                // ── coluna direita: resultado
+                // ── coluna direita: resultado + análises
                 <div>
                     <div class="panel">
                         <div class="panel-title">"Resultado da Inferência"</div>
@@ -653,6 +684,16 @@ fn Simulador() -> impl IntoView {
                             </span>
                         </div>
                     </div>
+
+                    <div class="panel" style="margin-top:12px">
+                        <div class="panel-title">"Varredura de Entrada (UC13)"</div>
+                        <div style="font-size:11px;color:var(--text3);padding:8px 0">
+                            "Varie uma entrada no intervalo e visualize a curva saída × entrada."
+                        </div>
+                        <button class="btn" style="font-size:10px;padding:4px 10px">
+                            <i class="ti ti-chart-line"></i>"Executar Varredura"
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -669,9 +710,14 @@ fn Historico() -> impl IntoView {
         <div class="content">
             <div class="section-header" style="margin-bottom:16px">
                 <div class="section-title">"Histórico de Simulações"</div>
-                <button class="btn" style="font-size:10px;padding:5px 12px">
-                    <i class="ti ti-download"></i>"Exportar CSV"
-                </button>
+                <div style="display:flex;gap:8px">
+                    <button class="btn" style="font-size:10px;padding:5px 12px">
+                        <i class="ti ti-arrows-left-right"></i>"Comparar (UC08)"
+                    </button>
+                    <button class="btn" style="font-size:10px;padding:5px 12px">
+                        <i class="ti ti-download"></i>"Exportar Relatório (UC09)"
+                    </button>
+                </div>
             </div>
 
             <div class="hist-wrap">
@@ -752,6 +798,92 @@ fn HistRow(
             <td>{date}</td>
             <td><button class="icon-btn"><i class="ti ti-eye"></i></button></td>
         </tr>
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Batch Dashboard (UC07)
+// ─────────────────────────────────────────────────────────────
+#[component]
+fn BatchDashboard() -> impl IntoView {
+    view! {
+        <Topbar breadcrumb="Inferência em Lote"/>
+        <div class="content">
+            <div class="section-header" style="margin-bottom:16px">
+                <div class="section-title">"Processar Inferência em Lote (UC07)"</div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">"Upload de Arquivo"</div>
+                <div style="border:2px dashed var(--border);border-radius:8px;padding:40px;text-align:center;margin-bottom:16px">
+                    <i class="ti ti-upload" style="font-size:32px;color:var(--text3)"></i>
+                    <div style="margin-top:8px;color:var(--text3);font-size:12px">
+                        "Arraste um arquivo .parquet ou clique para selecionar"
+                    </div>
+                </div>
+                <div class="panel-title">"Mapeamento de Colunas"</div>
+                <div style="color:var(--text3);font-size:11px;padding:16px 0">
+                    "Selecione um sistema e um arquivo para iniciar o mapeamento."
+                </div>
+            </div>
+        </div>
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Análise (UC14 — Matriz de Regras, UC15 — Superfície)
+// ─────────────────────────────────────────────────────────────
+#[component]
+fn Analise() -> impl IntoView {
+    view! {
+        <Topbar breadcrumb="Análise"/>
+        <div class="content">
+            <div class="section-header" style="margin-bottom:16px">
+                <div class="section-title">"Superfície de Controle e Matriz de Regras"</div>
+            </div>
+            <div class="sim-layout">
+                <div>
+                    <div class="panel">
+                        <div class="panel-title">"Superfície de Controle (UC15)"</div>
+                        <div style="padding:40px 0;text-align:center;color:var(--text3);font-size:12px">
+                            <i class="ti ti-chart-heatmap" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                            "Selecione duas variáveis de entrada e gere o mapa de calor."
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="panel">
+                        <div class="panel-title">"Matriz de Regras Ativadas (UC14)"</div>
+                        <div style="padding:40px 0;text-align:center;color:var(--text3);font-size:12px">
+                            <i class="ti ti-grid-dots" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                            "Execute uma simulação para visualizar a matriz."
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auditoria (UC16)
+// ─────────────────────────────────────────────────────────────
+#[component]
+fn Auditoria() -> impl IntoView {
+    view! {
+        <Topbar breadcrumb="Auditoria"/>
+        <div class="content">
+            <div class="section-header" style="margin-bottom:16px">
+                <div class="section-title">"Histórico de Alterações"</div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">"Timeline do Sistema"</div>
+                <div style="padding:40px 0;text-align:center;color:var(--text3);font-size:12px">
+                    <i class="ti ti-history" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                    "Navegue pelo histórico de alterações do sistema.<br/>
+                    Use Ctrl+Z / Ctrl+Shift+Z para desfazer e refazer."
+                </div>
+            </div>
+        </div>
     }
 }
 

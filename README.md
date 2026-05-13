@@ -63,41 +63,41 @@ FullStackEmRUST/
 
 ## Telas da Aplicação
 
-| # | Tela | Entidade principal | Operações |
+| # | Tela | UCs | Operações |
 |---|---|---|---|
-| 1 | Dashboard | `fuzzy_systems` | Listar, criar, editar, excluir sistemas |
-| 2 | Editor de Variáveis | `fuzzy_variables` + `fuzzy_terms` | Adicionar/remover variáveis e termos linguísticos |
-| 3 | Editor de Regras | `fuzzy_rules` | Criar, editar, reordenar, excluir regras |
-| 4 | Simulador | `simulations` | Executar simulação manual, buscar dados OpenWeather |
-| 5 | Histórico | `simulations` | Listar, expandir detalhes, excluir registros |
-| 6 | Dashboard Batch | `batch_results` | Upload de Parquet, mapeamento de colunas, execução em lote, visualização de resultados |
-| 7 | Gerenciamento de Variáveis do Dataset | `parquet_columns` (frontend) | Renomear colunas do Parquet para variáveis fuzzy, normalizar nomes com caracteres especiais |
+| 1 | Dashboard | UC01, UC10, UC11 | CRUD sistemas, duplicar, exportar/importar |
+| 2 | Editor de Variáveis | UC02 | CRUD variáveis e termos linguísticos |
+| 3 | Editor de Regras | UC03 | CRUD regras fuzzy |
+| 4 | Simulador | UC04, UC05, UC12, UC13 | Simular, clima, cenários, varredura |
+| 5 | Histórico | UC06, UC08, UC09 | Listar, comparar, exportar, excluir |
+| 6 | Dashboard Batch | UC07 | Upload Parquet, mapeamento, inferência em lote |
+| 7 | Análise | UC14, UC15 | Matriz de regras, superfície de controle |
+| 8 | Timeline do Sistema | UC16 | Histórico de alterações, desfazer/refazer |
 
 ---
 
-## Casos de Uso (17)
+## Casos de Uso (16)
 
 Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
 
-| ID | Nome | Tela |
+| ID | Nome | Ator(es) |
 |---|---|---|
-| UC01 | Criar novo sistema fuzzy | Dashboard |
-| UC02 | Editar metadados de um sistema | Dashboard |
-| UC03 | Excluir sistema fuzzy | Dashboard |
-| UC04 | Adicionar variável antecedente | Editor de Variáveis |
-| UC05 | Adicionar variável consequente | Editor de Variáveis |
-| UC06 | Adicionar termo linguístico a uma variável | Editor de Variáveis |
-| UC07 | Remover variável ou termo | Editor de Variáveis |
-| UC08 | Criar regra fuzzy via interface visual | Editor de Regras |
-| UC09 | Editar regra existente | Editor de Regras |
-| UC10 | Remover regra | Editor de Regras |
-| UC11 | Executar simulação com inputs manuais | Simulador |
-| UC12 | Buscar dados climáticos reais via OpenWeather | Simulador |
-| UC13 | Visualizar pipeline completo da simulação | Simulador |
-| UC14 | Consultar histórico de simulações | Histórico |
-| UC15 | Validar sistema antes de executar | Sistema (automático) |
-| UC16 | Carregar dataset Parquet e executar inferência em lote | Dashboard Batch |
-| UC17 | Renomear colunas do Parquet via dashboard para normalizar nomes | Gerenciamento de Variáveis do Dataset |
+| UC01 | Gerenciar Sistemas Fuzzy | Usuário |
+| UC02 | Gerenciar Variáveis e Termos | Usuário |
+| UC03 | Gerenciar Regras Fuzzy | Usuário |
+| UC04 | Executar Simulação | Usuário |
+| UC05 | Buscar Dados Climáticos | Usuário, OpenWeather API |
+| UC06 | Consultar Histórico de Simulações | Usuário |
+| UC07 | Processar Inferência em Lote | Usuário |
+| UC08 | Comparar Simulações | Usuário |
+| UC09 | Exportar Relatório de Simulação | Usuário |
+| UC10 | Duplicar Sistema Fuzzy | Usuário |
+| UC11 | Exportar e Importar Sistema | Usuário |
+| UC12 | Salvar Cenário de Simulação | Usuário |
+| UC13 | Executar Varredura de Entrada | Usuário |
+| UC14 | Visualizar Matriz de Regras Ativadas | Usuário |
+| UC15 | Visualizar Superfície de Controle | Usuário |
+| UC16 | Gerenciar Histórico de Alterações | Usuário |
 
 ---
 
@@ -172,7 +172,7 @@ Projeto integrado ao [SonarQube Cloud](https://sonarcloud.io/project/overview?id
 
 | Documento | Conteúdo |
 |---|---|
-| [USE_CASES.md](./USE_CASES.md) | Especificação completa dos 17 casos de uso |
+| [USE_CASES.md](./USE_CASES.md) | Especificação completa dos 16 casos de uso |
 | [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Variáveis, universos, funções de pertinência, base de regras e cenários de teste |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Modelagem do banco, integrações (OpenWeather + Parquet) e fluxo de dados |
 

@@ -14,5 +14,16 @@ axum.workspace = true
 simple_logger.workspace = true
 tokio.workspace = true
 tower.workspace = true
-tower-http.workspace = true
+tower-http = { workspace = true, features = ["cors", "fs"] }
 log.workspace = true
+thiserror.workspace = true
+
+sqlx.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+leptos_config = "0.8.2"
+dotenvy = "0.15"
+mime_guess = "2"
