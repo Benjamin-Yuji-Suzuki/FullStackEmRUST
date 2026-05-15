@@ -1,6 +1,6 @@
 # FuzzySimulated
 
-> Plataforma web full-stack para construção, persistência e simulação de Sistemas de Inferência Fuzzy Mamdani — com visualização interativa e análise de datasets de cibersegurança via upload de Parquet.
+> Plataforma web full-stack para construção, persistência e simulação de Sistemas de Inferência Fuzzy Mamdani — com visualização interativa, histórico e auditoria.
 
 **Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 01/2026  
 **Modalidade (IA):** Opção B — Aplicação/Produto baseado em Controle Fuzzy  
@@ -17,8 +17,8 @@ O projeto é composto por dois repositórios:
 
 | Repositório | Função | Tecnologias |
 |---|---|---|
-| [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) | Motor de inferência Mamdani puro, publicado como crate open-source | Rust puro |
-| [`FullStackEmRUST`](https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST) ← **este repo** | Plataforma web que consome o motor fuzzy | Leptos · Axum · PostgreSQL |
+| [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) | Motor de inferência Mamdani/TSK/PSO, publicado como crate | Rust puro |
+| [`FullStackEmRUST`](https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST) ← **este repo** | Plataforma web full-stack (simulação atualmente via mock) | Leptos · Axum · PostgreSQL |
 
 ---
 
@@ -26,12 +26,12 @@ O projeto é composto por dois repositórios:
 
 | Camada | Tecnologia | Justificativa |
 |---|---|---|
-| Frontend | [Leptos 0.8](https://leptos.dev/) (Rust → WASM) | Framework reativo em Rust; SSR + hydration; consistência total de linguagem |
+| Frontend | [Leptos 0.8](https://leptos.dev/) (Rust → WASM) | Framework reativo em Rust; SSR + hydration; `gloo-net` para HTTP no WASM |
 | Backend | [Axum 0.8](https://github.com/tokio-rs/axum) (Rust) | Framework assíncrono; integração nativa com Tokio |
 | Banco de dados | PostgreSQL | Relacional robusto; JSONB para termos fuzzy flexíveis |
 | ORM | [SQLx](https://github.com/launchbadge/sqlx) | Queries verificadas em tempo de compilação |
-| Motor Fuzzy | [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) | Implementação Mamdani pura em Rust, publicada no crates.io |
-| Pipeline de dados | [Polars](https://github.com/pola-rs/polars) (Rust) | Processamento de DataFrames em Rust; leitura de Parquet no backend |
+| Motor Fuzzy | [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) | Implementação Mamdani/TSK/PSO (pendente de integração — atualmente mock) |
+| API Externa | [OpenWeather API](https://openweathermap.org/api) | Temperatura e umidade reais por cidade |
 | API Externa | [OpenWeather API](https://openweathermap.org/api) | Temperatura e umidade reais por cidade |
 | Build | [cargo-leptos](https://github.com/leptos-rs/cargo-leptos) | Gerencia WASM + servidor em um único comando |
 | Qualidade | [SonarQube Cloud](https://sonarcloud.io) | Análise estática: complexidade, duplicação, code smells, vulnerabilidades |
@@ -139,11 +139,11 @@ cd FullStackEmRUST/fuzzysimulated
 
 ### 2. Configurar variáveis de ambiente
 
-```bash
-cp .env.example .env
-# Edite .env:
-# DATABASE_URL=postgres://user:password@localhost/fuzzysimulated
-# OPENWEATHER_API_KEY=sua_chave_aqui
+Crie o arquivo `.env` em `fuzzysimulated/`:
+
+```env
+DATABASE_URL=postgres://user:password@localhost/fuzzysimulated
+OPENWEATHER_API_KEY=sua_chave_aqui
 ```
 
 ### 3. Criar o banco de dados
@@ -191,9 +191,9 @@ npx playwright test
 
 > ⚠️ Testes E2E ainda não implementados (esboço em `end2end/tests/example.spec.ts`).
 
-### Qualidade estática — SonarQube Cloud
+### Qualidade estática — SonarQube Cloud (planejado)
 
-Projeto integrado ao [SonarQube Cloud](https://sonarcloud.io/project/overview?id=Benjamin-Yuji-Suzuki_FullStackEmRUST). Métricas monitoradas: complexidade ciclomática, duplicação de código, code smells e vulnerabilidades de segurança.
+> ⚠️ Integração com SonarQube Cloud pendente para Sprint 3. Atualmente sem análise automática.
 
 ---
 
