@@ -214,9 +214,7 @@ Conforme exigido pela disciplina de Inteligência Artificial e Computacional, de
 
 | Ferramenta | Finalidade | Prompt/Comando resumido | Revisão da equipe |
 |---|---|---|---|
-| Claude (Anthropic) / opencode | Desenvolvimento de código (componentes Leptos, rotas Axum, testes Rust), estruturação de documentação, correção de bugs de compilação, debug de WASM/SSR | "Implementar página de variáveis", "corrigir erro Pool not initialized", "criar rotas REST para rules", "debug MIME types WASM", "converter HTML/JS para 100% Rust" | Todo código gerado foi revisado, testado (cargo check + cargo test) e validado quanto à correção funcional antes de incorporar ao repositório |
-| Gemini Pro (Google) | Ideação de arquitetura — sugestão de integrar pipeline de dados ao ecossistema fullstack | "Como estruturar um projeto fullstack Rust com Leptos + Axum + fuzzy inference?" | Ideia avaliada criticamente e adaptada pelo autor conforme viabilidade técnica |
-| ChatGPT (OpenAI) | Esclarecimento de conceitos de lógica fuzzy (Mamdani, TSK, PSO) e revisão de documentação | "Diferença entre Mamdani e TSK", "como documentar casos de uso UML" | Conteúdo revisado e adaptado ao contexto do projeto |
+| opencode (DeepSeek V4) | Desenvolvimento de código (componentes Leptos, rotas Axum, testes Rust), estruturação de documentação, correção de bugs de compilação, debug de WASM/SSR | "Implementar página de variáveis", "corrigir erro Pool not initialized", "criar rotas REST para rules", "debug MIME types WASM", "converter HTML/JS para 100% Rust" | Todo código gerado foi revisado, testado (cargo check + cargo test) e validado quanto à correção funcional antes de incorporar ao repositório |
 
 **Nota:** O uso de IA não substitui o domínio conceitual da equipe. Todos os integrantes compreendem e são capazes de explicar cada parte do código, modelo fuzzy e decisões de arquitetura.
 
