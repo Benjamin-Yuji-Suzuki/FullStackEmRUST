@@ -60,6 +60,7 @@ pub fn App() -> impl IntoView {
                         <Route path=StaticSegment("sys/create-form") view=CreateSystemForm/>
                         <Route path=StaticSegment("add-var") view=AddVarPage/>
                         <Route path=StaticSegment("add-term") view=AddTermPage/>
+                        <Route path=StaticSegment("add-rule") view=AddRulePage/>
                         <Route path=StaticSegment("vars")   view=Variaveis/>
                         <Route path=StaticSegment("rules")  view=Regras/>
                         <Route path=StaticSegment("sim")    view=Simulador/>
@@ -483,44 +484,68 @@ fn Variaveis() -> impl IntoView {
     }
 }
 
- fn Regras() -> impl IntoView {
-     let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
-     let selected_sys = RwSignal::new(String::new());
-     let rules = RwSignal::new(Vec::<serde_json::Value>::new());
+  fn Regras() -> impl IntoView {
+      let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+      let selected_sys = RwSignal::new(String::new());
+      let rules = RwSignal::new(Vec::<serde_json::Value>::new());
 
-    spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+      let load_rules = {
+          let ss = selected_sys.clone(); let r = rules.clone();
+          move || { let s = ss.get(); if !s.is_empty() { let r2 = r.clone(); spawn_async(async move { r2.set(serde_json::to_value(list_rules(&s).await).unwrap_or_default().as_array().cloned().unwrap_or_default()); }); } }
+      };
 
-    view! {
-        <Topbar breadcrumb="Editor de Regras"/>
-        <div class="content">
-            <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Editor de Regras (UC03)"</div></div>
-            <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
-                <label class="input-label">"Sistema"</label>
-                <select class="text-input" style="margin-bottom:0"
-                    on:change=move |e| {
-                        let sid = event_target_value(&e);
-                        selected_sys.set(sid.clone());
-                        let r = rules.clone();
-                        spawn_async(async move { r.set(serde_json::to_value(list_rules(&sid).await).unwrap_or_default().as_array().cloned().unwrap_or_default()); });
-                    }>
-                     <option value="">"— Selecione —"</option>
-                     {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
-                 </select>
-             </div>
-             {move || {
-                 let rs = rules.get();
-                 if rs.is_empty() { return view! { <div class="empty-state">"Selecione um sistema para ver as regras."</div> }.into_any(); }
-                 view! {
-                     <div class="rule-hint">"Formato: SE &lt;variável&gt; É &lt;termo&gt; E ... ENTÃO &lt;variável&gt; É &lt;termo&gt; [peso]"</div>
-                     {rs.iter().map(|r| {
-                         let text = r["rule_text"].as_str().unwrap_or("").to_string();
-                         view! { <div class="rule-row"><div class="rule-num">{r["position"].as_i64().unwrap_or(0)}</div><div class="rule-text">"SE " {text}</div><div class="rule-weight">"w=" {r["weight"].as_f64().unwrap_or(1.0)}</div></div> }
-                     }).collect_view()}
-                 }.into_any()
-             }}
-         </div>
-     }
- }
+      spawn_async({
+          let sl = systems_list.clone(); let ss = selected_sys.clone(); let r = rules.clone();
+          async move {
+              sl.set(list_systems().await);
+              #[cfg(target_arch = "wasm32")]
+              if let Some(s) = web_sys::window().and_then(|w| w.location().search().ok()) {
+                  if let Some(id) = s.split("s=").nth(1).and_then(|x| x.split('&').next()) {
+                      if !id.is_empty() { ss.set(id.to_string()); r.set(serde_json::to_value(list_rules(id).await).unwrap_or_default().as_array().cloned().unwrap_or_default()); }
+                  }
+              }
+          }
+      });
+
+      view! {
+          <Topbar breadcrumb="Editor de Regras"/>
+          <div class="content">
+              <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Editor de Regras (UC03)"</div></div>
+              <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
+                  <label class="input-label">"Sistema"</label>
+                  <select class="text-input" style="margin-bottom:0"
+                      prop:value=move || selected_sys.get()
+                      on:change=move |e| { selected_sys.set(event_target_value(&e)); load_rules(); }>
+                      <option value="">"— Selecione —"</option>
+                      {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                  </select>
+              </div>
+              {move || {
+                  let sid = selected_sys.get();
+                  if sid.is_empty() { return view! { <div class="empty-state">"Selecione um sistema"</div> }.into_any(); }
+                  let rs = rules.get();
+                  view! {
+                      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+                          <a class="btn btn-primary" style="font-size:10px;padding:4px 10px" href={format!("/add-rule?s={}", sid)} target="_self">
+                              <i class="ti ti-plus"></i>"Regra"
+                          </a>
+                      </div>
+                      {if rs.is_empty() {
+                          view! { <div class="empty-state">"Nenhuma regra ainda. Crie a primeira!"</div> }.into_any()
+                      } else {
+                          view! {
+                              <div class="rule-hint">"Formato: SE &lt;variável&gt; É &lt;termo&gt; E ... ENTÃO &lt;variável&gt; É &lt;termo&gt; [peso]"</div>
+                              {rs.iter().map(|r| {
+                                  let text = r["rule_text"].as_str().unwrap_or("").to_string();
+                                  view! { <div class="rule-row"><div class="rule-num">{r["position"].as_i64().unwrap_or(0)}</div><div class="rule-text">"SE " {text}</div><div class="rule-weight">"w=" {r["weight"].as_f64().unwrap_or(1.0)}</div></div> }
+                              }).collect_view()}
+                          }.into_any()
+                      }}
+                  }.into_any()
+              }}
+          </div>
+      }
+  }
 
  #[component]
  fn Simulador() -> impl IntoView {
@@ -743,6 +768,67 @@ fn AddTermPage() -> impl IntoView {
                 {move || { let m = msg.get(); if !m.is_empty() { view! { <div style="color:var(--coral);font-size:11px;margin-top:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
                 <div style="display:flex;gap:10px;margin-top:16px">
                     <a class="btn" href="/vars" target="_self">"Cancelar"</a>
+                    <button class="btn btn-primary" on:click=move |_| submit()>"Adicionar"</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// AddRulePage
+// ─────────────────────────────────────────────────────────────
+#[component]
+fn AddRulePage() -> impl IntoView {
+    let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+    let sel_sys = RwSignal::new(String::new());
+    let rule_text = RwSignal::new(String::new());
+    let weight = RwSignal::new("1.0".to_string());
+    let msg = RwSignal::new(String::new());
+
+    spawn_async({ let sl = systems_list.clone(); let ss = sel_sys.clone(); async move {
+        sl.set(list_systems().await);
+        #[cfg(target_arch = "wasm32")]
+        if let Some(s) = web_sys::window().and_then(|w| w.location().search().ok()) {
+            if let Some(id) = s.split("s=").nth(1).and_then(|x| x.split('&').next()) {
+                if !id.is_empty() { ss.set(id.to_string()); }
+            }
+        }
+    }});
+
+    let submit = move || {
+        let sid = sel_sys.get();
+        let text = rule_text.get();
+        let w: f64 = weight.get().parse().unwrap_or(1.0);
+        if sid.is_empty() || text.is_empty() { msg.set("Preencha todos os campos".into()); return; }
+        let m = msg.clone();
+        spawn_async(async move {
+            match create_rule(&sid, &text, w).await {
+                Some(_) => { #[cfg(target_arch = "wasm32")] { _ = web_sys::window().and_then(|w| w.location().set_href(&format!("/rules?s={sid}")).ok()); } }
+                None => m.set("Erro ao criar regra".into()),
+            }
+        });
+    };
+
+    view! {
+        <Topbar breadcrumb="Adicionar Regra"/>
+        <div class="content">
+            <div class="section-header"><div class="section-title">"Nova Regra Fuzzy"</div></div>
+            <div class="panel" style="max-width:500px">
+                <label class="input-label">"Sistema"</label>
+                <select class="text-input" prop:value=move || sel_sys.get()
+                    on:change=move |e| sel_sys.set(event_target_value(&e))>
+                    <option value="">"— Selecione —"</option>
+                    {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                </select>
+                <label class="input-label">"Regra (formato: var É termo E ... ENTÃO var É termo)"</label>
+                <input type="text" class="text-input" placeholder="Ex: temperatura É Frio E umidade É Alta ENTÃO conforto É Desconfortável"
+                    prop:value=move || rule_text.get() on:input=move |e| rule_text.set(event_target_value(&e))/>
+                <label class="input-label">"Peso (0.0 a 1.0)"</label>
+                <input type="text" class="text-input" value="1.0" prop:value=move || weight.get() on:input=move |e| weight.set(event_target_value(&e))/>
+                {move || { let m = msg.get(); if !m.is_empty() { view! { <div style="color:var(--coral);font-size:11px;margin-top:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+                <div style="display:flex;gap:10px;margin-top:16px">
+                    <a class="btn" href="/rules" target="_self">"Cancelar"</a>
                     <button class="btn btn-primary" on:click=move |_| submit()>"Adicionar"</button>
                 </div>
             </div>
