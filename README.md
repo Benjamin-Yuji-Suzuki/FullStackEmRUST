@@ -200,11 +200,11 @@ npx playwright test
 ## Documentação Complementar
 
 | Documento | Conteúdo |
-|---|---|---|
-| [USE_CASES.md](./USE_CASES.md) | Especificação completa dos 20 casos de uso |
-| [TEST_CASES.md](./TEST_CASES.md) | Casos de teste documentados (43 casos, 16 aprovados) |
-| [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Modelos Mamdani e TSK + Otimização PSO |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Modelagem do banco, integrações e fluxo de dados |
+|---|---|
+| [USE_CASES.md](./USE_CASES.md) | Especificação dos 20 casos de uso |
+| [TEST_CASES.md](./TEST_CASES.md) | 43 casos de teste (16 aprovados) |
+| [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Modelos Mamdani, TSK e Otimização PSO |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Banco de dados, integrações e fluxos |
 
 ---
 
