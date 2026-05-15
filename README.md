@@ -215,6 +215,8 @@ Conforme exigido pela disciplina de Inteligência Artificial e Computacional, de
 | Ferramenta | Finalidade | Prompt/Comando resumido | Revisão da equipe |
 |---|---|---|---|
 | opencode (DeepSeek V4) | Desenvolvimento de código (componentes Leptos, rotas Axum, testes Rust), estruturação de documentação, correção de bugs de compilação, debug de WASM/SSR | "Implementar página de variáveis", "corrigir erro Pool not initialized", "criar rotas REST para rules", "debug MIME types WASM", "converter HTML/JS para 100% Rust" | Todo código gerado foi revisado, testado (cargo check + cargo test) e validado quanto à correção funcional antes de incorporar ao repositório |
+| Claude (Anthropic) | Revisão inicial de documentação e estruturação do projeto | "Revisar USE_CASES.md", "sugerir estrutura de projeto Rust fullstack" | Contribuições iniciais revisadas e adaptadas |
+| Gemini Pro (Google) | Ideação de arquitetura — sugestão de integrar pipeline de dados ao ecossistema fullstack | "Como estruturar um projeto fullstack Rust com Leptos + Axum?" | Ideia avaliada criticamente e adaptada pelo autor |
 
 **Nota:** O uso de IA não substitui o domínio conceitual da equipe. Todos os integrantes compreendem e são capazes de explicar cada parte do código, modelo fuzzy e decisões de arquitetura.
 
