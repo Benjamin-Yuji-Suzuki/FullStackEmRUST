@@ -17,7 +17,7 @@
 | [UC01](#uc01) | Gerenciar Sistemas Fuzzy | [Criar][Ler][Atualizar][Deletar] | Usuário |
 | [UC02](#uc02) | Gerenciar Variáveis e Termos | [Criar][Ler][Atualizar][Deletar] | Usuário |
 | [UC03](#uc03) | Gerenciar Regras Fuzzy | [Criar][Ler][Atualizar][Deletar] | Usuário |
-| [UC04](#uc04) | Executar Simulação | [Processamento] | Usuário |
+| [UC04](#uc04) | Executar Inferência Mamdani | [Processamento] | Usuário |
 | [UC05](#uc05) | Buscar Dados Climáticos | [Consumo] | Usuário, OpenWeather API |
 | [UC06](#uc06) | Consultar Histórico de Simulações | [Ler][Deletar] | Usuário |
 | [UC07](#uc07) | Processar Inferência em Lote | [Processamento] | Usuário |
@@ -237,7 +237,7 @@
 
 ## UC04
 
-### Executar Simulação
+### Executar Inferência Mamdani
 
 | Campo | Descrição |
 |---|---|

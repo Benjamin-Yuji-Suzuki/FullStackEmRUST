@@ -557,7 +557,7 @@ fn Variaveis() -> impl IntoView {
     view! {
         <Topbar breadcrumb="Simulador"/>
         <div class="content">
-            <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Simulador (UC04)"</div></div>
+             <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Simulador Mamdani (UC04)"</div></div>
              <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
                  <label class="input-label">"Sistema"</label>
                  <select class="text-input" style="margin-bottom:0"

@@ -101,7 +101,7 @@ Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
 | UC01 | Gerenciar Sistemas Fuzzy | Usuário |
 | UC02 | Gerenciar Variáveis e Termos | Usuário |
 | UC03 | Gerenciar Regras Fuzzy | Usuário |
-| UC04 | Executar Simulação | Usuário |
+| UC04 | Executar Inferência Mamdani | Usuário |
 | UC05 | Buscar Dados Climáticos | Usuário, OpenWeather API |
 | UC06 | Consultar Histórico de Simulações | Usuário |
 | UC07 | Processar Inferência em Lote | Usuário |
