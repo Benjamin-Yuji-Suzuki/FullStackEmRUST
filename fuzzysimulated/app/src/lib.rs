@@ -58,7 +58,8 @@ pub fn App() -> impl IntoView {
                     <Routes fallback=|| view! { <NotFound/> }>
                         <Route path=StaticSegment("")       view=Dashboard/>
                         <Route path=StaticSegment("sys/create-form") view=CreateSystemForm/>
-
+                        <Route path=StaticSegment("add-var") view=AddVarPage/>
+                        <Route path=StaticSegment("add-term") view=AddTermPage/>
                         <Route path=StaticSegment("vars")   view=Variaveis/>
                         <Route path=StaticSegment("rules")  view=Regras/>
                         <Route path=StaticSegment("sim")    view=Simulador/>
@@ -335,52 +336,47 @@ fn Auditoria() -> impl IntoView {
 // ─────────────────────────────────────────────────────────────
 #[component]
 fn CreateSystemForm() -> impl IntoView {
+    let name = RwSignal::new(String::new());
+    let desc = RwSignal::new(String::new());
+    let method = RwSignal::new("centroid".to_string());
+    let msg = RwSignal::new(String::new());
+
+    let submit = move || {
+        let n = name.get();
+        if n.trim().is_empty() { msg.set("Nome obrigatório".into()); return; }
+        let d = if desc.get().is_empty() { None } else { Some(desc.get()) };
+        let m = method.get();
+        let msg2 = msg.clone();
+        spawn_async(async move {
+            match create_system(&n, d.as_deref(), &m).await {
+                Some(_) => { #[cfg(target_arch = "wasm32")] { _ = web_sys::window().and_then(|w| w.location().set_href("/").ok()); } }
+                None => msg2.set("Erro ao criar sistema".into()),
+            }
+        });
+    };
+
     view! {
         <Topbar breadcrumb="Novo Sistema"/>
         <div class="content">
-            <div class="section-header" style="margin-bottom:20px">
-                <div class="section-title">"Novo Sistema Fuzzy"</div>
-            </div>
-
+            <div class="section-header" style="margin-bottom:20px"><div class="section-title">"Novo Sistema Fuzzy"</div></div>
             <div class="panel" style="max-width:500px">
-                <form id="create-form" action="/api/sys/create" method="post" target="_self">
-                    <label class="input-label">"Nome *"</label>
-                    <input type="text" name="name" class="text-input" placeholder="Ex: Conforto Térmico" required/>
-
-                    <label class="input-label">"Descrição"</label>
-                    <input type="text" name="description" class="text-input" placeholder="Opcional"/>
-
-                    <label class="input-label">"Método de Defuzzificação"</label>
-                    <select name="defuzz_method" class="text-input">
-                        <option value="centroid">"Centroide"</option>
-                        <option value="bisector">"Bissetor"</option>
-                        <option value="mom">"Mean of Maximum"</option>
-                        <option value="lom">"Largest of Maximum"</option>
-                        <option value="som">"Smallest of Maximum"</option>
-                    </select>
-
-                    <div style="display:flex;gap:10px;margin-top:16px">
-                        <a class="btn" href="/">"Cancelar"</a>
-                        <button type="submit" class="btn btn-primary">"Criar Sistema"</button>
-                    </div>
-                </form>
-                <script>
-                    {r#"document.getElementById('create-form').addEventListener('submit', async function(e) {
-                        e.preventDefault();
-                        var data = new FormData(this);
-                        var body = JSON.stringify({
-                            name: data.get('name'),
-                            description: data.get('description') || null,
-                            defuzz_method: data.get('defuzz_method') || 'centroid'
-                        });
-                        await fetch('/api/systems', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: body
-                        });
-                        window.location.href = '/';
-                    });"#}
-                </script>
+                <label class="input-label">"Nome *"</label>
+                <input type="text" class="text-input" placeholder="Ex: Conforto Térmico" prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/>
+                <label class="input-label">"Descrição"</label>
+                <input type="text" class="text-input" placeholder="Opcional" prop:value=move || desc.get() on:input=move |e| desc.set(event_target_value(&e))/>
+                <label class="input-label">"Método de Defuzzificação"</label>
+                <select class="text-input" prop:value=move || method.get() on:change=move |e| method.set(event_target_value(&e))>
+                    <option value="centroid">"Centroide"</option>
+                    <option value="bisector">"Bissetor"</option>
+                    <option value="mom">"Mean of Maximum"</option>
+                    <option value="lom">"Largest of Maximum"</option>
+                    <option value="som">"Smallest of Maximum"</option>
+                </select>
+                {move || { let m = msg.get(); if !m.is_empty() { view! { <div style="color:var(--coral);font-size:11px;margin-top:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+                <div style="display:flex;gap:10px;margin-top:16px">
+                    <a class="btn" href="/" target="_self">"Cancelar"</a>
+                    <button class="btn btn-primary" on:click=move |_| submit()>"Criar Sistema"</button>
+                </div>
             </div>
         </div>
     }
@@ -603,6 +599,156 @@ fn Variaveis() -> impl IntoView {
  fn Analise() -> impl IntoView {
      view! { <Topbar breadcrumb="Análise"/><div class="content"><div class="empty-state">"Análise — em construção"</div></div> }
  }
+
+// ─────────────────────────────────────────────────────────────
+// AddVarPage (RUST 100%)
+// ─────────────────────────────────────────────────────────────
+#[component]
+fn AddVarPage() -> impl IntoView {
+    let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+    let sel_sys = RwSignal::new(String::new());
+    let name = RwSignal::new(String::new());
+    let role = RwSignal::new("antecedent".to_string());
+    let msg = RwSignal::new(String::new());
+
+    spawn_async({ let sl = systems_list.clone(); let ss = sel_sys.clone(); async move {
+        sl.set(list_systems().await);
+        #[cfg(target_arch = "wasm32")]
+        if let Some(s) = web_sys::window().and_then(|w| w.location().search().ok()) {
+            if let Some(id) = s.split("s=").nth(1).and_then(|x| x.split('&').next()) {
+                if !id.is_empty() { ss.set(id.to_string()); }
+            }
+        }
+    }});
+
+    let systems_clone = systems_list.clone();
+    let sel_sys_clone = sel_sys.clone();
+    let name_clone = name.clone();
+    let role_clone = role.clone();
+    let msg_clone = msg.clone();
+
+    let submit = move || {
+        let sid = sel_sys_clone.get();
+        let n = name_clone.get();
+        let r = role_clone.get();
+        if sid.is_empty() || n.is_empty() { msg_clone.set("Preencha todos os campos".into()); return; }
+        let m = msg_clone.clone();
+        spawn_async(async move {
+            match create_variable(&sid, &n, &r, 0.0, 100.0).await {
+                Some(_) => { #[cfg(target_arch = "wasm32")] { _ = web_sys::window().and_then(|w| w.location().set_href(&format!("/vars?s={sid}")).ok()); } }
+                None => m.set("Erro ao criar variável".into()),
+            }
+        });
+    };
+
+    view! {
+        <Topbar breadcrumb="Adicionar Variável"/>
+        <div class="content">
+            <div class="section-header"><div class="section-title">"Nova Variável"</div></div>
+            <div class="panel" style="max-width:500px">
+                <label class="input-label">"Sistema"</label>
+                <select class="text-input" prop:value=move || sel_sys.get()
+                    on:change=move |e| sel_sys.set(event_target_value(&e))>
+                    <option value="">"— Selecione —"</option>
+                    {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                </select>
+                <label class="input-label">"Nome"</label>
+                <input type="text" class="text-input" prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/>
+                <label class="input-label">"Papel"</label>
+                <select class="text-input" prop:value=move || role.get() on:change=move |e| role.set(event_target_value(&e))>
+                    <option value="antecedent">"Antecedente"</option>
+                    <option value="consequent">"Consequente"</option>
+                </select>
+                {move || { let m = msg.get(); if !m.is_empty() { view! { <div style="color:var(--coral);font-size:11px;margin-top:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+                <div style="display:flex;gap:10px;margin-top:16px">
+                    <a class="btn" href="/vars" target="_self">"Cancelar"</a>
+                    <button class="btn btn-primary" on:click=move |_| submit()>"Adicionar"</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// AddTermPage (RUST 100%)
+// ─────────────────────────────────────────────────────────────
+#[component]
+fn AddTermPage() -> impl IntoView {
+    let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+    let vars_list = RwSignal::new(Vec::<serde_json::Value>::new());
+    let sel_sys = RwSignal::new(String::new());
+    let sel_var = RwSignal::new(String::new());
+    let label = RwSignal::new(String::new());
+    let mf_type = RwSignal::new("trimf".to_string());
+    let params = RwSignal::new(String::new());
+    let msg = RwSignal::new(String::new());
+
+    spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+
+    // load variables when system changes
+    let load_vars = {
+        let vl = vars_list.clone();
+        let ss = sel_sys.clone();
+        move || { let s = ss.get(); if !s.is_empty() { let v = vl.clone(); spawn_async(async move { v.set(list_variables(&s).await); }); } }
+    };
+
+    let submit = {
+        let lbl = label.clone(); let mf = mf_type.clone(); let p = params.clone();
+        let sv = sel_var.clone(); let ss = sel_sys.clone(); let m = msg.clone();
+        move || {
+            let vid = sv.get();
+            if vid.is_empty() { m.set("Selecione uma variável".into()); return; }
+            let parsed: Vec<f64> = p.get().split(',').filter_map(|x| x.trim().parse().ok()).collect();
+            if parsed.is_empty() { m.set("Parâmetros inválidos. Ex: 0,10,22".into()); return; }
+            let m2 = m.clone();
+            spawn_async(async move {
+                match create_term(&vid, &lbl.get(), &mf.get(), parsed).await {
+                    Some(_) => { #[cfg(target_arch = "wasm32")] { _ = web_sys::window().and_then(|w| w.location().set_href(&format!("/vars?s={}", ss.get())).ok()); } }
+                    None => m2.set("Erro ao criar termo".into()),
+                }
+            });
+        }
+    };
+
+    view! {
+        <Topbar breadcrumb="Adicionar Termo"/>
+        <div class="content">
+            <div class="section-header"><div class="section-title">"Novo Termo Linguístico"</div></div>
+            <div class="panel" style="max-width:500px">
+                <label class="input-label">"Sistema"</label>
+                <select class="text-input" prop:value=move || sel_sys.get()
+                    on:change=move |e| { sel_sys.set(event_target_value(&e)); load_vars(); }>
+                    <option value="">"— Selecione —"</option>
+                    {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                </select>
+                <label class="input-label">"Variável"</label>
+                <select class="text-input" prop:value=move || sel_var.get() on:change=move |e| sel_var.set(event_target_value(&e))>
+                    <option value="">"— Selecione —"</option>
+                    {move || vars_list.get().iter().map(|v| {
+                        let id = v["id"].as_str().unwrap_or("").to_string();
+                        let name = v["name"].as_str().unwrap_or("?").to_string();
+                        view! { <option value={id}>{name}</option> }
+                    }).collect_view()}
+                </select>
+                <label class="input-label">"Rótulo"</label>
+                <input type="text" class="text-input" placeholder="Ex: Frio" prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/>
+                <label class="input-label">"Tipo MF"</label>
+                <select class="text-input" prop:value=move || mf_type.get() on:change=move |e| mf_type.set(event_target_value(&e))>
+                    <option value="trimf">"trimf [a,b,c]"</option>
+                    <option value="trapmf">"trapmf [a,b,c,d]"</option>
+                    <option value="gaussmf">"gaussmf [mean,sigma]"</option>
+                </select>
+                <label class="input-label">"Parâmetros (ex: 0,10,22)"</label>
+                <input type="text" class="text-input" placeholder="0, 10, 22" prop:value=move || params.get() on:input=move |e| params.set(event_target_value(&e))/>
+                {move || { let m = msg.get(); if !m.is_empty() { view! { <div style="color:var(--coral);font-size:11px;margin-top:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+                <div style="display:flex;gap:10px;margin-top:16px">
+                    <a class="btn" href="/vars" target="_self">"Cancelar"</a>
+                    <button class="btn btn-primary" on:click=move |_| submit()>"Adicionar"</button>
+                </div>
+            </div>
+        </div>
+    }
+}
 
 // ── 404 ──
 #[component]

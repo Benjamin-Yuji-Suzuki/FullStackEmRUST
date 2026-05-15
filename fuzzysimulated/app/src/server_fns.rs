@@ -120,6 +120,15 @@ pub async fn list_systems() -> Vec<SystemInfo> {
     api_get("/api/systems").await.unwrap_or_default()
 }
 
+pub async fn create_system(name: &str, description: Option<&str>, defuzz_method: &str) -> Option<SystemInfo> {
+    let body = serde_json::json!({
+        "name": name,
+        "description": description,
+        "defuzz_method": defuzz_method,
+    });
+    api_post("/api/systems", &body).await
+}
+
 // ── Variables ──
 
 pub async fn list_variables(system_id: &str) -> Vec<serde_json::Value> {

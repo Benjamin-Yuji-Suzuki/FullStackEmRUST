@@ -63,9 +63,6 @@ async fn main() {
 
     let app = Router::new()
         .nest("/api", routes::api_routes())
-        .route("/novo-sistema", axum::routing::get(routes::systems::create_form_page))
-        .route("/add-var", axum::routing::get(routes::systems::add_var_page))
-        .route("/add-term", axum::routing::get(routes::systems::add_term_page))
         .nest_service("/pkg", pkg_svc)
         .leptos_routes(&app_state, routes, {
             let leptos_options = leptos_options.clone();
