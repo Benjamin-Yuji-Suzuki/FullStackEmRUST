@@ -42,37 +42,53 @@ O projeto é composto por dois repositórios:
 
 ```
 FullStackEmRUST/
+├── USE_CASES.md              # 20 casos de uso
+├── TEST_CASES.md             # 43 casos de teste
+├── FUZZY_MODEL.md            # Modelo fuzzy de demonstração
+├── ARCHITECTURE.md           # Arquitetura técnica
+├── README.md
 └── fuzzysimulated/
-    ├── Cargo.toml            # workspace Rust
-    ├── Cargo.lock            # versões fixadas (commitado)
-    ├── .env.example          # template de variáveis de ambiente
-    ├── app/                  # crate compartilhada Leptos (SSR + CSR)
+    ├── Cargo.toml             # workspace Rust
+    ├── Cargo.lock             # versões fixadas (commitado)
+    ├── app/                   # crate compartilhada Leptos (SSR + CSR)
+    │   └── src/
+    │       ├── lib.rs         # componentes e páginas
+    │       └── server_fns.rs  # chamadas à REST API (gloo-net/reqwest)
+    ├── server/                # crate Axum — REST API + SSR
+    │   ├── Cargo.toml
+    │   ├── src/
+    │   │   ├── main.rs        # entry point, router, static files
+    │   │   ├── audit.rs       # helper de auditoria
+    │   │   ├── errors.rs      # AppError
+    │   │   ├── models/        # FuzzySystem, Variable, Term, Rule, etc.
+    │   │   ├── routes/        # systems, variables, rules, simulate, weather, audit
+    │   │   └── state.rs       # AppState (PgPool + LeptosOptions)
+    │   ├── migrations/
+    │   │   └── 001_schema.sql # 7 tabelas + índices
+    │   └── tests/
+    │       └── api_test.rs    # 16 unit + 6 integration tests
+    ├── frontend/              # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── server/               # crate Axum — rotas e lógica de negócio
-    │   ├── src/main.rs
-    │   └── migrations/
-    │       └── 001_schema.sql
-    ├── frontend/             # crate WASM — entry point client-side
-    │   └── src/lib.rs
-    ├── end2end/              # testes Playwright (E2E)
-    ├── style/                # SCSS global
-    └── public/               # assets estáticos
+    ├── end2end/               # testes Playwright (E2E)
+    ├── style/
+    │   └── main.scss          # SCSS global (tema escuro Catppuccin)
+    └── public/                # assets estáticos
 ```
 
 ---
 
 ## Telas da Aplicação
 
-| # | Tela | UCs | Operações |
-|---|---|---|---|
-| 1 | Dashboard | UC01, UC10, UC11 | CRUD sistemas, duplicar, exportar/importar |
-| 2 | Editor de Variáveis | UC02 | CRUD variáveis e termos linguísticos |
-| 3 | Editor de Regras | UC03 | CRUD regras fuzzy |
-| 4 | Simulador | UC04, UC05, UC12, UC13 | Simular, clima, cenários, varredura |
-| 5 | Histórico | UC06, UC08, UC09 | Listar, comparar, exportar, excluir |
-| 6 | Dashboard Batch | UC07 | Upload Parquet, mapeamento, inferência em lote |
-| 7 | Análise | UC14, UC15 | Matriz de regras, superfície de controle |
-| 8 | Timeline do Sistema | UC16 | Histórico de alterações, desfazer/refazer |
+| # | Tela | UCs | Status | Operações |
+|---|---|---|---|---|
+| 1 | Dashboard | UC01, UC10, UC11 | ✅ Funcional | CRUD sistemas, criar via formulário, excluir |
+| 2 | Editor de Variáveis | UC02 | ✅ Funcional | Lista vars/termos, add var, add termo |
+| 3 | Editor de Regras | UC03 | ✅ Funcional | Lista regras por sistema |
+| 4 | Simulador | UC04, UC05, UC12, UC13 | ⚡ Esboço | Seleciona sistema |
+| 5 | Histórico | UC06, UC08, UC09 | ✅ Funcional | Lista simulações por sistema |
+| 6 | Dashboard Batch | UC07 | ❌ Placeholder | — |
+| 7 | Análise | UC14, UC15 | ❌ Placeholder | — |
+| 8 | Auditoria | UC16 | ✅ Funcional | Timeline de alterações no banco |
 
 ---
 
@@ -148,13 +164,22 @@ cargo leptos watch
 
 ## Testes
 
-### Unitários e de integração
+### Unitários (16)
 
 ```bash
-cargo test
+cargo test -p server -- --skip ignored
 ```
 
-Cobrem: funções de pertinência (trimf, trapmf, gaussmf), pipeline de inferência Mamdani, defuzzificação por centroide, validação de regras e camada de serviço do backend.
+Cobrem: validação de nome de sistema (vazio, tamanho), método de defuzzificação, parâmetros de MF (trimf, trapmf, gaussmf).
+
+### Integração (6 — esboçados)
+
+```bash
+# Requer banco 'fuzzysimulated_test' com migrations aplicadas
+DATABASE_URL=postgres://postgres@localhost/fuzzysimulated_test cargo test -p server -- --ignored
+```
+
+Cobrem: CRUD de sistema, variável, termo, cascade delete, simulação.
 
 ### End-to-End (Playwright)
 
@@ -164,7 +189,7 @@ npx playwright install
 npx playwright test
 ```
 
-Cobrem os fluxos críticos: criação de sistema, adição de variáveis/termos/regras, execução de simulação e consulta ao histórico.
+> ⚠️ Testes E2E ainda não implementados (esboço em `end2end/tests/example.spec.ts`).
 
 ### Qualidade estática — SonarQube Cloud
 
