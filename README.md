@@ -31,6 +31,7 @@ O projeto é composto por dois repositórios:
 | Banco de dados | PostgreSQL | Relacional robusto; JSONB para termos fuzzy flexíveis |
 | ORM | [SQLx](https://github.com/launchbadge/sqlx) | Queries verificadas em tempo de compilação |
 | Motor Fuzzy | [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) | Implementação Mamdani/TSK/PSO (pendente de integração — atualmente mock) |
+| Pipeline de dados | [Polars](https://pola.rs/) (Rust) |  Leitura de Parquet + inferência em lote (planejado Sprint 3) |
 | API Externa | [OpenWeather API](https://openweathermap.org/api) | Temperatura e umidade reais por cidade |
 | API Externa | [OpenWeather API](https://openweathermap.org/api) | Temperatura e umidade reais por cidade |
 | Build | [cargo-leptos](https://github.com/leptos-rs/cargo-leptos) | Gerencia WASM + servidor em um único comando |
