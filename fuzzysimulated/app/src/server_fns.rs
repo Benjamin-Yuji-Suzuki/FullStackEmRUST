@@ -1,41 +1,214 @@
 use cfg_if::cfg_if;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
-cfg_if! { if #[cfg(feature = "ssr")] {
-    use sqlx::PgPool;
-    use std::sync::OnceLock;
-    use serde::{Deserialize, Serialize};
+// ── Tipos ──
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct SystemInfo {
-        pub id: String,
-        pub name: String,
-        pub description: Option<String>,
-        pub defuzz_method: String,
-        pub created_at: String,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemInfo {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub defuzz_method: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VariableInfo {
+    pub id: String,
+    pub system_id: String,
+    pub name: String,
+    pub role: String,
+    pub universe_min: f64,
+    pub universe_max: f64,
+    pub resolution: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TermInfo {
+    pub id: String,
+    pub variable_id: String,
+    pub label: String,
+    pub mf_type: String,
+    pub params: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuleInfo {
+    pub id: String,
+    pub system_id: String,
+    pub rule_text: String,
+    pub weight: f64,
+    pub position: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimulationInfo {
+    pub id: String,
+    pub system_id: String,
+    pub inputs: Value,
+    pub outputs: Value,
+    pub weather_data: Option<Value>,
+    pub city: Option<String>,
+    pub executed_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditEvent {
+    pub id: String,
+    pub system_id: String,
+    pub action_type: String,
+    pub entity_type: String,
+    pub description: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditSummary {
+    pub events: Vec<AuditEvent>,
+    pub total: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditResponse {
+    pub events: Vec<AuditEvent>,
+    pub total: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeatherData {
+    pub city: String,
+    pub temp: f64,
+    pub humidity: f64,
+}
+
+// ── Helper ──
+
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        async fn api_get<T: serde::de::DeserializeOwned>(url: &str) -> Option<T> {
+            gloo_net::http::Request::get(url).send().await.ok()?.json().await.ok()
+        }
+        async fn api_post<T: serde::de::DeserializeOwned, B: serde::Serialize>(url: &str, body: &B) -> Option<T> {
+            gloo_net::http::Request::post(url)
+                .json(body).ok()?
+                .send().await.ok()?
+                .json().await.ok()
+        }
+        async fn api_delete(url: &str) -> bool {
+            gloo_net::http::Request::delete(url).send().await.ok().is_some()
+        }
+    } else {
+        async fn api_get<T: serde::de::DeserializeOwned>(url: &str) -> Option<T> {
+            reqwest::get(url).await.ok()?.json().await.ok()
+        }
+        async fn api_post<T: serde::de::DeserializeOwned, B: serde::Serialize>(url: &str, body: &B) -> Option<T> {
+            reqwest::Client::new()
+                .post(url).json(body).send().await.ok()?
+                .json().await.ok()
+        }
+        async fn api_delete(url: &str) -> bool {
+            reqwest::Client::new().delete(url).send().await.ok().is_some()
+        }
     }
+}
 
-    static POOL: OnceLock<PgPool> = OnceLock::new();
+// ── Systems ──
 
-    pub fn init_pool(pool: PgPool) {
-        let _ = POOL.set(pool);
+pub async fn list_systems() -> Vec<SystemInfo> {
+    api_get("/api/systems").await.unwrap_or_default()
+}
+
+// ── Variables ──
+
+pub async fn list_variables(system_id: &str) -> Vec<serde_json::Value> {
+    api_get(&format!("/api/systems/{system_id}/variables")).await.unwrap_or_default()
+}
+
+pub async fn create_variable(system_id: &str, name: &str, role: &str, min: f64, max: f64) -> Option<VariableInfo> {
+    let body = serde_json::json!({
+        "name": name, "role": role,
+        "universe_min": min, "universe_max": max,
+        "resolution": 501
+    });
+    api_post(&format!("/api/systems/{system_id}/variables"), &body).await
+}
+
+pub async fn delete_variable(id: &str) -> bool {
+    api_delete(&format!("/api/variables/{id}")).await
+}
+
+pub async fn create_term(variable_id: &str, label: &str, mf_type: &str, params: Vec<f64>) -> Option<TermInfo> {
+    let body = serde_json::json!({ "label": label, "mf_type": mf_type, "params": params });
+    api_post(&format!("/api/variables/{variable_id}/terms"), &body).await
+}
+
+pub async fn delete_term(id: &str) -> bool {
+    api_delete(&format!("/api/terms/{id}")).await
+}
+
+// ── Rules ──
+
+pub async fn list_rules(system_id: &str) -> Vec<RuleInfo> {
+    // Fetch from export endpoint
+    let data: Option<serde_json::Value> = api_get(&format!("/api/systems/{system_id}/export")).await;
+    match data {
+        Some(d) => d["rules"].as_array()
+            .map(|arr| arr.iter().map(|r| RuleInfo {
+                id: r["id"].as_str().unwrap_or("").to_string(),
+                system_id: system_id.to_string(),
+                rule_text: r["rule_text"].as_str().unwrap_or("").to_string(),
+                weight: r["weight"].as_f64().unwrap_or(1.0),
+                position: r["position"].as_i64().unwrap_or(0) as i32,
+            }).collect())
+            .unwrap_or_default(),
+        None => vec![],
     }
+}
 
-    pub fn get_pool() -> &'static PgPool {
-        POOL.get().expect("Pool not initialized")
+pub async fn create_rule(system_id: &str, rule_text: &str, weight: f64) -> Option<RuleInfo> {
+    let body = serde_json::json!({ "rule_text": rule_text, "weight": weight });
+    api_post(&format!("/api/systems/{system_id}/rules"), &body).await
+}
+
+pub async fn delete_rule(id: &str) -> bool {
+    api_delete(&format!("/api/rules/{id}")).await
+}
+
+// ── Simulations ──
+
+pub async fn list_simulations(system_id: &str) -> Vec<SimulationInfo> {
+    api_get(&format!("/api/systems/{system_id}/simulations")).await.unwrap_or_default()
+}
+
+pub async fn run_simulation(system_id: &str, inputs: &serde_json::Value) -> Option<serde_json::Value> {
+    let body = serde_json::json!({ "inputs": inputs });
+    // The simulate endpoint expects { "inputs": { ... } }
+    // Our API accepts SimulateRequest
+    api_post(&format!("/api/systems/{system_id}/simulate"), &serde_json::json!({ "inputs": inputs })).await
+}
+
+pub async fn get_weather(city: &str) -> Option<WeatherData> {
+    api_get(&format!("/api/weather?city={city}")).await
+}
+
+// ── Audit ──
+
+pub async fn list_audit_events(system_id: String) -> AuditSummary {
+    let val: Option<serde_json::Value> = api_get(&format!("/api/systems/{system_id}/audit")).await;
+    match val {
+        Some(v) => {
+            let events: Vec<AuditEvent> = serde_json::from_value(v["events"].clone()).unwrap_or_default();
+            let total = events.len();
+            AuditSummary { events, total }
+        }
+        None => AuditSummary { events: vec![], total: 0 },
     }
+}
 
-    pub async fn list_systems_db() -> Result<Vec<SystemInfo>, String> {
-        let pool = get_pool();
+// ── Delete system ──
 
-        let rows = sqlx::query_as::<_, (String, String, Option<String>, String, String)>(
-            "SELECT id::text, name, description, defuzz_method, created_at::text FROM fuzzy_systems ORDER BY created_at DESC"
-        )
-        .fetch_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
-        Ok(rows.into_iter().map(|(id, name, desc, defuzz, created)| SystemInfo {
-            id, name, description: desc, defuzz_method: defuzz, created_at: created,
-        }).collect())
-    }
-}}
+pub async fn delete_system(id: &str) -> bool {
+    api_delete(&format!("/api/systems/{id}")).await
+}

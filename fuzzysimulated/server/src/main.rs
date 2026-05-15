@@ -1,12 +1,12 @@
 use axum::Router;
-use axum::response::{IntoResponse, Response};
-use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use leptos::prelude::*;
 use leptos_axum::{generate_route_list, LeptosRoutes};
 use app::*;
 use log::info;
 use sqlx::postgres::PgPoolOptions;
 
+mod audit;
 mod errors;
 mod models;
 mod routes;
@@ -14,28 +14,8 @@ mod state;
 
 use state::AppState;
 
-async fn fallback_handler(
-    uri: axum::http::Uri,
-    axum::extract::State(state): axum::extract::State<AppState>,
-) -> axum::response::Response {
-    let root: &str = &state.leptos_options.site_root;
-    let path = uri.path().trim_start_matches('/');
-    let file_path = std::path::Path::new(root).join(path);
-
-    match tokio::fs::read(&file_path).await {
-        Ok(data) => {
-            let mime = mime_guess::from_path(&file_path).first_or_octet_stream();
-            axum::response::Response::builder()
-                .header("Content-Type", mime.as_ref())
-                .body(axum::body::Body::from(data))
-                .unwrap()
-        }
-        Err(_) => (
-            axum::http::StatusCode::NOT_FOUND,
-            format!("Resource not found: {uri}"),
-        ).into_response(),
-    }
-}
+use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeader;
 
 #[tokio::main]
 async fn main() {
@@ -66,24 +46,35 @@ async fn main() {
     let leptos_options = conf.leptos_options;
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(App);
-    let site_root = leptos_options.site_root.clone();
-
-    #[cfg(feature = "ssr")] {
-        app::server_fns::init_pool(pool.clone());
-    }
 
     let app_state = AppState {
         pool: pool.clone(),
         leptos_options: leptos_options.clone(),
     };
 
+    let site_root = std::path::PathBuf::from("target/site");
+    let pkg_dir = site_root.join("pkg");
+
+    // serve /pkg/ directly as static files (before leptos routes)
+    let pkg_svc = tower_http::services::ServeDir::new(&pkg_dir)
+        .precompressed_gzip()
+        .precompressed_br()
+        .append_index_html_on_directories(false);
+
     let app = Router::new()
         .nest("/api", routes::api_routes())
+        .route("/novo-sistema", axum::routing::get(routes::systems::create_form_page))
+        .route("/add-var", axum::routing::get(routes::systems::add_var_page))
+        .route("/add-term", axum::routing::get(routes::systems::add_term_page))
+        .nest_service("/pkg", pkg_svc)
         .leptos_routes(&app_state, routes, {
             let leptos_options = leptos_options.clone();
             move || shell(leptos_options.clone())
         })
-        .fallback(fallback_handler)
+        .fallback(axum::routing::any_service(
+            tower_http::services::ServeDir::new(&site_root)
+                .append_index_html_on_directories(false)
+        ))
         .with_state(app_state)
         .layer(
             tower::ServiceBuilder::new()

@@ -30,6 +30,14 @@
 | [UC14](#uc14) | Visualizar Matriz de Regras Ativadas | Usuário |
 | [UC15](#uc15) | Visualizar Superfície de Controle | Usuário |
 | [UC16](#uc16) | Gerenciar Histórico de Alterações | Usuário |
+| [UC17](#uc17) | Otimizar Parâmetros com PSO | Usuário |
+| [UC18](#uc18) | Executar Inferência TSK | Usuário |
+| [UC19](#uc19) | Exportar Visualizações SVG | Usuário |
+| [UC20](#uc20) | Visualizar Relatório de Diagnóstico | Usuário |
+| [UC17](#uc17) | Otimizar Parâmetros com PSO | Usuário |
+| [UC18](#uc18) | Executar Inferência TSK | Usuário |
+| [UC19](#uc19) | Exportar Visualizações SVG | Usuário |
+| [UC20](#uc20) | Visualizar Relatório de Diagnóstico | Usuário |
 
 ---
 
@@ -658,3 +666,136 @@
 
 - Timeline exibida com todas as ações registradas.
 - Ao desfazer/refazer: estado do sistema restaurado e novo evento registrado na timeline.
+
+---
+
+## UC17
+
+### Otimizar Parâmetros com PSO
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | — |
+| **Pré-condições** | Sistema fuzzy com variáveis, termos e regras configurados (UC02 + UC03). Usuário está na tela de Otimização. |
+
+**Fluxo Principal**
+
+1. Usuário seleciona o que deseja otimizar: parâmetros das funções de pertinência, pesos das regras ou ambos.
+2. Usuário define se possui dados de referência (pares entrada-saída esperada) para a função objetivo.
+3. Usuário configura parâmetros do PSO: tamanho da população, número máximo de iterações, limites de busca para cada parâmetro, peso da inércia, coeficientes cognitivo e social, tolerância e paciência (early stopping).
+4. Usuário clica em "Iniciar Otimização".
+5. **Sistema** executa o PSO em background (`spawn_blocking`), avaliando a função objetivo (erro quadrático médio ou customizada) a cada iteração.
+6. **Sistema** exibe gráfico de convergência (melhor fitness por iteração) em tempo real.
+7. Ao final, **Sistema** exibe os parâmetros ótimos encontrados e o fitness final.
+8. Usuário pode aplicar os parâmetros otimizados ao sistema atual ou salvar como nova versão.
+
+**Fluxos Alternativos**
+
+- **FA1 — Nenhum dado de referência:** Usuário pode definir função objetivo manual (ex: minimizar/maximizar saída para determinados inputs).
+- **FA2 — Limites inválidos:** "Limite mínimo deve ser menor que o máximo para cada parâmetro". Retorna.
+- **FA3 — Sem parâmetros selecionados:** "Selecione ao menos um parâmetro para otimizar". Retorna.
+- **FA4 — Otimização divergente:** "A otimização não convergiu dentro da tolerância. Ajuste os parâmetros do PSO e tente novamente."
+- **FA5 — Usuário cancela:** Otimização interrompida. Resultados parciais descartados.
+
+**Pós-condições**
+
+- Parâmetros otimizados exibidos e disponíveis para aplicação.
+- Gráfico de convergência disponível para download.
+- Nenhuma alteração no banco até o usuário confirmar a aplicação.
+
+---
+
+## UC18
+
+### Executar Inferência TSK
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | — |
+| **Pré-condições** | Sistema fuzzy com variáveis antecedentes e ao menos uma regra. Usuário está na tela Simulador ou Análise. |
+
+**Fluxo Principal**
+
+1. Usuário seleciona o motor de inferência: "Mamdani" ou "TSK (Takagi-Sugeno-Kang)".
+2. Ao selecionar TSK, **Sistema** exibe campos de coeficientes para cada consequente de regra: `y = a₀ + a₁·x₁ + a₂·x₂ + ...` onde `a₀` é o bias e `a₁, a₂...` são coeficientes para cada entrada, na ordem alfabética das variáveis.
+3. Usuário preenche os coeficientes de cada regra e clica em "Executar".
+4. **Sistema** executa a inferência TSK: fuzzificação → grau de ativação por regra → média ponderada dos consequentes → saída crisp.
+5. **Sistema** exibe o valor de saída, o cálculo detalhado (ativação de cada regra × seu consequente) e o peso final.
+6. Usuário pode alternar entre Mamdani e TSK para comparar os resultados.
+
+**Fluxos Alternativos**
+
+- **FA1 — Sistema configurado para Mamdani sem consequente fuzzy:** "O sistema precisa de uma variável consequente com termos para TSK ou remova os termos para usar apenas coeficientes."
+- **FA2 — Coeficientes inconsistentes:** "Número de coeficientes deve ser 1 + N (bias + uma para cada entrada)". Retorna.
+- **FA3 — Nenhuma regra ativada:** Mensagem similar ao UC04-FA3.
+
+**Pós-condições**
+
+- Resultado TSK exibido com detalhamento dos cálculos.
+- Comparação Mamdani × TSK disponível se ambos forem executados.
+
+---
+
+## UC19
+
+### Exportar Visualizações SVG
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | — |
+| **Pré-condições** | Sistema fuzzy com variáveis e termos configurados (UC02). Usuário está no Editor de Variáveis ou Simulador. |
+
+**Fluxo Principal**
+
+1. Usuário clica em "Exportar SVG" no painel de uma variável ou no resultado da simulação.
+2. **Sistema** pergunta o que exportar: "Funções de pertinência de uma variável", "Todas as variáveis", "Conjunto agregado" ou "Pipeline completo da simulação".
+3. Usuário seleciona a opção desejada.
+4. **Sistema** gera o gráfico SVG com tema Catppuccin Mocha (dark) ou tema claro, conforme preferência.
+5. **Sistema** exibe prévia do SVG na tela e disponibiliza botão de download.
+6. Usuário pode baixar o arquivo SVG ou copiar o código SVG para a área de transferência.
+
+**Fluxos Alternativos**
+
+- **FA1 — Nenhuma variável configurada:** "Não há dados para exportar."
+- **FA2 — Falha na geração:** "Não foi possível gerar o SVG". Retorna.
+
+**Pós-condições**
+
+- Arquivo SVG baixado ou código copiado. Nenhuma alteração no banco.
+
+---
+
+## UC20
+
+### Visualizar Relatório de Diagnóstico
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | — |
+| **Pré-condições** | Simulação executada com sucesso (UC04). Usuário está no resultado da simulação ou no Histórico. |
+
+**Fluxo Principal**
+
+1. Usuário clica em "Diagnóstico" ou "Explain" no resultado de uma simulação.
+2. **Sistema** gera relatório detalhado do pipeline de inferência contendo:
+   - Tabela de fuzzificação: grau de pertinência de cada input em cada termo.
+   - Tabela de regras: grau de ativação (α) de cada regra, com destaque para regras não ativadas (α = 0).
+   - Tabela de implicação: contribuição de cada regra para o conjunto agregado.
+   - Ponto de defuzzificação: valor crisp final e método utilizado.
+   - Tabela COG (Center of Gravity): discretização do centroide para verificação manual.
+3. **Sistema** exibe o relatório em formato de painéis colapsáveis na interface.
+4. Usuário pode expandir cada seção para ver detalhes ou exportar o diagnóstico como JSON/CSV.
+
+**Fluxos Alternativos**
+
+- **FA1 — Simulação sem dados de diagnóstico:** "Esta simulação não possui dados detalhados. Execute novamente com diagnóstico ativado."
+- **FA2 — Nenhuma regra ativada:** Relatório exibe "Nenhuma regra foi ativada" com a tabela de fuzzificação para depuração.
+
+**Pós-condições**
+
+- Relatório de diagnóstico exibido e disponível para exportação.
+- Nenhuma alteração no banco.

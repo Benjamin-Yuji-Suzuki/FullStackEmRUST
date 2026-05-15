@@ -454,6 +454,69 @@ html, body {
 .hist-val-mid  { color: var(--amber); font-weight: 700; }
 .hist-val-bad  { color: var(--coral); font-weight: 700; }
 
+// ── modal
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+
+.modal {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 24px; width: 480px; max-width: 90vw;
+}
+
+.modal-title { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 20px; }
+
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+.text-input {
+  width: 100%; padding: 8px 10px; border-radius: 5px;
+  background: var(--surface3); border: 1px solid var(--border2);
+  color: var(--text); font-family: var(--mono); font-size: 12px;
+  margin-bottom: 14px; outline: none; transition: border-color 0.12s;
+  &:focus { border-color: var(--amber); }
+}
+
+// ── estados
+.loading, .error-msg, .empty-state {
+  text-align: center; padding: 40px 20px; font-size: 12px; color: var(--text3);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; grid-column: 1 / -1;
+}
+
+.error-msg { color: var(--coral); border-color: rgba(216,90,48,0.3); }
+
+// ── timeline (auditoria)
+.timeline { position: relative; padding-left: 28px; }
+
+.timeline::before {
+  content: ''; position: absolute; left: 8px; top: 4px; bottom: 4px;
+  width: 2px; background: var(--border2); border-radius: 1px;
+}
+
+.timeline-item {
+  position: relative; padding-bottom: 20px;
+  &:last-child { padding-bottom: 0; }
+}
+
+.timeline-dot {
+  position: absolute; left: -24px; top: 3px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--surface3); border: 2px solid var(--amber);
+  &[data-action="create"] { border-color: var(--green); }
+  &[data-action="update"] { border-color: var(--amber); }
+  &[data-action="delete"] { border-color: var(--coral); }
+}
+
+.timeline-content {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 14px;
+}
+
+.timeline-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+
+.timeline-desc { font-size: 11px; color: var(--text2); line-height: 1.5; }
+
 // ── 404
 .not-found { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; color: var(--text3); font-size: 12px; gap: 12px; }
 .not-found-code { font-family: var(--display); font-size: 64px; font-weight: 800; color: var(--border2); }

@@ -2,10 +2,22 @@ pub mod server_fns;
 
 use leptos::prelude::*;
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
-use leptos_router::{
-    components::{Route, Router, Routes},
-    StaticSegment,
-};
+use leptos_router::components::{Route, Router, Routes};
+use leptos_router::StaticSegment;
+use server_fns::*;
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        fn spawn_async(f: impl std::future::Future<Output = ()> + 'static) {
+            wasm_bindgen_futures::spawn_local(f);
+        }
+    } else {
+        fn spawn_async(f: impl std::future::Future<Output = ()> + Send + 'static) {
+            leptos::task::spawn(f);
+        }
+    }
+}
 
 // ─────────────────────────────────────────────────────────────
 // Shell (SSR entry point)
@@ -45,6 +57,8 @@ pub fn App() -> impl IntoView {
                 <div class="main">
                     <Routes fallback=|| view! { <NotFound/> }>
                         <Route path=StaticSegment("")       view=Dashboard/>
+                        <Route path=StaticSegment("sys/create-form") view=CreateSystemForm/>
+
                         <Route path=StaticSegment("vars")   view=Variaveis/>
                         <Route path=StaticSegment("rules")  view=Regras/>
                         <Route path=StaticSegment("sim")    view=Simulador/>
@@ -128,7 +142,7 @@ fn Sidebar() -> impl IntoView {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Topbar helper
+// Topbar
 // ─────────────────────────────────────────────────────────────
 #[component]
 fn Topbar(breadcrumb: &'static str) -> impl IntoView {
@@ -140,756 +154,457 @@ fn Topbar(breadcrumb: &'static str) -> impl IntoView {
                     <i class="ti ti-file-description"></i>
                     "Docs"
                 </button>
-                <button class="btn btn-primary">
-                    <i class="ti ti-plus"></i>
-                    "Novo Sistema"
-                </button>
             </div>
         </div>
     }
 }
 
 // ─────────────────────────────────────────────────────────────
-// Dashboard (static data — frontend integration via API TBD)
+// Dashboard — SSR + WASM via sinal simples
+// ⚠️ SSR não usa Resource (não é Send no WASM)
 // ─────────────────────────────────────────────────────────────
 #[component]
 fn Dashboard() -> impl IntoView {
+    let systems = RwSignal::new(Vec::<SystemInfo>::new());
+    let loaded = RwSignal::new(false);
+
+    spawn_async({
+        let s = systems.clone();
+        let l = loaded.clone();
+        async move { let data = list_systems().await; s.set(data); l.set(true); }
+    });
+
     view! {
         <Topbar breadcrumb="Dashboard"/>
         <div class="content">
 
-            <div class="sprint-timeline">
-                <div class="sprint-block done">
-                    <div class="sprint-num">"Sprint 1"</div>
-                    <div class="sprint-name">"Estrutura"</div>
-                    <div class="sprint-date">"12 mai"</div>
-                    <div class="sprint-status dot-green">"✓ Entregue"</div>
-                </div>
-                <div class="sprint-block active-sprint">
-                    <div class="sprint-num">"Sprint 2"</div>
-                    <div class="sprint-name">"CRUDs + API"</div>
-                    <div class="sprint-date">"19 mai"</div>
-                    <div class="sprint-status dot-amber">"◉ Em progresso"</div>
-                </div>
-                <div class="sprint-block">
-                    <div class="sprint-num">"Sprint 3"</div>
-                    <div class="sprint-name">"Testes + Deploy"</div>
-                    <div class="sprint-date">"26 mai"</div>
-                    <div class="sprint-status dot-gray">"○ Pendente"</div>
-                </div>
-            </div>
-
-            <div class="kpi-grid">
-                <KpiCard label="Sistemas"   value="3"  unit="cadastrados"/>
-                <KpiCard label="Variáveis"  value="14" unit="antec. + conseq."/>
-                <KpiCard label="Regras"     value="27" unit="mapeadas"/>
-                <KpiCard label="Simulações" value="81" unit="executadas"/>
-            </div>
-
             <div class="section-header">
-                <div class="section-title">"Sistemas Fuzzy (UC01)"</div>
+                <div class="section-title">"Sistemas Fuzzy"</div>
                 <div style="display:flex;gap:8px">
-                    <button class="btn" style="font-size:10px;padding:5px 10px">
-                        <i class="ti ti-copy"></i>"Duplicar (UC10)"
-                    </button>
-                    <button class="btn" style="font-size:10px;padding:5px 10px">
-                        <i class="ti ti-upload"></i>"Importar (UC11)"
-                    </button>
-                    <button class="btn btn-primary" style="font-size:10px;padding:5px 12px">
+                    <a class="btn btn-primary" href="/novo-sistema" target="_self"
+                        style="font-size:10px;padding:5px 12px;text-decoration:none">
                         <i class="ti ti-plus"></i>"Criar Sistema"
-                    </button>
+                    </a>
                 </div>
             </div>
 
             <div class="systems-grid">
-                <SystemCard
-                    name="Conforto Térmico Urbano"
-                    desc="Classifica o conforto a partir de temperatura e umidade."
-                    tag_class="tag-green"
-                    tag_text="Ativo"
-                    meta="centroide · 9 regras · 4 variáveis"
-                    extra="OpenWeather integrado"
-                />
-                <SystemCard
-                    name="Risco de Queimadas"
-                    desc="Avalia risco a partir de umidade do ar e temperatura."
-                    tag_class="tag-coral"
-                    tag_text="Rascunho"
-                    meta="bissetor · 12 regras · 6 variáveis"
-                    extra="Sem integração"
-                />
-                <SystemCard
-                    name="Qualidade do Ar"
-                    desc="Índice de qualidade baseado em PM2.5 e CO₂."
-                    tag_class="tag-teal"
-                    tag_text="Completo"
-                    meta="MOM · 6 regras · 4 variáveis"
-                    extra="81 simulações"
-                />
-                <div class="system-card system-card-dashed">
-                    <i class="ti ti-plus" style="font-size:20px"></i>
-                    "Novo sistema fuzzy"
-                </div>
-            </div>
-        </div>
-    }
-}
-
-#[component]
-fn KpiCard(label: &'static str, value: &'static str, unit: &'static str) -> impl IntoView {
-    view! {
-        <div class="kpi-card">
-            <div class="kpi-label">{label}</div>
-            <div class="kpi-value">{value}</div>
-            <div class="kpi-unit">{unit}</div>
-        </div>
-    }
-}
-
-#[component]
-fn SystemCard(
-    name: &'static str,
-    desc: &'static str,
-    tag_class: &'static str,
-    tag_text: &'static str,
-    meta: &'static str,
-    extra: &'static str,
-) -> impl IntoView {
-    view! {
-        <div class="system-card">
-            <div class="system-card-top">
-                <div>
-                    <div class="system-name">{name}</div>
-                    <div class="system-desc">{desc}</div>
-                </div>
-                <span class={format!("tag {tag_class}")}>{tag_text}</span>
-            </div>
-            <div style="font-size:10px;color:var(--text3)">
-                "Defuzz: " <span style="color:var(--amber)">{meta}</span>
-            </div>
-            <div class="system-meta">
-                <span>{extra}</span>
-                <div class="system-actions">
-                    <button class="icon-btn"><i class="ti ti-edit"></i></button>
-                    <button class="icon-btn"><i class="ti ti-player-play"></i></button>
-                    <button class="icon-btn"><i class="ti ti-trash"></i></button>
-                </div>
-            </div>
-        </div>
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Variáveis & Termos
-// ─────────────────────────────────────────────────────────────
-#[component]
-fn Variaveis() -> impl IntoView {
-    let selected = RwSignal::new("Temperatura");
-    let selected_term = RwSignal::new("Frio");
-
-    view! {
-        <Topbar breadcrumb="Variáveis & Termos"/>
-        <div class="content">
-            <div class="section-header" style="margin-bottom:16px">
-                <div>
-                    <div class="section-title" style="margin-bottom:3px">"Variáveis & Termos Linguísticos (UC02)"</div>
-                    <div style="font-size:11px;color:var(--text3)">
-                        "Sistema: " <span style="color:var(--amber)">"Conforto Térmico Urbano"</span>
-                    </div>
-                </div>
-                <button class="btn btn-primary" style="font-size:10px;padding:5px 12px">
-                    <i class="ti ti-plus"></i>"Variável"
-                </button>
-            </div>
-
-            <div class="var-layout">
-                // ── painel lateral de variáveis
-                <div class="var-sidebar">
-                    <div class="var-group-label">"Antecedentes"</div>
-                    <VarItem name="Temperatura" color="var(--amber)" selected=selected/>
-                    <VarItem name="Umidade"     color="var(--teal)"  selected=selected/>
-
-                    <div class="var-group-label">"Consequentes"</div>
-                    <VarItem name="Conforto"   color="var(--coral)" selected=selected/>
-                    <VarItem name="Índice UV"  color="var(--green)" selected=selected/>
-
-                    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
-                        <button class="btn" style="width:100%;font-size:10px">
-                            <i class="ti ti-plus"></i>"Adicionar variável"
-                        </button>
-                    </div>
-                </div>
-
-                // ── painel de edição
-                <div class="var-panel">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-                        <div>
-                            <div style="font-family:var(--display);font-size:15px;font-weight:700;color:var(--text)">
-                                {move || selected.get()}
-                            </div>
-                            <div style="font-size:10px;color:var(--text3);margin-top:2px">
-                                "antecedente · universo [0, 50] · resolução 501"
-                            </div>
-                        </div>
-                        <span class="tag tag-amber">"antecedente"</span>
-                    </div>
-
-                    // ── gráfico MF
-                    <div class="mf-canvas">
-                        <svg viewBox="0 0 580 140" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="30" y1="110" x2="560" y2="110" stroke="#333" stroke-width="1"/>
-                            <line x1="30" y1="20"  x2="30"  y2="115" stroke="#333" stroke-width="1"/>
-                            // Frio
-                            <polyline points="30,110 100,110 170,30 240,110" fill="none" stroke="#378ADD" stroke-width="2"/>
-                            <text x="140" y="26" fill="#378ADD" font-size="10" font-family="monospace">"Frio"</text>
-                            // Agradável
-                            <polyline points="160,110 240,30 320,30 400,110" fill="none" stroke="#EF9F27" stroke-width="2"/>
-                            <text x="248" y="26" fill="#EF9F27" font-size="10" font-family="monospace">"Agradável"</text>
-                            // Quente
-                            <polyline points="320,110 400,30 500,30 560,110" fill="none" stroke="#D85A30" stroke-width="2"/>
-                            <text x="410" y="26" fill="#D85A30" font-size="10" font-family="monospace">"Quente"</text>
-                            // eixo x labels
-                            <text x="28"  y="128" fill="#666" font-size="9" font-family="monospace">"0"</text>
-                            <text x="265" y="128" fill="#666" font-size="9" font-family="monospace">"25"</text>
-                            <text x="540" y="128" fill="#666" font-size="9" font-family="monospace">"50°C"</text>
-                        </svg>
-                    </div>
-
-                    // ── termos
-                    <div class="section-title" style="margin-bottom:8px;font-size:11px">"Termos linguísticos"</div>
-                    <div class="term-chips">
-                        <TermChip label="Frio"      suffix="trimf"  selected=selected_term/>
-                        <TermChip label="Agradável" suffix="trapmf" selected=selected_term/>
-                        <TermChip label="Quente"    suffix="trimf"  selected=selected_term/>
-                        <button class="term-chip" style="border-style:dashed;color:var(--text3)">
-                            "+ Termo"
-                        </button>
-                    </div>
-
-                    // ── parâmetros
-                    <div class="params-box">
-                        <div class="params-label">
-                            "Parâmetros — " {move || selected_term.get()} " (trimf)"
-                        </div>
-                        <div class="params-grid">
-                            <div><div class="param-key">"A"</div>       <div class="param-val">"0"</div></div>
-                            <div><div class="param-key">"B (pico)"</div><div class="param-val">"10"</div></div>
-                            <div><div class="param-key">"C"</div>       <div class="param-val">"22"</div></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-}
-
-#[component]
-fn VarItem(
-    name: &'static str,
-    color: &'static str,
-    selected: RwSignal<&'static str>,
-) -> impl IntoView {
-    view! {
-        <div
-            class=move || if selected.get() == name { "var-item active" } else { "var-item" }
-            on:click=move |_| selected.set(name)
-        >
-            <span class="var-dot" style=format!("background:{color}")></span>
-            {name}
-        </div>
-    }
-}
-
-#[component]
-fn TermChip(
-    label: &'static str,
-    suffix: &'static str,
-    selected: RwSignal<&'static str>,
-) -> impl IntoView {
-    view! {
-        <button
-            class=move || if selected.get() == label { "term-chip active" } else { "term-chip" }
-            on:click=move |_| selected.set(label)
-        >
-            {label}" "
-            <span style="font-size:9px;opacity:0.6">"["</span>
-            <span style="font-size:9px;opacity:0.6">{suffix}</span>
-            <span style="font-size:9px;opacity:0.6">"]"</span>
-        </button>
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Editor de Regras
-// ─────────────────────────────────────────────────────────────
-#[component]
-fn Regras() -> impl IntoView {
-    view! {
-        <Topbar breadcrumb="Editor de Regras"/>
-        <div class="content">
-            <div class="section-header" style="margin-bottom:16px">
-                <div>
-                    <div class="section-title" style="margin-bottom:3px">"Editor de Regras Fuzzy (UC03)"</div>
-                    <div style="font-size:11px;color:var(--text3)">
-                        "Sistema: " <span style="color:var(--amber)">"Conforto Térmico Urbano"</span>
-                        " · 9 regras"
-                    </div>
-                </div>
-                <button class="btn btn-primary" style="font-size:10px;padding:5px 12px">
-                    <i class="ti ti-plus"></i>"Regra"
-                </button>
-            </div>
-
-            <div class="rule-hint">
-                <span style="color:var(--text3)">"Formato: "</span>
-                <span class="rule-kw">"SE "</span>
-                "<antecedente> "
-                <span class="rule-kw">"É "</span>
-                "<termo> "
-                <span class="rule-kw">"E "</span>
-                "... "
-                <span class="rule-kw">"ENTÃO "</span>
-                "<consequente> "
-                <span class="rule-kw">"É "</span>
-                "<termo> "
-                <span style="color:var(--text3)">"[peso]"</span>
-            </div>
-
-            <RuleRow n=1  ante="Temperatura" ate="Frio"       cons="Conforto" ct="Desconfortável"      w="1.0"/>
-            <RuleRow n=2  ante="Temperatura" ate="Agradável"  cons="Conforto" ct="Confortável"          w="1.0"/>
-            <RuleRow n=3  ante="Temperatura" ate="Quente"     cons="Conforto" ct="Muito Desconfortável" w="0.9"/>
-            <RuleRow n=4  ante="Temperatura" ate="Quente"     cons="Conforto" ct="Desconfortável"       w="0.8"/>
-            <RuleRow n=5  ante="Temperatura" ate="Frio"       cons="Conforto" ct="Neutro"               w="0.7"/>
-
-            // ── construtor visual
-            <div class="rule-builder">
-                <div class="section-title" style="font-size:11px">"Construtora visual de regra"</div>
-                <div class="rule-builder-grid">
-                    <select>
-                        <option>"Temperatura"</option>
-                        <option>"Umidade"</option>
-                    </select>
-                    <span class="rule-kw-label">"É"</span>
-                    <select>
-                        <option>"Frio"</option>
-                        <option>"Agradável"</option>
-                        <option>"Quente"</option>
-                    </select>
-                    <span class="rule-arrow">"→"</span>
-                    <select>
-                        <option>"Confortável"</option>
-                        <option>"Desconfortável"</option>
-                        <option>"Neutro"</option>
-                    </select>
-                </div>
-                <button class="btn btn-primary" style="margin-top:12px;font-size:10px">
-                    "Adicionar regra"
-                </button>
-            </div>
-        </div>
-    }
-}
-
-#[component]
-fn RuleRow(
-    n: u8,
-    ante: &'static str,
-    ate: &'static str,
-    cons: &'static str,
-    ct: &'static str,
-    w: &'static str,
-) -> impl IntoView {
-    view! {
-        <div class="rule-row">
-            <div class="rule-num">{format!("{n:02}")}</div>
-            <div class="rule-text">
-                <span class="rule-kw">"SE "</span>
-                <span class="rule-var">{ante}</span>
-                <span class="rule-kw">" É "</span>
-                <span class="rule-term">{ate}</span>
-                <span class="rule-kw">" E "</span>
-                <span class="rule-var">"Umidade"</span>
-                <span class="rule-kw">" É "</span>
-                <span class="rule-term">"Alta"</span>
-                <span class="rule-kw">" ENTÃO "</span>
-                <span class="rule-var">{cons}</span>
-                <span class="rule-kw">" É "</span>
-                <span class="rule-term">{ct}</span>
-            </div>
-            <div class="rule-weight">{format!("w={w}")}</div>
-            <div class="system-actions">
-                <button class="icon-btn"><i class="ti ti-edit"></i></button>
-                <button class="icon-btn"><i class="ti ti-trash"></i></button>
-            </div>
-        </div>
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Simulador
-// ─────────────────────────────────────────────────────────────
-#[component]
-fn Simulador() -> impl IntoView {
-    let temp = RwSignal::new(32_i32);
-    let hum = RwSignal::new(88_i32);
-
-    // inferência simplificada: disconforto = temp*0.6 + hum*0.4 (escala 0-100)
-    let output = move || {
-        let t = temp.get() as f64 / 50.0;
-        let h = hum.get() as f64 / 100.0;
-        (t * 0.6 + h * 0.4) * 100.0
-    };
-
-    let class_label = move || {
-        let v = output();
-        if v < 30.0 {
-            ("Confortável", "var(--green)")
-        } else if v < 55.0 {
-            ("Neutro", "var(--amber)")
-        } else if v < 75.0 {
-            ("Desconfortável", "var(--coral)")
-        } else {
-            ("Muito Desconfortável", "var(--red)")
-        }
-    };
-
-    view! {
-        <Topbar breadcrumb="Simulador"/>
-        <div class="content">
-            <div class="section-header" style="margin-bottom:16px">
-                <div>
-                    <div class="section-title" style="margin-bottom:3px">"Simulador Mamdani"</div>
-                    <div style="font-size:11px;color:var(--text3)">
-                        "Sistema: " <span style="color:var(--amber)">"Conforto Térmico Urbano"</span>
-                        " · UC04 · UC05 · UC12 · UC13"
-                    </div>
-                </div>
-            </div>
-
-            <div class="sim-layout">
-                // ── coluna esquerda: entradas
-                <div>
-                    <div class="panel">
-                        <div class="panel-title">"Entradas climáticas (UC04)"</div>
-
-                        <div class="weather-card">
-                            <div class="weather-icon">"🌦"</div>
-                            <div>
-                                <div class="weather-city">"Belém, PA — Brasil"</div>
-                                <div class="weather-vals">
-                                    "Temp: " <span>"32.4°C"</span>
-                                    " · Umidade: " <span>"88%"</span>
-                                    " · via OpenWeather (UC05)"
-                                </div>
-                            </div>
-                            <button class="btn" style="margin-left:auto;font-size:10px;padding:5px 10px">
-                                <i class="ti ti-refresh"></i>
-                            </button>
-                        </div>
-
-                        <div class="input-group">
-                            <label class="input-label">"Temperatura"</label>
-                            <div class="input-row">
-                                <input type="range" class="range-input" min="0" max="50"
-                                    prop:value=move || temp.get()
-                                    on:input=move |e| {
-                                        let v = event_target_value(&e).parse::<i32>().unwrap_or(25);
-                                        temp.set(v);
+                {move || {
+                    if !loaded.get() {
+                        return view! { <div class="loading">"Carregando..."</div> }.into_any();
+                    }
+                    let list = systems.get();
+                    if list.is_empty() {
+                        view! { <div class="empty-state">"Nenhum sistema cadastrado. Crie o primeiro!"</div> }.into_any()
+                    } else {
+                        view! {
+                            <For each=move || list.clone() key=|s| s.id.clone() let:sys>
+                                {
+                                    let sid = sys.id.clone();
+                                    view! {
+                                        <div class="system-card">
+                                            <div class="system-card-top">
+                                                <div>
+                                                    <div class="system-name">{sys.name.clone()}</div>
+                                                    <div class="system-desc">{sys.description.clone().unwrap_or_default()}</div>
+                                                </div>
+                                                <span class="tag tag-green">"Ativo"</span>
+                                            </div>
+                                            <div style="font-size:10px;color:var(--text3)">
+                                                "Defuzz: " <span style="color:var(--amber)">{sys.defuzz_method.clone()}</span>
+                                                " · Criado: " <span>{sys.created_at[..10].to_string()}</span>
+                                            </div>
+                                            <div class="system-meta">
+                                                <span>"ID: " {sys.id[..8].to_string()}"..."</span>
+                                                <div class="system-actions">
+                                                    <a class="icon-btn" href={format!("/audit?id={}", sid)}>
+                                                        <i class="ti ti-history"></i>
+                                                    </a>
+                                                    <form action={format!("/api/sys/{sid}/delete")} method="post" target="_self" style="display:inline">
+                                                        <button type="submit" class="icon-btn">
+                                                            <i class="ti ti-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
                                     }
-                                />
-                                <div class="range-val">{move || format!("{}°C", temp.get())}</div>
-                            </div>
-                        </div>
-
-                        <div class="input-group">
-                            <label class="input-label">"Umidade Relativa"</label>
-                            <div class="input-row">
-                                <input type="range" class="range-input" min="0" max="100"
-                                    prop:value=move || hum.get()
-                                    on:input=move |e| {
-                                        let v = event_target_value(&e).parse::<i32>().unwrap_or(50);
-                                        hum.set(v);
-                                    }
-                                />
-                                <div class="range-val">{move || format!("{}%", hum.get())}</div>
-                            </div>
-                        </div>
-
-                        <button class="btn btn-primary" style="width:100%;margin-top:8px">
-                            <i class="ti ti-player-play"></i>
-                            "Executar Simulação"
-                        </button>
-                    </div>
-
-                    <div class="panel" style="margin-top:12px">
-                        <div class="panel-title">"Cenários Salvos (UC12)"</div>
-                        <div style="font-size:11px;color:var(--text3);padding:8px 0">
-                            "Salve combinações de inputs para reuso rápido."
-                        </div>
-                        <button class="btn" style="font-size:10px;padding:4px 10px">
-                            <i class="ti ti-plus"></i>"Salvar Cenário Atual"
-                        </button>
-                    </div>
-                </div>
-
-                // ── coluna direita: resultado + análises
-                <div>
-                    <div class="panel">
-                        <div class="panel-title">"Resultado da Inferência"</div>
-
-                        <div class="output-display">
-                            <div class="output-val">
-                                {move || format!("{:.1}", output())}
-                            </div>
-                            <div class="output-label">"Índice de Conforto · Defuzz: centroide"</div>
-                        </div>
-
-                        <div class="output-stats" style="margin-top:12px">
-                            <div class="stat-box">
-                                <div class="stat-key">"Classificação"</div>
-                                <div class="stat-val" style=move || format!("color:{}", class_label().1)>
-                                    {move || class_label().0}
-                                </div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-key">"Regras ativas"</div>
-                                <div class="stat-val" style="color:var(--amber)">"3 / 9"</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-key">"Latência"</div>
-                                <div class="stat-val" style="color:var(--green)">"1.2 ms"</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title">"Pipeline de Inferência"</div>
-                        <div class="pipeline-step">
-                            <span class="pipeline-num" style="color:var(--green)">"①"</span>
-                            "Fuzzificação das entradas"
-                        </div>
-                        <div class="pipeline-step">
-                            <span class="pipeline-num" style="color:var(--green)">"②"</span>
-                            "Avaliação das regras (min-operador)"
-                        </div>
-                        <div class="pipeline-step">
-                            <span class="pipeline-num" style="color:var(--amber)">"③"</span>
-                            "Agregação das saídas (max-operador)"
-                        </div>
-                        <div class="pipeline-step">
-                            <span class="pipeline-num" style="color:var(--amber)">"④"</span>
-                            "Defuzzificação — centroide → "
-                            <span style="color:var(--amber);font-weight:700">
-                                {move || format!("{:.1}", output())}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="panel" style="margin-top:12px">
-                        <div class="panel-title">"Varredura de Entrada (UC13)"</div>
-                        <div style="font-size:11px;color:var(--text3);padding:8px 0">
-                            "Varie uma entrada no intervalo e visualize a curva saída × entrada."
-                        </div>
-                        <button class="btn" style="font-size:10px;padding:4px 10px">
-                            <i class="ti ti-chart-line"></i>"Executar Varredura"
-                        </button>
-                    </div>
-                </div>
+                                }
+                            </For>
+                        }.into_any()
+                    }
+                }}
             </div>
+
         </div>
     }
 }
 
 // ─────────────────────────────────────────────────────────────
-// Histórico
-// ─────────────────────────────────────────────────────────────
-#[component]
-fn Historico() -> impl IntoView {
-    view! {
-        <Topbar breadcrumb="Histórico"/>
-        <div class="content">
-            <div class="section-header" style="margin-bottom:16px">
-                <div class="section-title">"Histórico de Simulações"</div>
-                <div style="display:flex;gap:8px">
-                    <button class="btn" style="font-size:10px;padding:5px 12px">
-                        <i class="ti ti-arrows-left-right"></i>"Comparar (UC08)"
-                    </button>
-                    <button class="btn" style="font-size:10px;padding:5px 12px">
-                        <i class="ti ti-download"></i>"Exportar Relatório (UC09)"
-                    </button>
-                </div>
-            </div>
-
-            <div class="hist-wrap">
-                <table class="hist-table">
-                    <thead>
-                        <tr>
-                            <th>"Sistema"</th>
-                            <th>"Entradas"</th>
-                            <th>"Saída"</th>
-                            <th>"Cidade"</th>
-                            <th>"Executado em"</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <HistRow
-                            tag_class="tag-green" tag="Conforto Térmico"
-                            inputs="32.4°C / 88%"
-                            val="17.3" val_class="hist-val-mid" classification="Desc."
-                            cidade="Belém, PA"
-                            date="12 mai 15:32"
-                        />
-                        <HistRow
-                            tag_class="tag-teal" tag="Qualidade do Ar"
-                            inputs="PM2.5: 45 / CO₂: 410"
-                            val="72.1" val_class="hist-val-good" classification="Boa"
-                            cidade="—"
-                            date="12 mai 14:10"
-                        />
-                        <HistRow
-                            tag_class="tag-coral" tag="Risco Queimada"
-                            inputs="38.1°C / 22%"
-                            val="91.4" val_class="hist-val-bad" classification="Alto"
-                            cidade="Santarém, PA"
-                            date="11 mai 09:55"
-                        />
-                        <HistRow
-                            tag_class="tag-green" tag="Conforto Térmico"
-                            inputs="26.0°C / 60%"
-                            val="62.8" val_class="hist-val-good" classification="Conf."
-                            cidade="Marabá, PA"
-                            date="10 mai 18:22"
-                        />
-                        <HistRow
-                            tag_class="tag-teal" tag="Qualidade do Ar"
-                            inputs="PM2.5: 120 / CO₂: 680"
-                            val="18.5" val_class="hist-val-bad" classification="Ruim"
-                            cidade="—"
-                            date="09 mai 11:00"
-                        />
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    }
-}
-
-#[component]
-fn HistRow(
-    tag_class: &'static str,
-    tag: &'static str,
-    inputs: &'static str,
-    val: &'static str,
-    val_class: &'static str,
-    classification: &'static str,
-    cidade: &'static str,
-    date: &'static str,
-) -> impl IntoView {
-    view! {
-        <tr>
-            <td><span class={format!("tag {tag_class}")} style="font-size:9px">{tag}</span></td>
-            <td>{inputs}</td>
-            <td>
-                <span class={val_class}>{val}</span>
-                " " <span style="color:var(--text3);font-size:10px">"("{classification}")"</span>
-            </td>
-            <td>{cidade}</td>
-            <td>{date}</td>
-            <td><button class="icon-btn"><i class="ti ti-eye"></i></button></td>
-        </tr>
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Batch Dashboard (UC07)
-// ─────────────────────────────────────────────────────────────
-#[component]
-fn BatchDashboard() -> impl IntoView {
-    view! {
-        <Topbar breadcrumb="Inferência em Lote"/>
-        <div class="content">
-            <div class="section-header" style="margin-bottom:16px">
-                <div class="section-title">"Processar Inferência em Lote (UC07)"</div>
-            </div>
-            <div class="panel">
-                <div class="panel-title">"Upload de Arquivo"</div>
-                <div style="border:2px dashed var(--border);border-radius:8px;padding:40px;text-align:center;margin-bottom:16px">
-                    <i class="ti ti-upload" style="font-size:32px;color:var(--text3)"></i>
-                    <div style="margin-top:8px;color:var(--text3);font-size:12px">
-                        "Arraste um arquivo .parquet ou clique para selecionar"
-                    </div>
-                </div>
-                <div class="panel-title">"Mapeamento de Colunas"</div>
-                <div style="color:var(--text3);font-size:11px;padding:16px 0">
-                    "Selecione um sistema e um arquivo para iniciar o mapeamento."
-                </div>
-            </div>
-        </div>
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Análise (UC14 — Matriz de Regras, UC15 — Superfície)
-// ─────────────────────────────────────────────────────────────
-#[component]
-fn Analise() -> impl IntoView {
-    view! {
-        <Topbar breadcrumb="Análise"/>
-        <div class="content">
-            <div class="section-header" style="margin-bottom:16px">
-                <div class="section-title">"Superfície de Controle e Matriz de Regras"</div>
-            </div>
-            <div class="sim-layout">
-                <div>
-                    <div class="panel">
-                        <div class="panel-title">"Superfície de Controle (UC15)"</div>
-                        <div style="padding:40px 0;text-align:center;color:var(--text3);font-size:12px">
-                            <i class="ti ti-chart-heatmap" style="font-size:32px;display:block;margin-bottom:8px"></i>
-                            "Selecione duas variáveis de entrada e gere o mapa de calor."
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <div class="panel">
-                        <div class="panel-title">"Matriz de Regras Ativadas (UC14)"</div>
-                        <div style="padding:40px 0;text-align:center;color:var(--text3);font-size:12px">
-                            <i class="ti ti-grid-dots" style="font-size:32px;display:block;margin-bottom:8px"></i>
-                            "Execute uma simulação para visualizar a matriz."
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Auditoria (UC16)
+// Auditoria — funcional (dados reais do banco)
 // ─────────────────────────────────────────────────────────────
 #[component]
 fn Auditoria() -> impl IntoView {
+    let systems_list = LocalResource::new(|| async move { list_systems().await });
+    let selected_id = RwSignal::new(String::new());
+
+    let selected_id_clone = selected_id;
+    let events = LocalResource::new(move || {
+        let id = selected_id_clone.get();
+        async move {
+            if id.is_empty() {
+                AuditSummary { events: vec![], total: 0 }
+            } else {
+                list_audit_events(id).await
+            }
+        }
+    });
+
     view! {
         <Topbar breadcrumb="Auditoria"/>
         <div class="content">
             <div class="section-header" style="margin-bottom:16px">
-                <div class="section-title">"Histórico de Alterações"</div>
+                <div class="section-title">"Histórico de Alterações (UC16)"</div>
             </div>
-            <div class="panel">
-                <div class="panel-title">"Timeline do Sistema"</div>
-                <div style="padding:40px 0;text-align:center;color:var(--text3);font-size:12px">
-                    <i class="ti ti-history" style="font-size:32px;display:block;margin-bottom:8px"></i>
-                    "Navegue pelo histórico de alterações do sistema.<br/>
-                    Use Ctrl+Z / Ctrl+Shift+Z para desfazer e refazer."
-                </div>
+
+            <div class="panel" style="margin-bottom:16px">
+                <div class="panel-title">"Selecione um Sistema"</div>
+                {move || {
+                    let list = systems_list.get();
+                    view! {
+                        <select class="text-input" style="margin-top:8px"
+                            prop:value=move || selected_id.get()
+                            on:change=move |e| selected_id.set(event_target_value(&e))>
+                            <option value="">"— Selecione —"</option>
+                            {move || list.clone().unwrap_or_default().into_iter().map(|s| view! {
+                                <option value={s.id.clone()}>{s.name.clone()}</option>
+                            }).collect_view()}
+                        </select>
+                    }
+                }}
+            </div>
+
+            <Suspense fallback=|| view! { <div class="loading">"Carregando..."</div> }>
+            {move || {
+                let id = selected_id.get();
+                if id.is_empty() {
+                    return view! { <div class="empty-state">"Selecione um sistema para ver o histórico."</div> }.into_any();
+                }
+
+                match events.get() {
+                    None => view! { <div class="loading">"Carregando..."</div> }.into_any(),
+                    Some(summary) => {
+                        if summary.events.is_empty() {
+                            view! { <div class="empty-state">"Nenhuma alteração registrada para este sistema."</div> }.into_any()
+                        } else {
+                            let total = summary.total;
+                            let events = summary.events;
+                            view! {
+                                <div style="font-size:11px;color:var(--text3);margin-bottom:12px">
+                                    {total}" evento(s) registrado(s)"
+                                </div>
+                                <div class="timeline">
+                                    <For each=move || events.clone() key=|e| e.id.clone() let:evt>
+                                        <div class="timeline-item">
+                                            <div class="timeline-dot" data-action=evt.action_type.clone()></div>
+                                            <div class="timeline-content">
+                                                <div class="timeline-header">
+                                                    <span class="tag tag-amber">{evt.action_type.clone()}</span>
+                                                    <span class="tag tag-teal">{evt.entity_type.clone()}</span>
+                                                    <span style="font-size:10px;color:var(--text3);margin-left:auto">
+                                                        {evt.created_at[..19].replace("T", " ")}
+                                                    </span>
+                                                </div>
+                                                <div class="timeline-desc">{evt.description.clone()}</div>
+                                            </div>
+                                        </div>
+                                    </For>
+                                </div>
+                            }.into_any()
+                        }
+                    }
+                }
+            }}
+            </Suspense>
+        </div>
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Create System (form page)
+// ─────────────────────────────────────────────────────────────
+#[component]
+fn CreateSystemForm() -> impl IntoView {
+    view! {
+        <Topbar breadcrumb="Novo Sistema"/>
+        <div class="content">
+            <div class="section-header" style="margin-bottom:20px">
+                <div class="section-title">"Novo Sistema Fuzzy"</div>
+            </div>
+
+            <div class="panel" style="max-width:500px">
+                <form id="create-form" action="/api/sys/create" method="post" target="_self">
+                    <label class="input-label">"Nome *"</label>
+                    <input type="text" name="name" class="text-input" placeholder="Ex: Conforto Térmico" required/>
+
+                    <label class="input-label">"Descrição"</label>
+                    <input type="text" name="description" class="text-input" placeholder="Opcional"/>
+
+                    <label class="input-label">"Método de Defuzzificação"</label>
+                    <select name="defuzz_method" class="text-input">
+                        <option value="centroid">"Centroide"</option>
+                        <option value="bisector">"Bissetor"</option>
+                        <option value="mom">"Mean of Maximum"</option>
+                        <option value="lom">"Largest of Maximum"</option>
+                        <option value="som">"Smallest of Maximum"</option>
+                    </select>
+
+                    <div style="display:flex;gap:10px;margin-top:16px">
+                        <a class="btn" href="/">"Cancelar"</a>
+                        <button type="submit" class="btn btn-primary">"Criar Sistema"</button>
+                    </div>
+                </form>
+                <script>
+                    {r#"document.getElementById('create-form').addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        var data = new FormData(this);
+                        var body = JSON.stringify({
+                            name: data.get('name'),
+                            description: data.get('description') || null,
+                            defuzz_method: data.get('defuzz_method') || 'centroid'
+                        });
+                        await fetch('/api/systems', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: body
+                        });
+                        window.location.href = '/';
+                    });"#}
+                </script>
             </div>
         </div>
     }
 }
 
 // ─────────────────────────────────────────────────────────────
-// 404
+// Variáveis & Termos (UC02) — CRUD
 // ─────────────────────────────────────────────────────────────
+#[component]
+fn Variaveis() -> impl IntoView {
+    let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+    let selected_sys = RwSignal::new(String::new());
+    let variables = RwSignal::new(Vec::<serde_json::Value>::new());
+
+    // Load systems + auto-select from URL param
+    {
+        let sl = systems_list.clone();
+        let ss = selected_sys.clone();
+        let v = variables.clone();
+        spawn_async(async move {
+            let systems = list_systems().await;
+            leptos::logging::log!("[Variaveis] loaded {} systems", systems.len());
+            sl.set(systems);
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                let search = web_sys::window()
+                    .and_then(|w| w.location().search().ok())
+                    .unwrap_or_default();
+                leptos::logging::log!("[Variaveis] URL search: {}", &search);
+                if let Some(id) = search.split("s=").nth(1).and_then(|s| s.split('&').next()) {
+                    if !id.is_empty() {
+                        leptos::logging::log!("[Variaveis] auto-selecting system: {}", id);
+                        ss.set(id.to_string());
+                        let vars = list_variables(id).await;
+                        leptos::logging::log!("[Variaveis] loaded {} variables", vars.len());
+                        v.set(vars);
+                    }
+                }
+            }
+        });
+    }
+
+    view! {
+        <Topbar breadcrumb="Variáveis & Termos"/>
+        <div class="content">
+            <div class="section-header"><div class="section-title">"Variáveis & Termos (UC02)"</div></div>
+            <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
+                <select class="text-input" style="margin-bottom:0"
+                    prop:value=move || selected_sys.get()
+                    on:change=move |e| {
+                        selected_sys.set(event_target_value(&e));
+                        let v = variables.clone();
+                        let s = event_target_value(&e);
+                        spawn_async(async move { v.set(list_variables(&s).await); });
+                    }>
+                    <option value="">"— Sistema —"</option>
+                    {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                </select>
+            </div>
+            {move || {
+                let sid = selected_sys.get();
+                if sid.is_empty() { return view! { <div class="empty-state">"Selecione um sistema"</div> }.into_any(); }
+                let vars = variables.get();
+                view! {
+                    <div class="var-layout">
+                        <div class="var-sidebar">
+                            <div class="var-group-label">"Variáveis"</div>
+                            {if vars.is_empty() {
+                                view! { <div style="font-size:10px;color:var(--text3);padding:8px">"Nenhuma variável ainda."</div> }.into_any()
+                            } else {
+                                vars.iter().map(|v| {
+                                    let name = v["name"].as_str().unwrap_or("?").to_string();
+                                    let role = v["role"].as_str().unwrap_or("").to_string();
+                                    let dot = if role=="antecedent"{"var(--amber)"}else{"var(--teal)"};
+                                    view! { <div class="var-item"><span class="var-dot" style=format!("background:{dot}")></span>{name}</div> }
+                                }).collect_view().into_any()
+                            }}
+                        </div>
+                        <div class="var-panel">
+                            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+                                <a class="btn btn-primary" style="font-size:10px;padding:4px 10px" href={format!("/add-var?s={}", sid)} target="_self">
+                                    <i class="ti ti-plus"></i>"Variável"
+                                </a>
+                                <a class="btn" style="font-size:10px;padding:4px 10px" href={format!("/add-term?s={}", sid)} target="_self">
+                                    <i class="ti ti-plus"></i>"Termo"
+                                </a>
+                            </div>
+                            <div class="section-title" style="font-size:11px">"Termos"</div>
+                            <div class="term-chips">
+                                {vars.first().and_then(|v| v["terms"].as_array().map(|terms| {
+                                    terms.iter().map(|t| {
+                                        let label = t["label"].as_str().unwrap_or("?").to_string();
+                                        let mf = t["mf_type"].as_str().unwrap_or("").to_string();
+                                        view! { <div class="term-chip active">{label}" ["{mf}"]"</div> }
+                                    }).collect_view()
+                                })).unwrap_or_default()}
+                            </div>
+                        </div>
+                    </div>
+                }.into_any()
+            }}
+        </div>
+    }
+}
+
+ fn Regras() -> impl IntoView {
+     let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+     let selected_sys = RwSignal::new(String::new());
+     let rules = RwSignal::new(Vec::<serde_json::Value>::new());
+
+    spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+
+    view! {
+        <Topbar breadcrumb="Editor de Regras"/>
+        <div class="content">
+            <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Editor de Regras (UC03)"</div></div>
+            <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
+                <label class="input-label">"Sistema"</label>
+                <select class="text-input" style="margin-bottom:0"
+                    on:change=move |e| {
+                        let sid = event_target_value(&e);
+                        selected_sys.set(sid.clone());
+                        let r = rules.clone();
+                        spawn_async(async move { r.set(serde_json::to_value(list_rules(&sid).await).unwrap_or_default().as_array().cloned().unwrap_or_default()); });
+                    }>
+                     <option value="">"— Selecione —"</option>
+                     {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                 </select>
+             </div>
+             {move || {
+                 let rs = rules.get();
+                 if rs.is_empty() { return view! { <div class="empty-state">"Selecione um sistema para ver as regras."</div> }.into_any(); }
+                 view! {
+                     <div class="rule-hint">"Formato: SE &lt;variável&gt; É &lt;termo&gt; E ... ENTÃO &lt;variável&gt; É &lt;termo&gt; [peso]"</div>
+                     {rs.iter().map(|r| {
+                         let text = r["rule_text"].as_str().unwrap_or("").to_string();
+                         view! { <div class="rule-row"><div class="rule-num">{r["position"].as_i64().unwrap_or(0)}</div><div class="rule-text">"SE " {text}</div><div class="rule-weight">"w=" {r["weight"].as_f64().unwrap_or(1.0)}</div></div> }
+                     }).collect_view()}
+                 }.into_any()
+             }}
+         </div>
+     }
+ }
+
+ #[component]
+ fn Simulador() -> impl IntoView {
+     let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+     let selected_sys = RwSignal::new(String::new());
+
+    spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+
+    view! {
+        <Topbar breadcrumb="Simulador"/>
+        <div class="content">
+            <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Simulador (UC04)"</div></div>
+             <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
+                 <label class="input-label">"Sistema"</label>
+                 <select class="text-input" style="margin-bottom:0"
+                     on:change=move |e| selected_sys.set(event_target_value(&e))>
+                     <option value="">"— Selecione —"</option>
+                     {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                 </select>
+             </div>
+             <div class="sim-layout">
+                 <div class="panel"><div class="panel-title">"Entradas"</div><div style="color:var(--text3);font-size:11px;padding:16px 0">"Configuração de inputs em breve."</div></div>
+                 <div class="panel"><div class="panel-title">"Resultado"</div><div style="color:var(--text3);font-size:11px;padding:16px 0">"Execute uma simulação para ver o resultado."</div></div>
+             </div>
+         </div>
+     }
+ }
+
+ #[component]
+ fn Historico() -> impl IntoView {
+     let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+     let selected_sys = RwSignal::new(String::new());
+     let sims = RwSignal::new(Vec::<serde_json::Value>::new());
+
+    spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+
+    view! {
+        <Topbar breadcrumb="Histórico"/>
+        <div class="content">
+            <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Histórico (UC06)"</div></div>
+            <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
+                <label class="input-label">"Sistema"</label>
+                <select class="text-input" style="margin-bottom:0"
+                    on:change=move |e| {
+                        let sid = event_target_value(&e);
+                        selected_sys.set(sid.clone());
+                        let s = sims.clone();
+                        spawn_async(async move { s.set(list_simulations(&sid).await.into_iter().map(|si| serde_json::json!(si)).collect()); });
+                    }>
+                     <option value="">"— Selecione —"</option>
+                     {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                 </select>
+             </div>
+             {move || {
+                 let list = sims.get();
+                 if list.is_empty() { return view! { <div class="empty-state">"Nenhuma simulação encontrada."</div> }.into_any(); }
+                 view! {
+                     <div class="hist-wrap">
+                         <table class="hist-table"><thead><tr><th>"Entradas"</th><th>"Saída"</th><th>"Data"</th></tr></thead>
+                         <tbody>{list.iter().map(|s| {
+                             view! { <tr><td style="font-size:10px">{s["inputs"].to_string()}</td><td>{s["outputs"].to_string()}</td><td>{s["executed_at"].as_str().unwrap_or("")[..19].replace("T"," ")}</td></tr> }
+                         }).collect_view()}</tbody></table>
+                     </div>
+                 }.into_any()
+             }}
+         </div>
+     }
+ }
+
+ #[component]
+ fn BatchDashboard() -> impl IntoView {
+     view! { <Topbar breadcrumb="Inferência em Lote"/><div class="content"><div class="empty-state">"Batch — em construção"</div></div> }
+ }
+
+ #[component]
+ fn Analise() -> impl IntoView {
+     view! { <Topbar breadcrumb="Análise"/><div class="content"><div class="empty-state">"Análise — em construção"</div></div> }
+ }
+
+// ── 404 ──
 #[component]
 fn NotFound() -> impl IntoView {
     view! {

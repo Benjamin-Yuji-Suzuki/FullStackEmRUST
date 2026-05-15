@@ -76,7 +76,7 @@ FullStackEmRUST/
 
 ---
 
-## Casos de Uso (16)
+## Casos de Uso (20)
 
 Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
 
@@ -98,6 +98,10 @@ Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
 | UC14 | Visualizar Matriz de Regras Ativadas | Usuário |
 | UC15 | Visualizar Superfície de Controle | Usuário |
 | UC16 | Gerenciar Histórico de Alterações | Usuário |
+| UC17 | Otimizar Parâmetros com PSO | Usuário |
+| UC18 | Executar Inferência TSK | Usuário |
+| UC19 | Exportar Visualizações SVG | Usuário |
+| UC20 | Visualizar Relatório de Diagnóstico | Usuário |
 
 ---
 
@@ -171,8 +175,9 @@ Projeto integrado ao [SonarQube Cloud](https://sonarcloud.io/project/overview?id
 ## Documentação Complementar
 
 | Documento | Conteúdo |
-|---|---|
-| [USE_CASES.md](./USE_CASES.md) | Especificação completa dos 16 casos de uso |
+|---|---|---|
+| [USE_CASES.md](./USE_CASES.md) | Especificação completa dos 20 casos de uso |
+| [TEST_CASES.md](./TEST_CASES.md) | Casos de teste documentados para os 20 UCs (43 casos, 16 ✅) |
 | [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Variáveis, universos, funções de pertinência, base de regras e cenários de teste |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Modelagem do banco, integrações (OpenWeather + Parquet) e fluxo de dados |
 
