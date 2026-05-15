@@ -1,6 +1,6 @@
 # 📋 Casos de Uso — FuzzySimulated
 
-> Especificação dos 16 casos de uso da plataforma, seguindo o padrão UML:
+> Especificação dos 20 casos de uso da plataforma, seguindo o padrão UML:
 > ator(es), pré-condições, fluxo principal, fluxos alternativos (com retorno ao fluxo principal) e pós-condições.
 > Atores são SEMPRE entidades externas à fronteira do sistema.
 
@@ -12,32 +12,28 @@
 
 ## Índice
 
-| ID | Nome | Ator(es) |
-|---|---|---|
-| [UC01](#uc01) | Gerenciar Sistemas Fuzzy | Usuário |
-| [UC02](#uc02) | Gerenciar Variáveis e Termos | Usuário |
-| [UC03](#uc03) | Gerenciar Regras Fuzzy | Usuário |
-| [UC04](#uc04) | Executar Simulação | Usuário |
-| [UC05](#uc05) | Buscar Dados Climáticos | Usuário, OpenWeather API |
-| [UC06](#uc06) | Consultar Histórico de Simulações | Usuário |
-| [UC07](#uc07) | Processar Inferência em Lote | Usuário |
-| [UC08](#uc08) | Comparar Simulações | Usuário |
-| [UC09](#uc09) | Exportar Relatório de Simulação | Usuário |
-| [UC10](#uc10) | Duplicar Sistema Fuzzy | Usuário |
-| [UC11](#uc11) | Exportar e Importar Sistema | Usuário |
-| [UC12](#uc12) | Salvar Cenário de Simulação | Usuário |
-| [UC13](#uc13) | Executar Varredura de Entrada | Usuário |
-| [UC14](#uc14) | Visualizar Matriz de Regras Ativadas | Usuário |
-| [UC15](#uc15) | Visualizar Superfície de Controle | Usuário |
-| [UC16](#uc16) | Gerenciar Histórico de Alterações | Usuário |
-| [UC17](#uc17) | Otimizar Parâmetros com PSO | Usuário |
-| [UC18](#uc18) | Executar Inferência TSK | Usuário |
-| [UC19](#uc19) | Exportar Visualizações SVG | Usuário |
-| [UC20](#uc20) | Visualizar Relatório de Diagnóstico | Usuário |
-| [UC17](#uc17) | Otimizar Parâmetros com PSO | Usuário |
-| [UC18](#uc18) | Executar Inferência TSK | Usuário |
-| [UC19](#uc19) | Exportar Visualizações SVG | Usuário |
-| [UC20](#uc20) | Visualizar Relatório de Diagnóstico | Usuário |
+| ID | Nome | Tipo | Ator(es) |
+|---|---|---|---|
+| [UC01](#uc01) | Gerenciar Sistemas Fuzzy | [Criar][Ler][Atualizar][Deletar] | Usuário |
+| [UC02](#uc02) | Gerenciar Variáveis e Termos | [Criar][Ler][Deletar] | Usuário |
+| [UC03](#uc03) | Gerenciar Regras Fuzzy | [Criar][Ler][Atualizar][Deletar] | Usuário |
+| [UC04](#uc04) | Executar Simulação | [Processamento] | Usuário |
+| [UC05](#uc05) | Buscar Dados Climáticos | [Consumo] | Usuário, OpenWeather API |
+| [UC06](#uc06) | Consultar Histórico de Simulações | [Ler][Deletar] | Usuário |
+| [UC07](#uc07) | Processar Inferência em Lote | [Processamento] | Usuário |
+| [UC08](#uc08) | Comparar Simulações | [Análise] | Usuário |
+| [UC09](#uc09) | Exportar Relatório de Simulação | [Exportar] | Usuário |
+| [UC10](#uc10) | Duplicar Sistema Fuzzy | [Clonar] | Usuário |
+| [UC11](#uc11) | Exportar e Importar Sistema | [Exportar][Importar] | Usuário |
+| [UC12](#uc12) | Salvar Cenário de Simulação | [Criar][Ler][Deletar] | Usuário |
+| [UC13](#uc13) | Executar Varredura de Entrada | [Análise] | Usuário |
+| [UC14](#uc14) | Visualizar Matriz de Regras Ativadas | [Visualização] | Usuário |
+| [UC15](#uc15) | Visualizar Superfície de Controle | [Visualização] | Usuário |
+| [UC16](#uc16) | Gerenciar Histórico de Alterações | [Ler][Desfazer][Refazer] | Usuário |
+| [UC17](#uc17) | Otimizar Parâmetros com PSO | [Otimização] | Usuário |
+| [UC18](#uc18) | Executar Inferência TSK | [Processamento] | Usuário |
+| [UC19](#uc19) | Exportar Visualizações SVG | [Exportar] | Usuário |
+| [UC20](#uc20) | Visualizar Relatório de Diagnóstico | [Visualização] | Usuário |
 
 ---
 
