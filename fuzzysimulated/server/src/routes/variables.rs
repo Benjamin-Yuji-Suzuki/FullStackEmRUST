@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use uuid::Uuid;
@@ -16,7 +16,8 @@ pub fn routes() -> Router<AppState> {
         .route("/systems/{id}/variables", get(list_variables).post(create_variable))
         .route("/variables/{id}", delete(delete_variable))
         .route("/variables/{id}/terms", post(create_term))
-        .route("/terms/{id}", delete(delete_term))
+        .route("/variables/{id}", put(update_variable))
+        .route("/terms/{id}", put(update_term).delete(delete_term))
 }
 
 async fn list_variables(
@@ -114,6 +115,48 @@ async fn create_variable(
         &format!("Variável '{}' adicionada como {}", row.name, row.role)).await;
 
     Ok((axum::http::StatusCode::CREATED, Json(row)))
+}
+
+async fn update_variable(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<CreateVariableRequest>,
+) -> Result<Json<FuzzyVariable>, AppError> {
+    let name = req.name.trim().to_string();
+    if name.is_empty() { return Err(AppError::Validation("Nome obrigatório".into())); }
+
+    let resolution = req.resolution.unwrap_or(501);
+    if resolution < 2 { return Err(AppError::Validation("Resolução mínima é 2".into())); }
+
+    let row = sqlx::query_as::<_, FuzzyVariable>(
+        "UPDATE fuzzy_variables SET name = $1, universe_min = $2, universe_max = $3, resolution = $4 WHERE id = $5 RETURNING *"
+    )
+    .bind(&name).bind(req.universe_min).bind(req.universe_max).bind(resolution).bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Variável não encontrada".into()))?;
+
+    Ok(Json(row))
+}
+
+async fn update_term(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<CreateTermRequest>,
+) -> Result<Json<FuzzyTerm>, AppError> {
+    let label = req.label.trim().to_string();
+    if label.is_empty() { return Err(AppError::Validation("Rótulo obrigatório".into())); }
+
+    let params_json = json!(req.params);
+    let row = sqlx::query_as::<_, FuzzyTerm>(
+        "UPDATE fuzzy_terms SET label = $1, mf_type = $2, params = $3 WHERE id = $4 RETURNING *"
+    )
+    .bind(&label).bind(&req.mf_type).bind(&params_json).bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Termo não encontrada".into()))?;
+
+    Ok(Json(row))
 }
 
 async fn delete_variable(

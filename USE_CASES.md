@@ -15,7 +15,7 @@
 | ID | Nome | Tipo | Ator(es) |
 |---|---|---|---|
 | [UC01](#uc01) | Gerenciar Sistemas Fuzzy | [Criar][Ler][Atualizar][Deletar] | Usuário |
-| [UC02](#uc02) | Gerenciar Variáveis e Termos | [Criar][Ler][Deletar] | Usuário |
+| [UC02](#uc02) | Gerenciar Variáveis e Termos | [Criar][Ler][Atualizar][Deletar] | Usuário |
 | [UC03](#uc03) | Gerenciar Regras Fuzzy | [Criar][Ler][Atualizar][Deletar] | Usuário |
 | [UC04](#uc04) | Executar Simulação | [Processamento] | Usuário |
 | [UC05](#uc05) | Buscar Dados Climáticos | [Consumo] | Usuário, OpenWeather API |
@@ -139,6 +139,22 @@
 4. **Sistema** valida: rótulo não vazio e único; parâmetros coerentes (`trimf: a≤b≤c`, `trapmf: a≤b≤c≤d`, `gaussmf: σ>0`).
 5. **Sistema** persiste o termo e atualiza o gráfico de pertinências.
 
+**Fluxo Principal — Editar variável**
+
+1. Usuário clica no ícone de edição ao lado de uma variável.
+2. **Sistema** exibe formulário modal pré-preenchido com os dados atuais (nome, universo mínimo, universo máximo, resolução).
+3. Usuário altera os campos desejados e clica em "Salvar".
+4. **Sistema** valida os dados e persiste as alterações.
+5. **Sistema** atualiza a listagem e o gráfico de pertinências.
+
+**Fluxo Principal — Editar termo linguístico**
+
+1. Usuário clica no ícone de edição ao lado de um termo.
+2. **Sistema** exibe formulário modal pré-preenchido com os dados atuais (rótulo, tipo de MF, parâmetros).
+3. Usuário altera os campos e clica em "Salvar".
+4. **Sistema** valida os parâmetros e persiste as alterações.
+5. **Sistema** atualiza o gráfico de pertinências.
+
 **Fluxo Principal — Remover variável ou termo**
 
 1. Usuário clica no ícone de remoção ao lado de uma variável ou termo.
@@ -155,6 +171,8 @@
 - **FA5 — Parâmetros fora do universo:** Sistema exibe aviso "Parâmetros extrapolam o universo. Confirma?" Usuário decide.
 - **FA6 — Variável referenciada em regras:** Sistema exibe "Referenciada em [N] regras. Removê-la as invalidará. Confirma?"
 - **FA7 — Usuário cancela:** Nenhuma alteração persistida.
+- **FA8 — Edição com nome duplicado:** Sistema exibe "Já existe uma variável com este nome". Retorna ao formulário de edição.
+- **FA9 — Edição de termo com parâmetros inválidos:** Sistema exibe o erro de validação específico. Retorna ao formulário de edição.
 
 **Pós-condições**
 
