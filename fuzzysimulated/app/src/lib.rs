@@ -617,7 +617,7 @@ fn Variaveis() -> impl IntoView {
 
  #[component]
  fn BatchDashboard() -> impl IntoView {
-     view! { <Topbar breadcrumb="Inferência em Lote"/><div class="content"><div class="empty-state">"Batch — em construção"</div></div> }
+     view! { <Topbar breadcrumb="Inferência em Lote"/><div class="content"><div class="empty-state">"Upload de arquivo .parquet + mapeamento de colunas + inferência em lote (Sprint 3)"</div></div> }
  }
 
  #[component]
