@@ -9,99 +9,119 @@
 O schema é versionado em `server/migrations/001_schema.sql`. Todas as tabelas usam UUID como chave primária e campos JSONB para armazenar estruturas flexíveis (inputs, outputs, termos fuzzy).
 
 ```sql
+-- Sistemas fuzzy (UC01)
 CREATE TABLE fuzzy_systems (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name          TEXT NOT NULL,
-  description   TEXT,
-  defuzz_method TEXT NOT NULL DEFAULT 'centroid',
-  created_at    TIMESTAMP DEFAULT NOW(),
-  updated_at    TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    description TEXT,
+    defuzz_method TEXT NOT NULL DEFAULT 'centroid',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Variáveis (UC02)
 CREATE TABLE fuzzy_variables (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  system_id     UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
-  name          TEXT NOT NULL,
-  role          TEXT NOT NULL CHECK (role IN ('antecedent', 'consequent')),
-  universe_min  FLOAT NOT NULL,
-  universe_max  FLOAT NOT NULL,
-  resolution    INT NOT NULL DEFAULT 501
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    system_id UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('antecedent', 'consequent')),
+    universe_min FLOAT NOT NULL,
+    universe_max FLOAT NOT NULL,
+    resolution INT NOT NULL DEFAULT 501
 );
 
+-- Termos linguísticos (UC02)
 CREATE TABLE fuzzy_terms (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  variable_id UUID NOT NULL REFERENCES fuzzy_variables(id) ON DELETE CASCADE,
-  label       TEXT NOT NULL,
-  mf_type     TEXT NOT NULL CHECK (mf_type IN ('trimf', 'trapmf', 'gaussmf')),
-  params      JSONB NOT NULL
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    variable_id UUID NOT NULL REFERENCES fuzzy_variables(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    mf_type TEXT NOT NULL CHECK (mf_type IN ('trimf', 'trapmf', 'gaussmf')),
+    params JSONB NOT NULL
 );
 
+-- Regras fuzzy (UC03)
 CREATE TABLE fuzzy_rules (
-  id        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  system_id UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
-  rule_text TEXT NOT NULL,
-  weight    FLOAT NOT NULL DEFAULT 1.0,
-  position  INT NOT NULL DEFAULT 0
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    system_id UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
+    rule_text TEXT NOT NULL,
+    weight FLOAT NOT NULL DEFAULT 1.0,
+    position INT NOT NULL DEFAULT 0
 );
 
+-- Simulações (UC04, UC06)
 CREATE TABLE simulations (
-  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  system_id    UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
-  inputs       JSONB NOT NULL,
-  outputs      JSONB NOT NULL,
-  weather_data JSONB,
-  city         TEXT,
-  executed_at  TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    system_id UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
+    inputs JSONB NOT NULL,
+    outputs JSONB NOT NULL,
+    weather_data JSONB,
+    city TEXT,
+    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Resultados de inferência em lote (UC07)
 CREATE TABLE batch_results (
-  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  system_id    UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
-  source_file  TEXT NOT NULL,
-  row_index    INT NOT NULL,
-  inputs       JSONB NOT NULL,
-  output       FLOAT NOT NULL,
-  executed_at  TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    system_id UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
+    source_file TEXT NOT NULL,
+    row_index INT NOT NULL,
+    inputs JSONB NOT NULL,
+    output FLOAT NOT NULL,
+    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Eventos de auditoria (UC16)
+CREATE TABLE audit_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    system_id UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
+    action_type TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id UUID,
+    description TEXT NOT NULL,
+    snapshot_before JSONB,
+    snapshot_after JSONB,
+    redo_stack BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Cenários de simulação (UC12)
+CREATE TABLE scenarios (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    system_id UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    inputs JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Índices
+
+```sql
+CREATE INDEX idx_variables_system ON fuzzy_variables(system_id);
+CREATE INDEX idx_terms_variable ON fuzzy_terms(variable_id);
+CREATE INDEX idx_rules_system ON fuzzy_rules(system_id);
+CREATE INDEX idx_simulations_system ON simulations(system_id);
+CREATE INDEX idx_simulations_executed ON simulations(executed_at DESC);
+CREATE INDEX idx_batch_system ON batch_results(system_id);
+CREATE INDEX idx_audit_system ON audit_events(system_id);
+CREATE INDEX idx_audit_created ON audit_events(created_at DESC);
+CREATE INDEX idx_scenarios_system ON scenarios(system_id);
 ```
 
 ---
 
 ## Integração com API Externa — OpenWeather
 
-A [OpenWeather Current Weather API](https://openweathermap.org/current) fornece temperatura (°C) e umidade (%) de qualquer cidade em tempo real, usadas como inputs automáticos do sistema fuzzy no Simulador (UC05).
+A [OpenWeather Current Weather API](https://openweathermap.org/current) fornece temperatura (°C) e umidade (%) de qualquer cidade em tempo real (UC05).
 
 ```
 GET https://api.openweathermap.org/data/2.5/weather?q=Belém&appid={API_KEY}&units=metric
 → { "main": { "temp": 32.4, "humidity": 88 } }
 ```
 
-O backend extrai `temp` e `humidity`, persiste em `simulations.weather_data` (JSONB) e os retorna ao frontend para preenchimento automático dos inputs.
-
----
-
-## Upload de Dataset Parquet — Dashboard Batch
-
-O usuário pode carregar um arquivo Parquet diretamente pelo Dashboard Batch. O backend processa o arquivo via Polars em thread pool (sem bloquear o runtime Tokio) e executa a inferência fuzzy linha a linha usando o `logicfuzzy_academic`. Os resultados são persistidos em `batch_results` e exibidos no dashboard.
-
-```
-Frontend (Leptos)
-  multipart upload do arquivo .parquet
-          ↓
-Axum backend
-  POST /api/batch/upload
-  spawn_blocking → Polars lê o Parquet
-  mapeamento de colunas → variáveis fuzzy do sistema selecionado
-  logicfuzzy_academic → MamdaniEngine por linha
-  batch_results → persistência no PostgreSQL
-          ↓
-Dashboard Batch
-  Leptos renderiza distribuição dos outputs
-```
-
-### Mapeamento e Renomeação de Colunas
-
-Datasets de cibersegurança frequentemente contêm colunas com caracteres especiais, espaços ou nomes incompatíveis. A interface permite ao usuário renomear qualquer coluna do Parquet antes de mapeá-la para as variáveis fuzzy do sistema, sem alterar o arquivo original.
+**Endpoint:** `GET /api/weather?city=Belém`  
+**Chave:** `OPENWEATHER_API_KEY` no `.env`  
+**Tratamento de erros:** cidade não encontrada (404), chave inválida (401), timeout (502)
 
 ---
 
@@ -109,68 +129,57 @@ Datasets de cibersegurança frequentemente contêm colunas com caracteres especi
 
 ```
 FullStackEmRUST/
+├── USE_CASES.md         # 20 casos de uso
+├── TEST_CASES.md        # 43 casos de teste
+├── FUZZY_MODEL.md       # Modelos Mamdani + TSK + PSO
+├── ARCHITECTURE.md      # Este documento
+├── README.md
 └── fuzzysimulated/
-    ├── Cargo.toml            # workspace Rust
-    ├── Cargo.lock            # versões fixadas (commitado)
-    ├── .env.example          # template de variáveis de ambiente
-    ├── app/                  # crate compartilhada Leptos (SSR + CSR)
+    ├── Cargo.toml        # workspace Rust (Leptos, Axum, SQLx, reqwest)
+    ├── app/              # crate compartilhada Leptos (SSR + CSR)
+    │   └── src/
+    │       ├── lib.rs         # componentes e páginas
+    │       └── server_fns.rs  # chamadas à REST API (gloo-net/reqwest)
+    ├── server/            # crate Axum — REST API
+    │   ├── src/
+    │   │   ├── main.rs        # entry point, router, static files
+    │   │   ├── audit.rs       # helper de registro de auditoria
+    │   │   ├── errors.rs      # AppError
+    │   │   ├── models/        # FuzzySystem, Variable, Term, Rule, etc.
+    │   │   ├── routes/        # systems, variables, rules, simulate, weather, audit
+    │   │   └── state.rs       # AppState
+    │   ├── migrations/001_schema.sql
+    │   └── tests/api_test.rs  # 16 unit + 6 integration tests
+    ├── frontend/          # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── server/               # crate Axum — rotas e lógica de negócio
-    │   ├── src/main.rs
-    │   └── migrations/
-    │       └── 001_schema.sql
-    ├── frontend/             # crate WASM — entry point client-side
-    │   └── src/lib.rs
-    ├── end2end/              # testes Playwright (E2E)
-    ├── style/                # SCSS global
-    └── public/               # assets estáticos
+    ├── end2end/           # Playwright (E2E) — esboço
+    ├── style/main.scss    # SCSS global (tema escuro)
+    └── public/            # assets estáticos
 ```
-
-> O motor de inferência [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) é uma dependência externa publicada no crates.io — adicionada via `cargo add logicfuzzy-academic`, não faz parte deste repositório.
 
 ---
 
-## Modelo Fuzzy — Visão Geral
+## Visão Geral da Arquitetura
 
-O sistema-padrão pré-carregado para demonstração avalia **risco crítico de incidentes de cibersegurança** com base em impacto financeiro e impacto de mercado. O usuário pode criar qualquer sistema via interface — as tabelas abaixo descrevem apenas o exemplo de demonstração, e a base de regras é inteiramente configurável pelo usuário na tela Editor de Regras.
-
-A especificação completa (parâmetros de pertinência, cenários de teste, análise de sensibilidade) está em **[FUZZY_MODEL.md](./FUZZY_MODEL.md)**.
-
-### Variáveis
-
-| Variável | Papel | Universo | Termos linguísticos |
-|---|---|---|---|
-| Impacto Financeiro | Antecedente | [0, 100] | Baixo · Médio · Alto |
-| Impacto de Mercado | Antecedente | [0, 100] | Baixo · Médio · Alto |
-| Risco Crítico | Consequente | [0, 100] | Tolerável · Moderado · Alto · Crítico · Severo |
-
-### Funções de Pertinência Suportadas
-
-| Tipo | Parâmetros | Uso típico |
-|---|---|---|
-| `trimf` | [a, b, c] | Termos centrais com transição triangular |
-| `trapmf` | [a, b, c, d] | Termos extremos com platô de pertinência máxima |
-| `gaussmf` | [mean, σ] | Transições suaves entre termos adjacentes |
-
-### Inferência Mamdani
-
-1. **Fuzzificação** — cada input crisp é mapeado para graus de pertinência em cada termo.
-2. **Avaliação de regras** — operador AND (mínimo) entre antecedentes; grau de ativação corta a pertinência do consequente (implicação mínimo).
-3. **Agregação** — união (máximo) de todos os consequentes ativados.
-4. **Defuzzificação** — método centroide (padrão) ou outros métodos configuráveis pelo usuário.
-
-### Base de Regras (sistema-padrão — 9 regras)
-
-A base de regras abaixo é o ponto de partida do sistema de demonstração. O usuário pode editar, adicionar ou remover regras livremente pela interface do Editor de Regras.
-
-| # | Se Impacto Financeiro é… | E Impacto de Mercado é… | Então Risco Crítico é… | Observação |
-|---|---|---|---|---|
-| R01 | Baixo | Baixo | Tolerável | Incidente isolado; monitoramento padrão é suficiente |
-| R02 | Baixo | Médio | Moderado | Operação normal, mas requer ação de relações públicas |
-| R03 | Baixo | Alto | Crítico | Risco alto de perda de clientes, mesmo sem grande custo direto |
-| R04 | Médio | Baixo | Moderado | Custo operacional absorvível, sem alarde público |
-| R05 | Médio | Médio | Alto | Prejuízo considerável e danos à reputação simultâneos |
-| R06 | Médio | Alto | Crítico | Necessita acionamento imediato do comitê de crise |
-| R07 | Alto | Baixo | Alto | Grande evasão de caixa, mesmo que o mercado não tenha precificado |
-| R08 | Alto | Médio | Crítico | Perdas financeiras severas vazando para a percepção pública |
-| R09 | Alto | Alto | Severo | Colapso simultâneo de caixa e reputação — resposta emergencial |
+```
+Navegador (WASM)
+  ├── Leptos (SSR + hydrate)
+  │     └── Componentes: Dashboard, Variáveis, Regras, Simulador, etc.
+  │
+  ├── HTTP (gloo-net via fetch)
+  │     ↓
+  └── Servidor Axum (porta 3000)
+        ├── REST API (/api/*)
+        │     ├── systems.rs      → CRUD sistemas
+        │     ├── variables.rs    → CRUD variáveis e termos
+        │     ├── rules.rs        → CRUD regras
+        │     ├── simulate.rs     → simulação, histórico, import/export, etc.
+        │     ├── weather.rs      → OpenWeather API
+        │     └── audit_routes.rs → auditoria
+        │
+        ├── PostgreSQL via SQLx
+        │     └── migrations, queries compile-checked, JSONB
+        │
+        └── Static files (ServeDir)
+              └── /pkg/ (WASM, JS, CSS gerados pelo wasm-bindgen)
+```

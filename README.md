@@ -1,9 +1,9 @@
 # FuzzySimulated
 
-> Plataforma web full-stack para construção, persistência e simulação de Sistemas de Inferência Fuzzy Mamdani — com visualização interativa, histórico e auditoria.
+> Plataforma web full-stack para construção, persistência e simulação de Sistemas de Inferência Fuzzy Mamdani e TSK — com visualização interativa, histórico, auditoria e otimização por PSO.
 
 **Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 01/2026  
-**Modalidade (IA):** Opção B — Aplicação/Produto baseado em Controle Fuzzy  
+**Modalidade (IA):** Opção B + Opção C-B (TSK) + Pontuação Extra (PSO)  
 **Equipe:** Benjamin Yuji Suzuki  
 **Repositório principal:** https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST
 
@@ -11,7 +11,7 @@
 
 ## Resumo
 
-**FuzzySimulated** é uma plataforma web desenvolvida inteiramente em Rust que permite montar sistemas de lógica fuzzy Mamdani de forma visual, persistir configurações em banco relacional, executar simulações e visualizar o pipeline completo de inferência — fuzzificação, avaliação de regras, agregação e defuzzificação.
+**FuzzySimulated** é uma plataforma web desenvolvida inteiramente em Rust que permite montar sistemas de inferência fuzzy (Mamdani e TSK) de forma visual, persistir configurações em banco relacional, executar simulações com ambos os motores, visualizar o pipeline completo e otimizar parâmetros via Particle Swarm Optimization (PSO).
 
 O projeto é composto por dois repositórios:
 
@@ -202,18 +202,23 @@ npx playwright test
 | Documento | Conteúdo |
 |---|---|---|
 | [USE_CASES.md](./USE_CASES.md) | Especificação completa dos 20 casos de uso |
-| [TEST_CASES.md](./TEST_CASES.md) | Casos de teste documentados para os 20 UCs (43 casos, 16 ✅) |
-| [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Variáveis, universos, funções de pertinência, base de regras e cenários de teste |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Modelagem do banco, integrações (OpenWeather + Parquet) e fluxo de dados |
+| [TEST_CASES.md](./TEST_CASES.md) | Casos de teste documentados (43 casos, 16 aprovados) |
+| [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Modelos Mamdani e TSK + Otimização PSO |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Modelagem do banco, integrações e fluxo de dados |
 
 ---
 
-## Declaração de Uso de IA
+## Declaração de Uso de IA (Obrigatória — Lauda IA §9)
 
-| Ferramenta | Finalidade | Revisão da equipe |
-|---|---|---|
-| Claude (Anthropic) | Revisão de documentação, estruturação de README/USE_CASES/FUZZY_MODEL, dúvidas sobre Rust/Leptos/SonarQube/Polars, avaliação de arquitetura | Todo conteúdo revisado, ajustado e validado pelo autor antes de incorporar ao repositório |
-| Gemini Pro (Google) | Ideação de arquitetura — sugestão de integrar pipeline de dados ao ecossistema fullstack | Ideia avaliada criticamente e adaptada pelo autor |
+Conforme exigido pela disciplina de Inteligência Artificial e Computacional, declaramos abaixo o uso de ferramentas de IA generativa e agentes de desenvolvimento, com transparência sobre finalidade, prompts resumidos e revisão humana.
+
+| Ferramenta | Finalidade | Prompt/Comando resumido | Revisão da equipe |
+|---|---|---|---|
+| Claude (Anthropic) / opencode | Desenvolvimento de código (componentes Leptos, rotas Axum, testes Rust), estruturação de documentação, correção de bugs de compilação, debug de WASM/SSR | "Implementar página de variáveis", "corrigir erro Pool not initialized", "criar rotas REST para rules", "debug MIME types WASM", "converter HTML/JS para 100% Rust" | Todo código gerado foi revisado, testado (cargo check + cargo test) e validado quanto à correção funcional antes de incorporar ao repositório |
+| Gemini Pro (Google) | Ideação de arquitetura — sugestão de integrar pipeline de dados ao ecossistema fullstack | "Como estruturar um projeto fullstack Rust com Leptos + Axum + fuzzy inference?" | Ideia avaliada criticamente e adaptada pelo autor conforme viabilidade técnica |
+| ChatGPT (OpenAI) | Esclarecimento de conceitos de lógica fuzzy (Mamdani, TSK, PSO) e revisão de documentação | "Diferença entre Mamdani e TSK", "como documentar casos de uso UML" | Conteúdo revisado e adaptado ao contexto do projeto |
+
+**Nota:** O uso de IA não substitui o domínio conceitual da equipe. Todos os integrantes compreendem e são capazes de explicar cada parte do código, modelo fuzzy e decisões de arquitetura.
 
 ---
 

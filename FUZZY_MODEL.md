@@ -1,6 +1,6 @@
 # FUZZY_MODEL.md — FuzzySimulated
 
-> Especificação completa do sistema fuzzy de demonstração: variáveis, universos de discurso, funções de pertinência, base de regras e cenários de teste.
+> Especificação completa dos modelos fuzzy de demonstração: Mamdani, TSK e otimização por PSO.
 
 ---
 
@@ -126,6 +126,114 @@ Os cenários abaixo cobrem os extremos e casos intermediários da base de regras
 | Custo médio + mercado alto | 50 | 85 | ~78 | Crítico |
 
 > Os valores de saída são aproximações baseadas na defuzzificação por centroide. Variações de ±3 pontos são esperadas dependendo da resolução do universo (padrão: 501 pontos).
+
+---
+
+---
+
+## Modelo TSK (Takagi-Sugeno-Kang)
+
+> A modalidade **Opção C-B** exige a implementação de TSK como motor de inferência alternativo, com consequentes polinomiais.
+
+### Diferenças para Mamdani
+
+| Característica | Mamdani | TSK |
+|---|---|---|
+| Consequente | Conjunto fuzzy (ex: "Risco é Alto") | Função polinomial (ex: `y = a₀ + a₁x₁ + a₂x₂`) |
+| Interpretabilidade | Alta (regras legíveis) | Média (consequentes matemáticos) |
+| Saída | Defuzzificação (centroide) | Média ponderada dos consequentes |
+| Continuidade | Suave | Suave (com coeficientes contínuos) |
+| Custo computacional | Maior (defuzzificação) | Menor (cálculo direto) |
+
+### Pipeline TSK
+
+```
+Inputs crisp: x₁, x₂
+     ↓
+1. Fuzzificação (mesma do Mamdani)
+   μ_Baixo(x₁), μ_Médio(x₁), μ_Alto(x₁)
+     ↓
+2. Grau de ativação de cada regra
+   α_Ri = min(μ_ant1(x₁), μ_ant2(x₂))   [AND = mínimo]
+     ↓
+3. Consequente polinomial
+   y_Ri = a₀_i + a₁_i·x₁ + a₂_i·x₂
+     ↓
+4. Média ponderada
+   y* = Σ(α_Ri · y_Ri) / Σ(α_Ri)
+     ↓
+Output crisp
+```
+
+### Exemplo de Regra TSK
+
+```
+SE impacto_financeiro É Alto E impacto_mercado É Alto
+ENTÃO risco_critico ⇒ [80.0, 0.3, 0.5]
+→ y = 80.0 + 0.3·x₁ + 0.5·x₂
+```
+
+### Base de Regras TSK (sistema de demonstração)
+
+A mesma base de 9 regras do Mamdani, porém com consequentes lineares:
+
+| # | Se `impacto_financeiro` é… | E `impacto_mercado` é… | Então (coeficientes [bias, c₁, c₂]) |
+|---|---|---|---|
+| R01 | Baixo | Baixo | [5.0, 0.1, 0.1] |
+| R02 | Baixo | Médio | [15.0, 0.2, 0.3] |
+| R03 | Baixo | Alto | [30.0, 0.1, 0.5] |
+| R04 | Médio | Baixo | [20.0, 0.4, 0.2] |
+| R05 | Médio | Médio | [35.0, 0.3, 0.3] |
+| R06 | Médio | Alto | [50.0, 0.2, 0.4] |
+| R07 | Alto | Baixo | [40.0, 0.5, 0.1] |
+| R08 | Alto | Médio | [55.0, 0.4, 0.3] |
+| R09 | Alto | Alto | [70.0, 0.3, 0.5] |
+
+---
+
+## Otimização por PSO (Particle Swarm Optimization)
+
+> Pontuação extra: otimização de hiperparâmetros das funções de pertinência ou pesos das regras usando o algoritmo PSO implementado no `logicfuzzy-academic`.
+
+### Funcionamento
+
+O PSO ajusta automaticamente os parâmetros das MF (ex: vértices das trimf/trapmf, mean/sigma das gaussmf) para minimizar uma função objetivo (ex: erro quadrático médio entre saída esperada e obtida).
+
+### Parâmetros Configuráveis
+
+| Parâmetro | Descrição | Padrão |
+|---|---|---|
+| `population_size` | Número de partículas no enxame | 30 |
+| `max_iterations` | Número máximo de iterações | 200 |
+| `inertia_weight` | Peso da inércia (velocidade anterior) | 0.729 |
+| `cognitive_coefficient` | Coeficiente cognitivo (melhor individual) | 1.494 |
+| `social_coefficient` | Coeficiente social (melhor global) | 1.494 |
+| `bounds` | Limites de busca por parâmetro | Definido por MF |
+| `tolerance` | Tolerância para convergência | 1e-8 |
+| `patience` | Iterações sem melhora para early stopping | 50 |
+
+### O que pode ser otimizado
+
+1. **Parâmetros das MF**: vértices de trimf/trapmf, mean/sigma de gaussmf
+2. **Pesos das regras**: weight de cada regra (0.0 a 1.0)
+3. **Coeficientes TSK**: bias e coeficientes dos consequentes polinomiais
+
+### Exemplo de Uso (via `logicfuzzy-academic`)
+
+```rust
+let config = PsoConfig {
+    population_size: 30,
+    max_iterations: 200,
+    bounds: vec![(0.0, 100.0); 6],  // 6 parâmetros para otimizar
+    seed: Some(42),
+    ..Default::default()
+};
+let mut optimizer = PsoOptimizer::new(config);
+let (best_params, best_fitness, _) = optimizer.optimize(|params| {
+    // função objetivo: MSE entre saída esperada e obtida
+    mse(params)
+});
+```
 
 ---
 
