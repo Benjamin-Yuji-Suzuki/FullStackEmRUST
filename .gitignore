@@ -23,7 +23,8 @@ opencode.json
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Business rules, AI skills, and session logs (local only)
+# Business rules, AI skills, session logs, and local opencode config (local only)
 regras_de_negocio/
 skills/
 session_logs/
+.opencode/
