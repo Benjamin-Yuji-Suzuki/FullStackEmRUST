@@ -96,6 +96,12 @@ cfg_if! {
                 .send().await.ok()?
                 .json().await.ok()
         }
+        async fn api_put<T: serde::de::DeserializeOwned, B: serde::Serialize>(url: &str, body: &B) -> Option<T> {
+            gloo_net::http::Request::put(url)
+                .json(body).ok()?
+                .send().await.ok()?
+                .json().await.ok()
+        }
         async fn api_delete(url: &str) -> bool {
             gloo_net::http::Request::delete(url).send().await.ok().is_some()
         }
@@ -108,6 +114,11 @@ cfg_if! {
                 .post(url).json(body).send().await.ok()?
                 .json().await.ok()
         }
+        async fn api_put<T: serde::de::DeserializeOwned, B: serde::Serialize>(url: &str, body: &B) -> Option<T> {
+            reqwest::Client::new()
+                .put(url).json(body).send().await.ok()?
+                .json().await.ok()
+        }
         async fn api_delete(url: &str) -> bool {
             reqwest::Client::new().delete(url).send().await.ok().is_some()
         }
@@ -118,6 +129,10 @@ cfg_if! {
 
 pub async fn list_systems() -> Vec<SystemInfo> {
     api_get("/api/systems").await.unwrap_or_default()
+}
+
+pub async fn get_system(id: &str) -> Option<SystemInfo> {
+    api_get(&format!("/api/systems/{id}")).await
 }
 
 pub async fn create_system(name: &str, description: Option<&str>, defuzz_method: &str) -> Option<SystemInfo> {
@@ -142,6 +157,18 @@ pub async fn create_variable(system_id: &str, name: &str, role: &str, min: f64, 
         "resolution": 501
     });
     api_post(&format!("/api/systems/{system_id}/variables"), &body).await
+}
+
+pub async fn get_variable(id: &str) -> Option<VariableInfo> {
+    api_get(&format!("/api/variables/{id}")).await
+}
+
+pub async fn get_term(id: &str) -> Option<TermInfo> {
+    api_get(&format!("/api/terms/{id}")).await
+}
+
+pub async fn get_rule(id: &str) -> Option<RuleInfo> {
+    api_get(&format!("/api/rules/{id}")).await
 }
 
 pub async fn delete_variable(id: &str) -> bool {
@@ -218,6 +245,43 @@ pub async fn list_audit_events(system_id: String) -> AuditSummary {
 
 // ── Delete system ──
 
+pub async fn update_system(id: &str, name: &str, description: Option<&str>, defuzz_method: &str) -> Option<SystemInfo> {
+    let body = serde_json::json!({
+        "name": name,
+        "description": description,
+        "defuzz_method": defuzz_method,
+    });
+    api_put(&format!("/api/systems/{id}"), &body).await
+}
+
 pub async fn delete_system(id: &str) -> bool {
     api_delete(&format!("/api/systems/{id}")).await
+}
+
+pub async fn update_variable(id: &str, name: &str, role: &str, universe_min: f64, universe_max: f64, resolution: i32) -> Option<VariableInfo> {
+    let body = serde_json::json!({
+        "name": name,
+        "role": role,
+        "universe_min": universe_min,
+        "universe_max": universe_max,
+        "resolution": resolution,
+    });
+    api_put(&format!("/api/variables/{id}"), &body).await
+}
+
+pub async fn update_term(id: &str, label: &str, mf_type: &str, params: Vec<f64>) -> Option<TermInfo> {
+    let body = serde_json::json!({
+        "label": label,
+        "mf_type": mf_type,
+        "params": params,
+    });
+    api_put(&format!("/api/terms/{id}"), &body).await
+}
+
+pub async fn update_rule(id: &str, rule_text: &str, weight: f64) -> Option<RuleInfo> {
+    let body = serde_json::json!({
+        "rule_text": rule_text,
+        "weight": weight,
+    });
+    api_put(&format!("/api/rules/{id}"), &body).await
 }
