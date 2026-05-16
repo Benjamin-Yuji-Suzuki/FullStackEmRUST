@@ -14,10 +14,9 @@ use crate::audit;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/systems/{id}/variables", get(list_variables).post(create_variable))
-        .route("/variables/{id}", delete(delete_variable))
+        .route("/variables/{id}", get(get_variable).put(update_variable).delete(delete_variable))
         .route("/variables/{id}/terms", post(create_term))
-        .route("/variables/{id}", put(update_variable))
-        .route("/terms/{id}", put(update_term).delete(delete_term))
+        .route("/terms/{id}", get(get_term).put(update_term).delete(delete_term))
 }
 
 async fn list_variables(
@@ -115,6 +114,36 @@ async fn create_variable(
         &format!("Variável '{}' adicionada como {}", row.name, row.role)).await;
 
     Ok((axum::http::StatusCode::CREATED, Json(row)))
+}
+
+async fn get_variable(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<FuzzyVariable>, AppError> {
+    let row = sqlx::query_as::<_, FuzzyVariable>(
+        "SELECT * FROM fuzzy_variables WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Variável não encontrada".into()))?;
+
+    Ok(Json(row))
+}
+
+async fn get_term(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<FuzzyTerm>, AppError> {
+    let row = sqlx::query_as::<_, FuzzyTerm>(
+        "SELECT * FROM fuzzy_terms WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Termo não encontrado".into()))?;
+
+    Ok(Json(row))
 }
 
 async fn update_variable(
