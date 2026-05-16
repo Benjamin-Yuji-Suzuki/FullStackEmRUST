@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    routing::{delete, post, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use uuid::Uuid;
@@ -13,7 +13,7 @@ use crate::audit;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/systems/{id}/rules", post(create_rule))
-        .route("/rules/{id}", put(update_rule).delete(delete_rule))
+        .route("/rules/{id}", get(get_rule).put(update_rule).delete(delete_rule))
 }
 
 async fn create_rule(
@@ -55,6 +55,21 @@ async fn create_rule(
         &format!("Regra #{} adicionada: {}", row.position, row.rule_text)).await;
 
     Ok((axum::http::StatusCode::CREATED, Json(row)))
+}
+
+async fn get_rule(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<FuzzyRule>, AppError> {
+    let row = sqlx::query_as::<_, FuzzyRule>(
+        "SELECT * FROM fuzzy_rules WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Regra não encontrada".into()))?;
+
+    Ok(Json(row))
 }
 
 async fn update_rule(
