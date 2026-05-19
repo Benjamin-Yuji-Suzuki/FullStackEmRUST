@@ -407,6 +407,7 @@ fn Variaveis() -> impl IntoView {
         let ss = selected_sys.clone();
         let v = variables.clone();
         let sv = selected_var.clone();
+        let _ = (&ss, &v, &sv);
         spawn_async(async move {
             let systems = list_systems().await;
             leptos::logging::log!("[Variaveis] loaded {} systems", systems.len());
@@ -529,6 +530,7 @@ fn Variaveis() -> impl IntoView {
     }
 }
 
+  #[allow(non_snake_case)]
   fn Regras() -> impl IntoView {
       let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
       let selected_sys = RwSignal::new(String::new());
@@ -541,6 +543,7 @@ fn Variaveis() -> impl IntoView {
 
       spawn_async({
           let sl = systems_list.clone(); let ss = selected_sys.clone(); let r = rules.clone();
+          let _ = (&ss, &r);
           async move {
               sl.set(list_systems().await);
               #[cfg(target_arch = "wasm32")]
@@ -607,24 +610,184 @@ fn Variaveis() -> impl IntoView {
  fn Simulador() -> impl IntoView {
      let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
      let selected_sys = RwSignal::new(String::new());
+     let variables = RwSignal::new(Vec::<serde_json::Value>::new());
+     let inputs = RwSignal::new(std::collections::HashMap::<String, f64>::new());
+     let result = RwSignal::new(None::<serde_json::Value>);
+     let loading = RwSignal::new(false);
+     let city_input = RwSignal::new(String::new());
+     let weather_msg = RwSignal::new(String::new());
 
-    spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+     spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
 
-    view! {
-        <Topbar breadcrumb="Simulador"/>
-        <div class="content">
+     let load_vars = {
+         let ss = selected_sys.clone();
+         let v = variables.clone();
+         let i = inputs.clone();
+         let r = result.clone();
+         move || {
+             let sid = ss.get();
+             if !sid.is_empty() {
+                 let v2 = v.clone();
+                 let i2 = i.clone();
+                 let r2 = r.clone();
+                 spawn_async(async move {
+                     let vars = list_variables(&sid).await;
+                     let mut map = std::collections::HashMap::new();
+                     for var in &vars {
+                         if var["role"].as_str() == Some("antecedent") {
+                             if let Some(min) = var["universe_min"].as_f64() {
+                                 map.insert(var["name"].as_str().unwrap_or("").to_string(), (min + var["universe_max"].as_f64().unwrap_or(100.0)) / 2.0);
+                             }
+                         }
+                     }
+                     i2.set(map);
+                     v2.set(vars);
+                     r2.set(None);
+                 });
+             }
+         }
+     };
+
+     let run_sim = {
+         let ss = selected_sys.clone();
+         let inp = inputs.clone();
+         let res = result.clone();
+         let ld = loading.clone();
+         move || {
+             let sid = ss.get();
+             if sid.is_empty() { return; }
+             ld.set(true);
+             let inp2 = inp.get();
+             let r2 = res.clone();
+             let l2 = ld.clone();
+             spawn_async(async move {
+                 let json_inputs = serde_json::json!(inp2);
+                 let output = run_simulation(&sid, &json_inputs).await;
+                 r2.set(output);
+                 l2.set(false);
+             });
+         }
+     };
+
+     let fetch_weather = {
+         let ci = city_input.clone();
+         let wm = weather_msg.clone();
+         let inp = inputs.clone();
+         move || {
+             let city = ci.get();
+             if city.trim().is_empty() { wm.set("Informe uma cidade".into()); return; }
+             let wm2 = wm.clone();
+             let inp2 = inp.clone();
+             spawn_async(async move {
+                 match get_weather(&city).await {
+                     Ok(w) => {
+                         let mut current = inp2.get();
+                         current.insert("temperatura".to_string(), w.temp);
+                         current.insert("umidade".to_string(), w.humidity);
+                         inp2.set(current);
+                         wm2.set(format!("{}: {}°C, {}%", w.city, w.temp, w.humidity));
+                     }
+                     Err(e) => wm2.set(format!("Erro: {e}")),
+                 }
+             });
+         }
+     };
+
+     view! {
+         <Topbar breadcrumb="Simulador"/>
+         <div class="content">
              <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Simulador Mamdani (UC04)"</div></div>
-             <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
+             <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:500px">
                  <label class="input-label">"Sistema"</label>
                  <select class="text-input" style="margin-bottom:0"
-                     on:change=move |e| selected_sys.set(event_target_value(&e))>
+                     prop:value=move || selected_sys.get()
+                     on:change=move |e| { selected_sys.set(event_target_value(&e)); load_vars(); }>
                      <option value="">"— Selecione —"</option>
                      {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
                  </select>
              </div>
+
              <div class="sim-layout">
-                 <div class="panel"><div class="panel-title">"Entradas"</div><div style="color:var(--text3);font-size:11px;padding:16px 0">"Configuração de inputs em breve."</div></div>
-                 <div class="panel"><div class="panel-title">"Resultado"</div><div style="color:var(--text3);font-size:11px;padding:16px 0">"Execute uma simulação para ver o resultado."</div></div>
+                 <div class="panel">
+                     <div class="panel-title">"Entradas"</div>
+                     <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+                         <input type="text" class="text-input" style="margin-bottom:0;flex:1" placeholder="Cidade (ex: Belém)"
+                             prop:value=move || city_input.get()
+                             on:input=move |e| city_input.set(event_target_value(&e))/>
+                         <button class="btn btn-primary" style="font-size:10px;padding:4px 10px" on:click=move |_| fetch_weather()>
+                             <i class="ti ti-cloud"></i>"Buscar Clima"
+                         </button>
+                     </div>
+                     {move || { let m = weather_msg.get(); if !m.is_empty() { view! { <div style="font-size:10px;color:var(--teal);margin-bottom:12px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+
+                     {move || {
+                         let vars = variables.get();
+                         let antecedents: Vec<&serde_json::Value> = vars.iter().filter(|v| v["role"].as_str() == Some("antecedent")).collect();
+                         if antecedents.is_empty() {
+                             return view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Nenhuma variável antecedente. Configure-as no Editor de Variáveis."</div> }.into_any();
+                         }
+                          view! {
+                             {antecedents.into_iter().map(|var| {
+                                 let name = var["name"].as_str().unwrap_or("?").to_string();
+                                 let min = var["universe_min"].as_f64().unwrap_or(0.0);
+                                 let max = var["universe_max"].as_f64().unwrap_or(100.0);
+                                  let name3 = name.clone();
+                                  let name4 = name.clone();
+                                  let name5 = name.clone();
+                                  let name6 = name.clone();
+                                  view! {
+                                      <div class="input-group">
+                                          <label class="input-label">{name.clone()}</label>
+                                          <div class="input-row">
+                                              <input type="range" class="range-input" min=min max=max step=0.1
+                                                  prop:value=move || inputs.with(|m| m.get(&name5).copied().unwrap_or((min+max)/2.0))
+                                                  on:input=move |e| {
+                                                      if let Ok(n) = event_target_value(&e).parse::<f64>() {
+                                                          inputs.update(|m| { m.insert(name3.clone(), n); });
+                                                      }
+                                                  }/>
+                                              <input type="number" class="range-number" min=min max=max step=0.1
+                                                  prop:value=move || inputs.with(|m| m.get(&name6).copied().unwrap_or((min+max)/2.0))
+                                                  on:input=move |e| {
+                                                      if let Ok(n) = event_target_value(&e).parse::<f64>() {
+                                                          let clamped = n.clamp(min, max);
+                                                          inputs.update(|m| { m.insert(name4.clone(), clamped); });
+                                                      }
+                                                  }/>
+                                          </div>
+                                          <div style="font-size:9px;color:var(--text3);display:flex;justify-content:space-between">
+                                              <span>{min}</span><span>{max}</span>
+                                          </div>
+                                      </div>
+                                  }
+                             }).collect_view()}
+                             <button class="btn btn-primary" on:click=move |_| run_sim() style="margin-top:8px">
+                                 <i class="ti ti-player-play"></i>"Executar Simulação"
+                             </button>
+                         }.into_any()
+                     }}
+                 </div>
+
+                 <div class="panel">
+                     <div class="panel-title">"Resultado"</div>
+                     {move || {
+                         if loading.get() {
+                             return view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Simulando..."</div> }.into_any();
+                         }
+                         match result.get() {
+                             None => view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Execute uma simulação para ver o resultado."</div> }.into_any(),
+                             Some(r) => {
+                                 let output_val = r["outputs"]["resultado"].as_f64().unwrap_or(0.0);
+                                 view! {
+                                     <div class="output-display">
+                                         <div class="output-val">{format!("{:.2}", output_val)}</div>
+                                         <div class="output-label">"Saída Defuzzificada"</div>
+                                     </div>
+                                 }.into_any()
+                             }
+                         }
+                     }}
+                 </div>
              </div>
          </div>
      }
@@ -772,17 +935,20 @@ fn AddVarPage() -> impl IntoView {
     let role = RwSignal::new("antecedent".to_string());
     let msg = RwSignal::new(String::new());
 
-    spawn_async({ let sl = systems_list.clone(); let ss = sel_sys.clone(); async move {
-        sl.set(list_systems().await);
-        #[cfg(target_arch = "wasm32")]
-        if let Some(s) = web_sys::window().and_then(|w| w.location().search().ok()) {
-            if let Some(id) = s.split("s=").nth(1).and_then(|x| x.split('&').next()) {
-                if !id.is_empty() { ss.set(id.to_string()); }
+    {
+        let sl = systems_list.clone();
+        let ss = sel_sys.clone();
+        let _ = &ss;
+        spawn_async(async move {
+            sl.set(list_systems().await);
+            #[cfg(target_arch = "wasm32")]
+            if let Some(s) = web_sys::window().and_then(|w| w.location().search().ok()) {
+                if let Some(id) = s.split("s=").nth(1).and_then(|x| x.split('&').next()) {
+                    if !id.is_empty() { ss.set(id.to_string()); }
+                }
             }
-        }
-    }});
-
-    let systems_clone = systems_list.clone();
+        });
+    }
     let sel_sys_clone = sel_sys.clone();
     let name_clone = name.clone();
     let role_clone = role.clone();
@@ -909,6 +1075,7 @@ fn EditVarPage() -> impl IntoView {
                         let vid = vid_for_submit.clone();
                         let m = msg.clone();
                         let s = sid_for_redirect.clone();
+                        let _ = &s;
                         spawn_async(async move {
                             match update_variable(&vid, &n, &role, min, max, res).await {
                                 Some(_) => { #[cfg(target_arch = "wasm32")] { _ = web_sys::window().and_then(|w| w.location().set_href(&format!("/vars?s={}", s)).ok()); } }
@@ -948,6 +1115,7 @@ fn AddTermPage() -> impl IntoView {
     let submit = {
         let lbl = label.clone(); let mf = mf_type.clone(); let p = params.clone();
         let sv = sel_var.clone(); let ss = sel_sys.clone(); let m2 = msg.clone();
+        let _ = &ss;
         move || {
             let vid = sv.get();
             if vid.is_empty() { m2.set("Selecione uma variável".into()); return; }
@@ -1072,6 +1240,7 @@ fn EditTermPage() -> impl IntoView {
                         if parsed.is_empty() { msg.set("Parâmetros inválidos. Ex: 0,10,22".into()); return; }
                         let m = msg.clone();
                         let s = sid_for_term.clone();
+                        let _ = &s;
                         spawn_async(async move {
                             match update_term(&tid, &lbl, &mf, parsed).await {
                                 Some(_) => { #[cfg(target_arch = "wasm32")] { _ = web_sys::window().and_then(|w| w.location().set_href(&format!("/vars?s={}", s)).ok()); } }
@@ -1096,15 +1265,20 @@ fn AddRulePage() -> impl IntoView {
     let weight = RwSignal::new("1.0".to_string());
     let msg = RwSignal::new(String::new());
 
-    spawn_async({ let sl = systems_list.clone(); let ss = sel_sys.clone(); async move {
-        sl.set(list_systems().await);
-        #[cfg(target_arch = "wasm32")]
-        if let Some(s) = web_sys::window().and_then(|w| w.location().search().ok()) {
-            if let Some(id) = s.split("s=").nth(1).and_then(|x| x.split('&').next()) {
-                if !id.is_empty() { ss.set(id.to_string()); }
+    {
+        let sl = systems_list.clone();
+        let ss = sel_sys.clone();
+        let _ = &ss;
+        spawn_async(async move {
+            sl.set(list_systems().await);
+            #[cfg(target_arch = "wasm32")]
+            if let Some(s) = web_sys::window().and_then(|w| w.location().search().ok()) {
+                if let Some(id) = s.split("s=").nth(1).and_then(|x| x.split('&').next()) {
+                    if !id.is_empty() { ss.set(id.to_string()); }
+                }
             }
-        }
-    }});
+        });
+    }
 
     let submit = move || {
         let sid = sel_sys.get();
@@ -1204,6 +1378,7 @@ fn EditRulePage() -> impl IntoView {
                         let w: f64 = match weight.get().parse() { Ok(v) => v, Err(_) => { msg.set("Peso inválido".into()); return; } };
                         let m = msg.clone();
                         let s = sid_for_rule.clone();
+                        let _ = &s;
                         spawn_async(async move {
                             match update_rule(&rid, &text, w).await {
                                 Some(_) => { #[cfg(target_arch = "wasm32")] { _ = web_sys::window().and_then(|w| w.location().set_href(&format!("/rules?s={}", s)).ok()); } }
