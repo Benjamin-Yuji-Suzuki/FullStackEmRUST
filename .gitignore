@@ -28,3 +28,6 @@ regras_de_negocio/
 skills/
 session_logs/
 .opencode/
+
+# Script de demonstração local (não faz parte do projeto)
+demo-sprint2.sh
