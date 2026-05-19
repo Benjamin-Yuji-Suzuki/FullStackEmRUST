@@ -121,9 +121,16 @@ GET https://api.openweathermap.org/data/2.5/weather?q=Belém&appid={API_KEY}&uni
 
 **Endpoint:** `GET /api/weather?city=Belém`  
 **Chave:** `OPENWEATHER_API_KEY` no `.env`  
-**Tratamento de erros:** cidade não encontrada (404), chave inválida (401), timeout (502)
+**Tratamento de erros:** cidade não encontrada (404), chave inválida (401), timeout (502)  
+**TLS:** reqwest com `rustls-tls` (sem dependência de OpenSSL do sistema)
+
+### Seed Data
+
+Na primeira execução, `server/migrations/002_seed.sql` insere automaticamente o sistema **"Conforto Térmico"** (3 variáveis, 9 termos, 9 regras) se o banco estiver vazio. Disponível para testes imediatos no Simulador.
 
 ---
+
+
 
 ## Estrutura dos Repositórios
 
@@ -148,11 +155,13 @@ FullStackEmRUST/
     │   │   ├── models/        # FuzzySystem, Variable, Term, Rule, etc.
     │   │   ├── routes/        # systems, variables, rules, simulate, weather, audit
     │   │   └── state.rs       # AppState
-    │   ├── migrations/001_schema.sql
-    │   └── tests/api_test.rs  # 16 unit + 6 integration tests
+    │   ├── migrations/
+    │   │   ├── 001_schema.sql      # schema: 7 tabelas + índices
+    │   │   └── 002_seed.sql        # seed: sistema Conforto Térmico
+    │   └── tests/api_test.rs       # 16 unit + 6 integration tests
     ├── frontend/          # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── end2end/           # Playwright (E2E) — esboço
+    ├── end2end/           # Playwright (E2E) — testes de navegação
     ├── style/main.scss    # SCSS global (tema escuro)
     └── public/            # assets estáticos
 ```
