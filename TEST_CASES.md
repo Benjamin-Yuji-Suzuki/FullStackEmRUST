@@ -43,21 +43,19 @@
 | **Dados de entrada** | `{ "name": "", "description": null, "defuzz_method": null }` |
 | **Passos** | 1. Enviar POST para `/api/systems`<br>2. Verificar status HTTP 422 Unprocessable Entity<br>3. Verificar mensagem de erro "O nome do sistema é obrigatório" |
 | **Resultado esperado** | Sistema NÃO criado. Erro de validação retornado. |
-| **Resultado obtido** | — |
-| **Status** | ⏳ Pendente |
+| **Resultado obtido** | `test_validate_system_name_empty` em `api_test.rs` — validation layer retorna erro |
+| **Status** | ✅ Aprovado |
 
 ### TC-UC01-03: Criar sistema com nome > 255 caracteres
 
 | Campo | Valor |
-|---|---|
-| **Objetivo** | Verificar limitação de tamanho do nome |
 | **Pré-condições** | Banco conectado. |
 | **Tipo** | Integração (I) |
 | **Dados de entrada** | `{ "name": "<string de 256 caracteres>", ... }` |
 | **Passos** | 1. Enviar POST para `/api/systems`<br>2. Verificar status HTTP 422<br>3. Verificar mensagem "Máximo 255 caracteres" |
 | **Resultado esperado** | Sistema rejeitado. |
-| **Resultado obtido** | — |
-| **Status** | ⏳ Pendente |
+| **Resultado obtido** | `test_validate_system_name_too_long` em `api_test.rs` — validation layer retorna erro |
+| **Status** | ✅ Aprovado |
 
 ### TC-UC01-04: Listar sistemas
 
@@ -173,8 +171,8 @@
 | **Dados de entrada** | `{ "label": "Invalido", "mf_type": "trimf", "params": [25, 10, 0] }` |
 | **Passos** | 1. POST `/api/variables/{id}/terms`<br>2. Verificar 422 |
 | **Resultado esperado** | Erro de validação: parâmetros incoerentes. |
-| **Resultado obtido** | — |
-| **Status** | ⏳ Pendente |
+| **Resultado obtido** | `test_validate_trimf_incoherent` em `api_test.rs` — validation layer retorna erro `"trimf: a ≤ b ≤ c"` |
+| **Status** | ✅ Aprovado |
 
 ### TC-UC02-05: Remover variável referenciada em regras
 
@@ -569,8 +567,8 @@
 |---|---|---|
 | UC | Casos | Unitários (código) | Integração | Status |
 |---|---|---|---|---|
-| UC01 — Gerenciar Sistemas Fuzzy | 8 | ✅ 16 (validações) | ⏳ 6 pendentes | 16 ✅ / 6 ⏳ |
-| UC02 — Gerenciar Variáveis e Termos | 5 | — | ⏳ | ⏳ |
+| UC01 — Gerenciar Sistemas Fuzzy | 8 | ✅ 6 (nome + defuzz) | ⏳ 2 pendentes | 6 ✅ / 2 ⏳ |
+| UC02 — Gerenciar Variáveis e Termos | 5 | ✅ 10 (trimf/trapmf/gaussmf) | ⏳ 5 pendentes | 10 ✅ / 5 ⏳ |
 | UC03 — Gerenciar Regras Fuzzy | 3 | — | ⏳ | ⏳ |
 | UC04 — Executar Simulação | 3 | — | ⏳ | ⏳ |
 | UC05 — Buscar Dados Climáticos | 2 | — | ⏳ | ⏳ |
