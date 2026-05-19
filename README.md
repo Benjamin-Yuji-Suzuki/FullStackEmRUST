@@ -82,9 +82,9 @@ FullStackEmRUST/
 | # | Tela | UCs | Status | Operações |
 |---|---|---|---|---|
 | 1 | Dashboard | UC01, UC10, UC11 | ✅ Funcional | CRUD sistemas, criar via formulário, excluir |
-| 2 | Editor de Variáveis | UC02 | ✅ Funcional | Lista vars/termos, add var, add termo |
-| 3 | Editor de Regras | UC03 | ✅ Funcional | Lista regras por sistema |
-| 4 | Simulador | UC04, UC05, UC12, UC13 | ⚡ Esboço | Seleciona sistema |
+| 2 | Editor de Variáveis | UC02 | ✅ Funcional | Lista vars/termos, add var, add termo, editar var/termo |
+| 3 | Editor de Regras | UC03 | ✅ Funcional | Lista regras, add regra, editar regra |
+| 4 | Simulador | UC04, UC05, UC12, UC13 | ✅ Funcional | Sliders por variável, busca clima OpenWeather, executa simulação |
 | 5 | Histórico | UC06, UC08, UC09 | ✅ Funcional | Lista simulações por sistema |
 | 6 | Dashboard Batch | UC07 | ❌ Placeholder | — |
 | 7 | Análise | UC14, UC15 | ❌ Placeholder | — |
