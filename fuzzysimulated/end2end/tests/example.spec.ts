@@ -1,15 +1,26 @@
 import { test, expect } from "@playwright/test";
 
-test("homepage has title and links to intro page", async ({ page }) => {
+test("homepage loads with FuzzySimulated title and system list", async ({ page }) => {
   await page.goto("http://localhost:3000/");
 
-  await expect(page).toHaveTitle("Welcome to Leptos");
+  await expect(page.locator(".topbar")).toContainText("FuzzySimulated");
+  await expect(page.locator(".section-title")).toContainText("Dashboard");
+});
 
-  await expect(page.locator("h1")).toHaveText("Welcome to Leptos!");
+test("can navigate to Variaveis page", async ({ page }) => {
+  await page.goto("http://localhost:3000/");
+  await page.locator('a[href="/variaveis"]').first().click();
+  await expect(page.locator(".section-title")).toContainText("Variáveis");
+});
 
-  await expect(page.getByRole('button')).toHaveText("Click Me: 0");
+test("can navigate to Regras page", async ({ page }) => {
+  await page.goto("http://localhost:3000/");
+  await page.locator('a[href="/regras"]').first().click();
+  await expect(page.locator(".section-title")).toContainText("Regras");
+});
 
-  await page.click('button');
-
-  await expect(page.getByRole('button')).toHaveText("Click Me: 1");
+test("can navigate to Simulador page", async ({ page }) => {
+  await page.goto("http://localhost:3000/");
+  await page.locator('a[href="/simulador"]').first().click();
+  await expect(page.locator(".section-title")).toContainText("Simulador");
 });
