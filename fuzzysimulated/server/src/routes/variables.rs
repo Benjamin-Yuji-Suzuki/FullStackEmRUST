@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use uuid::Uuid;
@@ -286,7 +286,7 @@ async fn delete_term(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<axum::http::StatusCode, AppError> {
-    let var_id = sqlx::query_scalar::<_, Uuid>(
+    sqlx::query_scalar::<_, Uuid>(
         "SELECT variable_id FROM fuzzy_terms WHERE id = $1"
     )
     .bind(id)

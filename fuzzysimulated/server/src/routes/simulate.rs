@@ -27,11 +27,6 @@ pub fn routes() -> Router<AppState> {
 }
 
 #[derive(Deserialize)]
-pub struct WeatherQuery {
-    pub city: String,
-}
-
-#[derive(Deserialize)]
 pub struct SweepRequest {
     pub variable: String,
     pub start: f64,
@@ -409,8 +404,8 @@ async fn import_system(
 }
 
 async fn sweep(
-    State(state): State<AppState>,
-    Path(system_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    Path(_system_id): Path<Uuid>,
     Json(req): Json<SweepRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     if req.start >= req.end {
@@ -458,8 +453,8 @@ async fn rule_matrix(
 }
 
 async fn surface(
-    State(state): State<AppState>,
-    Path(system_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    Path(_system_id): Path<Uuid>,
     Json(req): Json<SurfaceRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let x_res = req.x_resolution.unwrap_or(20).min(100);

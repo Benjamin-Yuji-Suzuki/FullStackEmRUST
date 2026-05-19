@@ -1,5 +1,4 @@
 use axum::Router;
-use axum::response::IntoResponse;
 use leptos::prelude::*;
 use leptos_axum::{generate_route_list, LeptosRoutes};
 use app::*;
@@ -13,9 +12,6 @@ mod routes;
 mod state;
 
 use state::AppState;
-
-use tower_http::services::ServeDir;
-use tower_http::set_header::SetResponseHeader;
 
 #[tokio::main]
 async fn main() {

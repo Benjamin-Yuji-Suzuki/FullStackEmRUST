@@ -10,4 +10,5 @@ pub use variable::*;
 pub use term::*;
 pub use rule::*;
 pub use simulation::*;
+#[allow(unused_imports)]
 pub use batch::*;

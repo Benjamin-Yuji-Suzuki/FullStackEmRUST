@@ -4,6 +4,7 @@ use serde_json::Value;
 use sqlx::FromRow;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct BatchResult {
     pub id: Uuid,
