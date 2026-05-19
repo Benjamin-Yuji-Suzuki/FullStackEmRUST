@@ -219,14 +219,30 @@ pub async fn list_simulations(system_id: &str) -> Vec<SimulationInfo> {
 }
 
 pub async fn run_simulation(system_id: &str, inputs: &serde_json::Value) -> Option<serde_json::Value> {
-    let body = serde_json::json!({ "inputs": inputs });
-    // The simulate endpoint expects { "inputs": { ... } }
-    // Our API accepts SimulateRequest
     api_post(&format!("/api/systems/{system_id}/simulate"), &serde_json::json!({ "inputs": inputs })).await
 }
 
-pub async fn get_weather(city: &str) -> Option<WeatherData> {
-    api_get(&format!("/api/weather?city={city}")).await
+pub async fn get_weather(city: &str) -> Result<WeatherData, String> {
+    let url = format!("/api/weather?city={city}");
+    cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            let resp = gloo_net::http::Request::get(&url).send().await.map_err(|e| format!("Erro de rede: {e}"))?;
+            if !resp.ok() {
+                let body: serde_json::Value = resp.json().await.unwrap_or_default();
+                let msg = body["error"].as_str().unwrap_or("Erro desconhecido");
+                return Err(msg.to_string());
+            }
+            resp.json().await.map_err(|e| format!("Erro ao decodificar resposta: {e}"))
+        } else {
+            let resp = reqwest::get(&url).await.map_err(|e| format!("Erro de rede: {e}"))?;
+            if !resp.status().is_success() {
+                let body: serde_json::Value = resp.json().await.unwrap_or_default();
+                let msg = body["error"].as_str().unwrap_or("Erro desconhecido");
+                return Err(msg.to_string());
+            }
+            resp.json().await.map_err(|e| format!("Erro ao decodificar resposta: {e}"))
+        }
+    }
 }
 
 // ── Audit ──

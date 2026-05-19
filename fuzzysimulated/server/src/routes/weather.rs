@@ -20,7 +20,7 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn get_weather(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     Query(query): Query<CityQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let city = query.city.ok_or_else(|| AppError::Validation("Parâmetro 'city' é obrigatório".into()))?;
@@ -77,5 +77,13 @@ async fn get_weather(
 }
 
 fn urlencoding(s: &str) -> String {
-    s.replace(' ', "%20")
+    let mut encoded = String::new();
+    for byte in s.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => encoded.push(byte as char),
+            b' ' => encoded.push_str("%20"),
+            _ => encoded.push_str(&format!("%{:02X}", byte)),
+        }
+    }
+    encoded
 }
