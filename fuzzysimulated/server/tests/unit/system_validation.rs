@@ -1,0 +1,57 @@
+fn validate_system_name(name: &str) -> Result<(), String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("Nome obrigatório".into());
+    }
+    if trimmed.len() > 255 {
+        return Err("Máximo 255 caracteres".into());
+    }
+    Ok(())
+}
+
+fn validate_defuzz_method(method: &str) -> Result<(), String> {
+    let valid = ["centroid", "bisector", "mom", "lom", "som"];
+    if !valid.contains(&method) {
+        return Err(format!("Método inválido: {method}"));
+    }
+    Ok(())
+}
+
+#[test]
+fn test_validate_system_name_ok() {
+    let result = validate_system_name("Conforto Térmico");
+    assert!(result.is_ok(), "Esperava Ok mas obteve: {:?}", result);
+}
+
+#[test]
+fn test_validate_system_name_empty() {
+    let result = validate_system_name("");
+    assert!(result.is_err(), "Esperava Err mas obteve: {:?}", result);
+}
+
+#[test]
+fn test_validate_system_name_whitespace() {
+    let result = validate_system_name("   ");
+    assert!(result.is_err(), "Esperava Err mas obteve: {:?}", result);
+}
+
+#[test]
+fn test_validate_system_name_too_long() {
+    let long = "a".repeat(256);
+    let result = validate_system_name(&long);
+    assert!(result.is_err(), "Esperava Err mas obteve: {:?}", result);
+}
+
+#[test]
+fn test_validate_defuzz_method_valid() {
+    for method in ["centroid", "bisector", "mom", "lom", "som"] {
+        let result = validate_defuzz_method(method);
+        assert!(result.is_ok(), "Esperava Ok para '{method}' mas obteve: {:?}", result);
+    }
+}
+
+#[test]
+fn test_validate_defuzz_method_invalid() {
+    let result = validate_defuzz_method("invalid");
+    assert!(result.is_err(), "Esperava Err mas obteve: {:?}", result);
+}
