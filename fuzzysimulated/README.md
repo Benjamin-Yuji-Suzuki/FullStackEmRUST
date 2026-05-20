@@ -23,19 +23,20 @@ Plataforma full-stack 100% Rust para construção e simulação de sistemas de i
 
 | Tela | Rota | Status |
 |---|---|---|
-| Dashboard | `/` | ✅ |
+| Dashboard (com estados) | `/` | ✅ |
 | Variáveis & Termos | `/vars?s=` | ✅ |
 | Editor de Regras | `/rules?s=` | ✅ |
 | Simulador | `/sim?s=` | ✅ |
 | Histórico | `/hist?s=` | ✅ |
-| Auditoria | `/audit?id=` | ✅ |
+| Auditoria (com undo completo) | `/audit?id=` | ✅ |
 | Batch | `/batch` | ❌ Placeholder |
 | Análise | `/analysis` | ❌ Placeholder |
-| Otimizador | `/opt` | ✅ Novo |
+| Otimizador | `/opt` | ✅ |
 
-## Casos de Uso
+## Funcionalidades
 
-25 casos de uso implementados ou em andamento, incluindo UC21–UC25 para otimização de função objetivo multivariável.
+- **Estados do sistema:** Ativo, Favorito (protege de deleção), Concluído (só simular), Desativado (oculto)
+- **Auditoria com undo real:** restore completo de sistema + variáveis + termos + regras via snapshots JSONB
 
 ## Desenvolvimento
 

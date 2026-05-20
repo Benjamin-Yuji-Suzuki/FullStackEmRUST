@@ -64,7 +64,11 @@ FullStackEmRUST/
     │   │   ├── routes/        # systems, variables, rules, simulate, weather, audit
     │   │   └── state.rs       # AppState (PgPool + LeptosOptions)
     │   ├── migrations/
-    │   │   └── 001_schema.sql # 7 tabelas + índices
+    │   │   ├── 001_schema.sql
+│   │   ├── 002_seed.sql
+│   │   ├── 003_optimization.sql
+│   │   ├── 004_audit_orphan.sql
+│   │   └── 005_system_status.sql
     │   └── tests/
     │       └── api_test.rs    # 16 unit + 6 integration tests
     ├── frontend/              # crate WASM — entry point hydrate
@@ -88,7 +92,8 @@ FullStackEmRUST/
 | 5 | Histórico | UC06, UC08, UC09 | ✅ Funcional | Lista simulações por sistema |
 | 6 | Dashboard Batch | UC07 | ❌ Placeholder | — |
 | 7 | Análise | UC14, UC15 | ❌ Placeholder | — |
-| 8 | Auditoria | UC16 | ✅ Funcional | Timeline de alterações no banco |
+| 8 | Auditoria | UC16 | ✅ Funcional | Timeline + undo real com snapshots + recuperação de sistemas deletados |
+| 9 | Estados do Sistema | — | ✅ Funcional | Ativo/Favorito/Concluído/Desativado com proteção e filtros |
 
 ---
 
