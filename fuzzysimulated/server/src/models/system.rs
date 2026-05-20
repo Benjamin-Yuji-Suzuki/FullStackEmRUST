@@ -19,7 +19,6 @@ pub struct CreateSystemRequest {
     pub name: String,
     pub description: Option<String>,
     pub defuzz_method: Option<String>,
-    pub status: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
