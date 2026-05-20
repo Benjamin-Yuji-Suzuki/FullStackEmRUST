@@ -8,11 +8,13 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  DATABASE_URL: postgres://postgres:postgres@localhost/fuzzysimulated_test
 
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost/fuzzysimulated_test
+      PGPASSWORD: postgres
     services:
       postgres:
         image: postgres:16
@@ -39,6 +41,9 @@ jobs:
         uses: taiki-e/install-action@65851e10cd6c377f11a60e600abc07cb08643468 # v2
         with:
           tool: cargo-llvm-cov
+
+      - name: Instalar PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
       - name: Rodar migrations
         run: |
