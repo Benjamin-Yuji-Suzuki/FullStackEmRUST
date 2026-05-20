@@ -13,13 +13,13 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Configurar ferramentas de cobertura
         run: rustup component add llvm-tools-preview
 
       - name: Instalar cargo-llvm-cov
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@65851e10cd6c377f11a60e600abc07cb08643468 # v2
         with:
           tool: cargo-llvm-cov
 
@@ -28,7 +28,7 @@ jobs:
         working-directory: fuzzysimulated
 
       - name: Enviar ao Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: fuzzysimulated/lcov.info
