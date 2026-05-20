@@ -27,3 +27,6 @@ reqwest.workspace = true
 leptos_config = "0.8.2"
 dotenvy = "0.15"
 mime_guess = "2"
+
+[dev-dependencies]
+http.workspace = true

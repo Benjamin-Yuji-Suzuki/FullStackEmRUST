@@ -2657,6 +2657,7 @@ dependencies = [
  "axum",
  "chrono",
  "dotenvy",
+ "http 1.4.0",
  "leptos",
  "leptos_axum",
  "leptos_config",

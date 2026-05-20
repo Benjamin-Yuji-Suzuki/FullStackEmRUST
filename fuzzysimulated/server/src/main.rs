@@ -1,17 +1,10 @@
 use axum::Router;
+use app::*;
 use leptos::prelude::*;
 use leptos_axum::{generate_route_list, LeptosRoutes};
-use app::*;
 use log::info;
+use server::{routes, state::AppState};
 use sqlx::postgres::PgPoolOptions;
-
-mod audit;
-mod errors;
-mod models;
-mod routes;
-mod state;
-
-use state::AppState;
 
 #[tokio::main]
 async fn main() {
