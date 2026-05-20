@@ -301,3 +301,45 @@ pub async fn update_rule(id: &str, rule_text: &str, weight: f64) -> Option<RuleI
     });
     api_put(&format!("/api/rules/{id}"), &body).await
 }
+
+// ── Optimization ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizationResult {
+    pub id: String,
+    pub optimal_x: f64,
+    pub optimal_y: f64,
+    pub optimal_value: f64,
+    pub critical_point_type: String,
+    pub explanation: String,
+    pub gradient_at_optimum: [f64; 2],
+    pub hessian_matrix: [[f64; 2]; 2],
+    pub coef_a: f64,
+    pub coef_b: f64,
+    pub coef_c: f64,
+    pub coef_d: f64,
+    pub coef_e: f64,
+    pub coef_f: f64,
+}
+
+pub async fn optimize_function(
+    system_id: Option<&str>,
+    coef_a: f64, coef_b: f64, coef_c: f64,
+    coef_d: f64, coef_e: f64, coef_f: f64,
+    x_min: f64, x_max: f64, y_min: f64, y_max: f64,
+) -> Option<OptimizationResult> {
+    let body = serde_json::json!({
+        "system_id": system_id,
+        "coef_a": coef_a,
+        "coef_b": coef_b,
+        "coef_c": coef_c,
+        "coef_d": coef_d,
+        "coef_e": coef_e,
+        "coef_f": coef_f,
+        "x_min": x_min,
+        "x_max": x_max,
+        "y_min": y_min,
+        "y_max": y_max,
+    });
+    api_post("/api/optimize", &body).await
+}
