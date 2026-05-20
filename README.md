@@ -2,7 +2,9 @@
 
 > Plataforma web full-stack para construção, persistência e simulação de Sistemas de Inferência Fuzzy Mamdani e TSK — com visualização interativa, histórico, auditoria e otimização por PSO.
 
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 02/2026  
+[![codecov](https://codecov.io/gh/Benjamin-Yuji-Suzuki/FullStackEmRUST/branch/main/graph/badge.svg)](https://codecov.io/gh/Benjamin-Yuji-Suzuki/FullStackEmRUST)
+
+**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados · Resolução de Problemas Multivariáveis — CESUPA 02/2026  
 **Modalidade (IA):** Opção B + Opção C-B (TSK) + Pontuação Extra (PSO)  
 **Equipe:** Benjamin Yuji Suzuki  
 **Repositório principal:** https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST
