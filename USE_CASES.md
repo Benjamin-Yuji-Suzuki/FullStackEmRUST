@@ -1,11 +1,11 @@
 # 📋 Casos de Uso — FuzzySimulated
 
-> Especificação dos 20 casos de uso da plataforma, seguindo o padrão UML:
+> Especificação dos 25 casos de uso da plataforma, seguindo o padrão UML:
 > ator(es), pré-condições, fluxo principal, fluxos alternativos (com retorno ao fluxo principal) e pós-condições.
 > Atores são SEMPRE entidades externas à fronteira do sistema.
 
 **Projeto:** FuzzySimulated  
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 01/2026  
+**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados · Resolução de Problemas Multivariáveis — CESUPA 02/2026  
 **Repositório:** https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST
 
 ---
@@ -34,6 +34,11 @@
 | [UC18](#uc18) | Executar Inferência TSK | [Processamento] | Usuário |
 | [UC19](#uc19) | Exportar Visualizações SVG | [Exportar] | Usuário |
 | [UC20](#uc20) | Visualizar Relatório de Diagnóstico | [Visualização] | Usuário |
+| [UC21](#uc21) | Definir Função Objetivo | [Criar] | Usuário |
+| [UC22](#uc22) | Calcular Ponto Ótimo | [Processamento] | Usuário, Back End |
+| [UC23](#uc23) | Visualizar Justificativa Matemática | [Visualização] | Usuário |
+| [UC24](#uc24) | Consultar Histórico de Otimizações | [Ler] | Usuário |
+| [UC25](#uc25) | Exportar Resultado de Otimização | [Exportar] | Usuário |
 
 ---
 
@@ -813,3 +818,146 @@
 
 - Relatório de diagnóstico exibido e disponível para exportação.
 - Nenhuma alteração no banco.
+
+---
+
+## UC21
+
+### Definir Função Objetivo
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | — |
+| **Pré-condições** | Usuário está na tela Otimizador. |
+
+**Fluxo Principal**
+
+1. **Sistema** exibe formulário com campos para os coeficientes a, b, c, d, e, f da função `f(x,y) = ax² + bxy + cy² + dx + ey + f`.
+2. **Sistema** exibe campos para o domínio: x_min, x_max, y_min, y_max.
+3. Usuário preenche os coeficientes e clica em "Calcular Ponto Ótimo".
+
+**Fluxos Alternativos**
+
+- **FA1 — Coeficiente inválido:** "Preencha todos os coeficientes com valores numéricos válidos". Retorna.
+- **FA2 — Domínio inválido (x_min ≥ x_max):** "x_min deve ser menor que x_max". Retorna.
+
+**Pós-condições**
+
+- Coeficientes e domínio capturados do formulário. Nenhuma persistência até o cálculo ser executado.
+
+---
+
+## UC22
+
+### Calcular Ponto Ótimo
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | Back End |
+| **Pré-condições** | Coeficientes e domínio preenchidos (UC21). |
+
+**Fluxo Principal**
+
+1. Usuário clica em "Calcular Ponto Ótimo".
+2. **Back End** resolve o sistema linear ∇f = 0:
+   - ∂f/∂x = 2ax + by + d = 0
+   - ∂f/∂y = bx + 2cy + e = 0
+3. **Back End** calcula a Hessiana e classifica o ponto crítico.
+4. **Back End** persiste o resultado na tabela `optimizations`.
+5. Se houver system_id vinculado, **Back End** registra evento de auditoria.
+6. **Back End** retorna o resultado para o front-end.
+7. **Sistema** exibe o resultado: x*, y*, f(x*,y*), tipo do ponto crítico.
+
+**Fluxos Alternativos**
+
+- **FA1 — Sistema linear singular (det H = 0):** "Não é possível determinar um ponto crítico único". Retorna.
+- **FA2 — Falha de comunicação:** Mensagem de erro "Erro ao calcular. Verifique os coeficientes."
+
+**Pós-condições**
+
+- Resultado persistido em `optimizations`.
+- Evento de auditoria registrado (se system_id informado).
+
+---
+
+## UC23
+
+### Visualizar Justificativa Matemática
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | — |
+| **Pré-condições** | Cálculo executado com sucesso (UC22). |
+
+**Fluxo Principal**
+
+1. **Sistema** exibe o resultado do cálculo em formato de cards: x*, y*, f(x*,y*), tipo do ponto crítico.
+2. **Sistema** exibe seção "Explicação" com texto em português explicando a classificação (baseada no determinante e traço da Hessiana).
+3. **Sistema** exibe seção colapsável "Detalhes Matemáticos" contendo:
+   - Valores do gradiente ∇f no ponto ótimo (∂f/∂x, ∂f/∂y ≈ 0)
+   - Matriz Hessiana H
+   - Determinante da Hessiana
+
+**Fluxos Alternativos**
+
+- **FA1 — Nenhum resultado disponível:** "Execute um cálculo para visualizar a justificativa."
+
+**Pós-condições**
+
+- Justificativa matemática exibida na interface. Nenhuma alteração no banco.
+
+---
+
+## UC24
+
+### Consultar Histórico de Otimizações
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | — |
+| **Pré-condições** | Ao menos uma otimização foi executada (UC22). |
+
+**Fluxo Principal**
+
+1. Usuário seleciona um sistema na tela Otimizador.
+2. **Sistema** consulta o histórico de otimizações daquele sistema via `GET /api/optimizations?system_id=UUID`.
+3. **Sistema** exibe a lista de cálculos anteriores com data, coeficientes e resultado.
+4. Usuário clica em um item para ver os detalhes completos.
+
+**Fluxos Alternativos**
+
+- **FA1 — Nenhuma otimização:** "Nenhuma otimização encontrada para este sistema."
+
+**Pós-condições**
+
+- Histórico exibido. Nenhuma alteração no banco.
+
+---
+
+## UC25
+
+### Exportar Resultado de Otimização
+
+| Campo | Descrição |
+|---|---|
+| **Ator Primário** | Usuário |
+| **Atores Secundários** | — |
+| **Pré-condições** | Resultado de otimização exibido na tela (UC23). |
+
+**Fluxo Principal**
+
+1. Usuário clica em "Exportar" no card de resultado.
+2. **Sistema** gera um JSON com todos os dados: coeficientes, domínio, x*, y*, f(x*,y*), tipo, gradiente, Hessiana e explicação.
+3. **Sistema** disponibiliza o arquivo para download.
+
+**Fluxos Alternativos**
+
+- **FA1 — Falha na geração:** "Não foi possível gerar o arquivo". Retorna.
+
+**Pós-condições**
+
+- Arquivo JSON baixado pelo usuário. Nenhuma alteração no banco.
