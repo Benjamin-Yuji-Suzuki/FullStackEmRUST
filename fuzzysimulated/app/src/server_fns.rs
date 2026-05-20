@@ -10,6 +10,7 @@ pub struct SystemInfo {
     pub name: String,
     pub description: Option<String>,
     pub defuzz_method: String,
+    pub status: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -57,7 +58,7 @@ pub struct SimulationInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEvent {
     pub id: String,
-    pub system_id: String,
+    pub system_id: Option<String>,
     pub action_type: String,
     pub entity_type: String,
     pub description: String,
@@ -259,6 +260,41 @@ pub async fn list_audit_events(system_id: String) -> AuditSummary {
     }
 }
 
+pub async fn list_orphan_audit_events() -> AuditSummary {
+    let val: Option<serde_json::Value> = api_get("/api/audit/orphans").await;
+    match val {
+        Some(v) => {
+            let events: Vec<AuditEvent> = serde_json::from_value(v["events"].clone()).unwrap_or_default();
+            let total = events.len();
+            AuditSummary { events, total }
+        }
+        None => AuditSummary { events: vec![], total: 0 },
+    }
+}
+
+pub async fn undo_audit_event(event_id: &str) -> Result<String, String> {
+    let url = format!("/api/audit/{event_id}/undo");
+    cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            let resp = gloo_net::http::Request::post(&url).send().await.map_err(|e| format!("Erro de rede: {e}"))?;
+            if resp.ok() {
+                Ok("Undo executado".into())
+            } else {
+                let body: serde_json::Value = resp.json().await.unwrap_or_default();
+                Err(body["error"].as_str().unwrap_or("Erro desconhecido").into())
+            }
+        } else {
+            let resp = reqwest::Client::new().post(&url).send().await.map_err(|e| format!("Erro de rede: {e}"))?;
+            if resp.status().is_success() {
+                Ok("Undo executado".into())
+            } else {
+                let body: serde_json::Value = resp.json().await.unwrap_or_default();
+                Err(body["error"].as_str().unwrap_or("Erro desconhecido").into())
+            }
+        }
+    }
+}
+
 // ── Delete system ──
 
 pub async fn update_system(id: &str, name: &str, description: Option<&str>, defuzz_method: &str) -> Option<SystemInfo> {
@@ -268,6 +304,11 @@ pub async fn update_system(id: &str, name: &str, description: Option<&str>, defu
         "defuzz_method": defuzz_method,
     });
     api_put(&format!("/api/systems/{id}"), &body).await
+}
+
+pub async fn update_system_status(id: &str, status: &str) -> Option<SystemInfo> {
+    let body = serde_json::json!({ "status": status });
+    api_put(&format!("/api/systems/{id}/status"), &body).await
 }
 
 pub async fn delete_system(id: &str) -> bool {
