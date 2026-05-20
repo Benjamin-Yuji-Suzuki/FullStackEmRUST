@@ -1,10 +1,10 @@
 # Casos de Teste — FuzzySimulated
 
-> Documentação dos casos de teste para os 20 casos de uso da plataforma.
+> Documentação dos casos de teste para os 25 casos de uso da plataforma.
 > Cada caso de teste segue o padrão: identificador, objetivo, pré-condições, dados de entrada, passos, resultado esperado, resultado obtido e status.
 
 **Projeto:** FuzzySimulated  
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 01/2026
+**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados · Resolução de Problemas Multivariáveis — CESUPA 02/2026
 
 ---
 
@@ -547,6 +547,162 @@
 | **Resultado obtido** | — |
 | **Status** | ⏳ Pendente |
 
+## UC21 — Definir Função Objetivo
+
+### TC-UC21-01: Preencher coeficientes válidos
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar que coeficientes e domínio são aceitos |
+| **Pré-condições** | Tela Otimizador carregada. |
+| **Tipo** | Unitário (U) |
+| **Dados de entrada** | a=1, b=0, c=1, d=0, e=0, f=0; domínio x=[-10,10], y=[-10,10] |
+| **Resultado esperado** | Coeficientes aceitos. Cálculo executado sem erros. |
+| **Resultado obtido** | `test_optimize_paraboloid_minimo` em `unit/optimization.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+### TC-UC21-02: Domínio inválido
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar rejeição de domínio com x_min ≥ x_max |
+| **Tipo** | Unitário (U) |
+| **Dados de entrada** | x_min=10, x_max=-10 |
+| **Resultado esperado** | Erro: domínio inválido. |
+| **Resultado obtido** | `test_optimize_domain_invalid` em `unit/optimization.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+---
+
+## UC22 — Calcular Ponto Ótimo
+
+### TC-UC22-01: Paraboloide com mínimo
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar cálculo de ponto ótimo para f(x,y)=x²+y² (mínimo em 0,0) |
+| **Tipo** | Unitário (U) |
+| **Dados de entrada** | a=1, b=0, c=1, d=0, e=0, f=0 |
+| **Resultado esperado** | x*=0, y*=0, f*=0, tipo="mínimo" |
+| **Resultado obtido** | `test_optimize_paraboloid_minimo` em `unit/optimization.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+### TC-UC22-02: Paraboloide com máximo
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar ponto de máximo para f(x,y)=-x²-y² |
+| **Tipo** | Unitário (U) |
+| **Dados de entrada** | a=-1, b=0, c=-1, d=0, e=0, f=0 |
+| **Resultado esperado** | x*=0, y*=0, f*=0, tipo="máximo" |
+| **Resultado obtido** | `test_optimize_paraboloid_maximo` em `unit/optimization.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+### TC-UC22-03: Ponto de sela
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar ponto de sela para f(x,y)=x²-y² |
+| **Tipo** | Unitário (U) |
+| **Dados de entrada** | a=1, b=0, c=-1, d=0, e=0, f=0 |
+| **Resultado esperado** | x*=0, y*=0, tipo="sela" |
+| **Resultado obtido** | `test_optimize_sela` em `unit/optimization.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+### TC-UC22-04: Sistema singular
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar erro para Hessiana singular (det=0) |
+| **Tipo** | Unitário (U) |
+| **Dados de entrada** | a=0, b=0, c=0, d=0, e=0, f=0 |
+| **Resultado esperado** | Erro: sistema singular |
+| **Resultado obtido** | `test_optimize_singular_system` em `unit/optimization.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+### TC-UC22-05: Gradiente zero no ponto ótimo
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar que ∇f ≈ 0 no ponto ótimo calculado |
+| **Tipo** | Unitário (U) |
+| **Dados de entrada** | a=2, b=3, c=4, d=5, e=6, f=7 |
+| **Resultado esperado** | ∂f/∂x ≈ 0 e ∂f/∂y ≈ 0 |
+| **Resultado obtido** | `test_optimize_gradient_at_optimum` em `unit/optimization.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+### TC-UC22-06: Otimização persiste no banco
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar que o resultado é persistido na tabela optimizations |
+| **Tipo** | Integração (I) |
+| **Passos** | 1. INSERT em optimizations via SQL direto<br>2. SELECT COUNT<br>3. Verificar count = 1 |
+| **Resultado esperado** | Registro persistido com todos os campos. |
+| **Resultado obtido** | `test_optimization_persists_in_db` em `integration/optimize.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+### TC-UC22-07: Colunas recuperadas corretamente
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar que os valores salvos são recuperados intactos |
+| **Tipo** | Integração (I) |
+| **Passos** | 1. INSERT com valores conhecidos<br>2. SELECT e verificar cada campo |
+| **Resultado esperado** | Todos os campos correspondem aos inseridos. |
+| **Resultado obtido** | `test_optimization_retrieves_correct_columns` em `integration/optimize.rs` — ✅ |
+| **Status** | ✅ Aprovado |
+
+---
+
+## UC23 — Visualizar Justificativa Matemática
+
+### TC-UC23-01: Exibição da explicação
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar que a justificativa matemática é exibida após o cálculo |
+| **Pré-condições** | Cálculo executado com sucesso. |
+| **Tipo** | End-to-End (E) |
+| **Passos** | 1. Preencher a=1, b=0, c=1<br>2. Clicar "Calcular Ponto Ótimo"<br>3. Verificar cards de resultado: x*, y*, f(x*,y*), tipo<br>4. Verificar seção "Detalhes Matemáticos" com gradiente e Hessiana |
+| **Resultado esperado** | Cards exibidos com valores corretos. Detalhes matemáticos disponíveis. |
+| **Resultado obtido** | — |
+| **Status** | ⏳ Pendente |
+
+---
+
+## UC24 — Consultar Histórico de Otimizações
+
+### TC-UC24-01: Listar otimizações de um sistema
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar listagem de otimizações por system_id |
+| **Pré-condições** | Otimizações salvas para o sistema. |
+| **Tipo** | Integração (I) |
+| **Passos** | 1. GET `/api/optimizations?system_id=UUID`<br>2. Verificar 200<br>3. Verificar array com registros |
+| **Resultado esperado** | Array de otimizações ordenado por `executed_at DESC`. |
+| **Resultado obtido** | — |
+| **Status** | ⏳ Pendente |
+
+---
+
+## UC25 — Exportar Resultado de Otimização
+
+### TC-UC25-01: Exportar resultado em JSON
+
+| Campo | Valor |
+|---|---|
+| **Objetivo** | Verificar exportação do resultado como JSON |
+| **Pré-condições** | Resultado exibido na tela. |
+| **Tipo** | End-to-End (E) |
+| **Passos** | 1. Calcular ponto ótimo<br>2. Clicar "Exportar"<br>3. Verificar download de arquivo JSON com todos os campos |
+| **Resultado esperado** | JSON baixado com coeficientes, x*, y*, f*, tipo, explicação, gradiente e Hessiana. |
+| **Resultado obtido** | — |
+| **Status** | ⏳ Pendente |
+
+---
+
 ### TC-UC16-03: Desfazer alteração
 
 | Campo | Valor |
@@ -587,4 +743,9 @@
 | UC18 — Executar Inferência TSK | 1 | — | ❌ Não impl. | 📝 Planejado |
 | UC19 — Exportar Visualizações SVG | 1 | — | ❌ Não impl. | 📝 Planejado |
 | UC20 — Visualizar Diagnóstico | 1 | — | ❌ Não impl. | 📝 Planejado |
-| **Total** | **43** | **16 ✅** | **6 ⏳ + 11 ❌** | **16 ✅ / 27 pendentes** |
+| UC21 — Definir Função Objetivo | 2 | — | ⏳ | ⏳ |
+| UC22 — Calcular Ponto Ótimo | 6 | ✅ 6 (otimizador) | ⏳ 2 pendentes | 6 ✅ / 2 ⏳ |
+| UC23 — Visualizar Justificativa | 1 | — | ⏳ | ⏳ |
+| UC24 — Consultar Histórico | 1 | — | ⏳ | ⏳ |
+| UC25 — Exportar Resultado | 1 | — | ⏳ | ⏳ |
+| **Total** | **55** | **22 ✅ / 6 ⏳** | **6 ⏳ + 13 ❌** | **22 ✅ / 33 pendentes** |
