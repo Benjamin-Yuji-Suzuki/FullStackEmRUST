@@ -8,23 +8,48 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  DATABASE_URL: postgres://postgres:postgres@localhost/fuzzysimulated_test
 
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fuzzysimulated_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - name: Configurar ferramentas de cobertura
-        run: rustup component add llvm-tools-preview
+      - name: Configurar Rust
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
+        with:
+          components: llvm-tools-preview
 
       - name: Instalar cargo-llvm-cov
         uses: taiki-e/install-action@65851e10cd6c377f11a60e600abc07cb08643468 # v2
         with:
           tool: cargo-llvm-cov
 
+      - name: Rodar migrations
+        run: |
+          for f in server/migrations/*.sql; do
+            echo "=== $f ==="
+            psql "$DATABASE_URL" -f "$f"
+          done
+        working-directory: fuzzysimulated
+
       - name: Rodar testes com cobertura
-        run: cargo llvm-cov --lcov --output-path lcov.info -p server -- --skip ignored
+        run: cargo llvm-cov --lcov --output-path lcov.info -p server
         working-directory: fuzzysimulated
 
       - name: Enviar ao Codecov
