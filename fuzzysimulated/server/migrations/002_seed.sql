@@ -7,6 +7,8 @@ DECLARE
     v_temp_id UUID;
     v_umid_id UUID;
     v_conf_id UUID;
+    mf_trapmf CONSTANT TEXT := 'trapmf';
+    mf_trimf  CONSTANT TEXT := 'trimf';
 BEGIN
     IF EXISTS (SELECT 1 FROM fuzzy_systems LIMIT 1) THEN
         RAISE NOTICE 'Sistemas já existem — seed ignorado';
@@ -33,21 +35,21 @@ BEGIN
 
     -- Termos: temperatura
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_temp_id, 'frio',       'trapmf', '[0, 0, 15, 22]'),
-    (v_temp_id, 'agradavel',  'trimf',  '[18, 24, 30]'),
-    (v_temp_id, 'quente',     'trapmf', '[26, 32, 50, 50]');
+    (v_temp_id, 'frio',       mf_trapmf, '[0, 0, 15, 22]'),
+    (v_temp_id, 'agradavel',  mf_trimf,  '[18, 24, 30]'),
+    (v_temp_id, 'quente',     mf_trapmf, '[26, 32, 50, 50]');
 
     -- Termos: umidade
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_umid_id, 'seco',   'trapmf', '[0, 0, 30, 50]'),
-    (v_umid_id, 'normal', 'trimf',  '[40, 55, 70]'),
-    (v_umid_id, 'umido',  'trapmf', '[60, 75, 100, 100]');
+    (v_umid_id, 'seco',   mf_trapmf, '[0, 0, 30, 50]'),
+    (v_umid_id, 'normal', mf_trimf,  '[40, 55, 70]'),
+    (v_umid_id, 'umido',  mf_trapmf, '[60, 75, 100, 100]');
 
     -- Termos: conforto
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_conf_id, 'desconfortavel', 'trapmf', '[0, 0, 3, 5]'),
-    (v_conf_id, 'neutro',         'trimf',  '[3, 5, 7]'),
-    (v_conf_id, 'confortavel',    'trapmf', '[5, 7, 10, 10]');
+    (v_conf_id, 'desconfortavel', mf_trapmf, '[0, 0, 3, 5]'),
+    (v_conf_id, 'neutro',         mf_trimf,  '[3, 5, 7]'),
+    (v_conf_id, 'confortavel',    mf_trapmf, '[5, 7, 10, 10]');
 
     -- Regras
     INSERT INTO fuzzy_rules (system_id, rule_text, weight, position) VALUES

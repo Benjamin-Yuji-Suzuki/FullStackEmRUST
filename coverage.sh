@@ -16,7 +16,7 @@ echo ">>> Resumo de cobertura:"
 cargo llvm-cov report -p server 2>/dev/null || true
 
 echo ""
-if [ -n "${CODECOV_TOKEN:-}" ]; then
+if [[ -n "${CODECOV_TOKEN:-}" ]]; then
     echo ">>> Enviando pro Codecov..."
     if command -v codecov &>/dev/null; then
         codecov --token "$CODECOV_TOKEN" --file "$ROOT/lcov.info"
