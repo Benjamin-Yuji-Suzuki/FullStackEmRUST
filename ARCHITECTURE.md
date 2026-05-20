@@ -92,6 +92,21 @@ CREATE TABLE scenarios (
     inputs JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Otimizações de função objetivo (UC21-UC25)
+CREATE TABLE optimizations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    system_id UUID REFERENCES fuzzy_systems(id) ON DELETE SET NULL,
+    coef_a FLOAT NOT NULL, coef_b FLOAT NOT NULL,
+    coef_c FLOAT NOT NULL, coef_d FLOAT NOT NULL,
+    coef_e FLOAT NOT NULL, coef_f FLOAT NOT NULL,
+    x_min FLOAT NOT NULL, x_max FLOAT NOT NULL,
+    y_min FLOAT NOT NULL, y_max FLOAT NOT NULL,
+    optimal_x FLOAT, optimal_y FLOAT, optimal_value FLOAT,
+    critical_point_type TEXT, explanation TEXT,
+    gradient_at_optimum JSONB, hessian_matrix JSONB,
+    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 ```
 
 ### Índices
@@ -106,6 +121,8 @@ CREATE INDEX idx_batch_system ON batch_results(system_id);
 CREATE INDEX idx_audit_system ON audit_events(system_id);
 CREATE INDEX idx_audit_created ON audit_events(created_at DESC);
 CREATE INDEX idx_scenarios_system ON scenarios(system_id);
+CREATE INDEX idx_optimizations_system ON optimizations(system_id);
+CREATE INDEX idx_optimizations_executed ON optimizations(executed_at DESC);
 ```
 
 ---
@@ -136,8 +153,8 @@ Na primeira execução, `server/migrations/002_seed.sql` insere automaticamente 
 
 ```
 FullStackEmRUST/
-├── USE_CASES.md         # 20 casos de uso
-├── TEST_CASES.md        # 43 casos de teste
+├── USE_CASES.md         # 25 casos de uso
+├── TEST_CASES.md        # 55 casos de teste
 ├── FUZZY_MODEL.md       # Modelos Mamdani + TSK + PSO
 ├── ARCHITECTURE.md      # Este documento
 ├── README.md
@@ -157,8 +174,19 @@ FullStackEmRUST/
     │   │   └── state.rs       # AppState
     │   ├── migrations/
     │   │   ├── 001_schema.sql      # schema: 7 tabelas + índices
-    │   │   └── 002_seed.sql        # seed: sistema Conforto Térmico
-    │   └── tests/api_test.rs       # 16 unit + 6 integration tests
+    │   │   ├── 002_seed.sql        # seed: sistema Conforto Térmico
+    │   │   └── 003_optimization.sql # otimização (UC21-UC25)
+    │   └── tests/
+    │       ├── api_test.rs         # entry point
+    │       ├── unit/               # 22 unit tests
+    │       │   ├── system_validation.rs
+    │       │   ├── mf_validation.rs
+    │       │   └── optimization.rs
+    │       └── integration/        # 8 integration tests
+    │           ├── systems.rs
+    │           ├── variables.rs
+    │           ├── simulate.rs
+    │           └── optimize.rs
     ├── frontend/          # crate WASM — entry point hydrate
     │   └── src/lib.rs
     ├── end2end/           # Playwright (E2E) — testes de navegação
@@ -182,9 +210,10 @@ Navegador (WASM)
         │     ├── systems.rs      → CRUD sistemas
         │     ├── variables.rs    → CRUD variáveis e termos
         │     ├── rules.rs        → CRUD regras
-        │     ├── simulate.rs     → simulação, histórico, import/export, etc.
-        │     ├── weather.rs      → OpenWeather API
-        │     └── audit_routes.rs → auditoria
+│         ├── simulate.rs     → simulação, histórico, import/export, etc.
+│         ├── weather.rs      → OpenWeather API
+│         ├── audit_routes.rs → auditoria
+│         └── optimize.rs     → otimização de função objetivo (UC21-UC25)
         │
         ├── PostgreSQL via SQLx
         │     └── migrations, queries compile-checked, JSONB
