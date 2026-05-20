@@ -173,12 +173,27 @@ async fn compute_optimal_point(
     if let Some(sid) = req.system_id {
         audit::log(
             &state.pool,
-            sid,
+            Some(sid),
             "create",
             "optimization",
+            Some(record_id),
             &format!("Otimização calculada: ponto ({:.4}, {:.4}) — {}", x, y, point_type),
-        )
-        .await;
+            None, serde_json::to_value(&Optimization {
+                id: record_id,
+                system_id: Some(sid),
+                coef_a: req.coef_a, coef_b: req.coef_b,
+                coef_c: req.coef_c, coef_d: req.coef_d,
+                coef_e: req.coef_e, coef_f: req.coef_f,
+                x_min: req.x_min, x_max: req.x_max,
+                y_min: req.y_min, y_max: req.y_max,
+                optimal_x: Some(x), optimal_y: Some(y),
+                optimal_value: Some(value),
+                critical_point_type: Some(point_type.clone()),
+                explanation: Some(explanation.clone()),
+                gradient_at_optimum: Some(json!(gradient)),
+                hessian_matrix: Some(json!(hessian)),
+                executed_at: chrono::Utc::now(),
+            }).ok()).await;
     }
 
     Ok(Json(json!({

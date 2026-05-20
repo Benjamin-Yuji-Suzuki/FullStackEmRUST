@@ -110,8 +110,10 @@ async fn create_variable(
     .fetch_one(&state.pool)
     .await?;
 
-    audit::log(&state.pool, system_id, "create", "variable",
-        &format!("Variável '{}' adicionada como {}", row.name, row.role)).await;
+    audit::log(&state.pool, Some(system_id), "create", "variable",
+        Some(row.id),
+        &format!("Variável '{}' adicionada como {}", row.name, row.role),
+        None, serde_json::to_value(&row).ok()).await;
 
     Ok((axum::http::StatusCode::CREATED, Json(row)))
 }
@@ -157,13 +159,25 @@ async fn update_variable(
     let resolution = req.resolution.unwrap_or(501);
     if resolution < 2 { return Err(AppError::Validation("Resolução mínima é 2".into())); }
 
+    let old = sqlx::query_as::<_, FuzzyVariable>(
+        "SELECT * FROM fuzzy_variables WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Variável não encontrada".into()))?;
+
     let row = sqlx::query_as::<_, FuzzyVariable>(
         "UPDATE fuzzy_variables SET name = $1, universe_min = $2, universe_max = $3, resolution = $4 WHERE id = $5 RETURNING *"
     )
     .bind(&name).bind(req.universe_min).bind(req.universe_max).bind(resolution).bind(id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Variável não encontrada".into()))?;
+    .fetch_one(&state.pool)
+    .await?;
+
+    audit::log(&state.pool, Some(old.system_id), "update", "variable",
+        Some(id),
+        &format!("Variável '{}' atualizada", old.name),
+        serde_json::to_value(&old).ok(), serde_json::to_value(&row).ok()).await;
 
     Ok(Json(row))
 }
@@ -177,13 +191,32 @@ async fn update_term(
     if label.is_empty() { return Err(AppError::Validation("Rótulo obrigatório".into())); }
 
     let params_json = json!(req.params);
+    let old = sqlx::query_as::<_, FuzzyTerm>(
+        "SELECT * FROM fuzzy_terms WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Termo não encontrado".into()))?;
+
     let row = sqlx::query_as::<_, FuzzyTerm>(
         "UPDATE fuzzy_terms SET label = $1, mf_type = $2, params = $3 WHERE id = $4 RETURNING *"
     )
     .bind(&label).bind(&req.mf_type).bind(&params_json).bind(id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Termo não encontrada".into()))?;
+    .fetch_one(&state.pool)
+    .await?;
+
+    let var = sqlx::query_as::<_, FuzzyVariable>(
+        "SELECT * FROM fuzzy_variables WHERE id = $1"
+    )
+    .bind(old.variable_id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    audit::log(&state.pool, Some(var.system_id), "update", "term",
+        Some(id),
+        &format!("Termo '{}' atualizado para '{}'", old.label, row.label),
+        serde_json::to_value(&old).ok(), serde_json::to_value(&row).ok()).await;
 
     Ok(Json(row))
 }
@@ -207,8 +240,10 @@ async fn delete_variable(
         .execute(&state.pool)
         .await?;
 
-    audit::log(&state.pool, sys_id, "delete", "variable",
-        &format!("Variável '{}' removida", var.name)).await;
+    audit::log(&state.pool, Some(sys_id), "delete", "variable",
+        Some(id),
+        &format!("Variável '{}' removida", var.name),
+        serde_json::to_value(&var).ok(), None).await;
 
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
@@ -276,8 +311,10 @@ async fn create_term(
     .fetch_one(&state.pool)
     .await?;
 
-    audit::log(&state.pool, var.system_id, "create", "term",
-        &format!("Termo '{}' ({}) adicionado à '{}'", row.label, row.mf_type, var.name)).await;
+    audit::log(&state.pool, Some(var.system_id), "create", "term",
+        Some(row.id),
+        &format!("Termo '{}' ({}) adicionado à '{}'", row.label, row.mf_type, var.name),
+        None, serde_json::to_value(&row).ok()).await;
 
     Ok((axum::http::StatusCode::CREATED, Json(row)))
 }
@@ -286,18 +323,30 @@ async fn delete_term(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<axum::http::StatusCode, AppError> {
-    sqlx::query_scalar::<_, Uuid>(
-        "SELECT variable_id FROM fuzzy_terms WHERE id = $1"
+    let term = sqlx::query_as::<_, FuzzyTerm>(
+        "SELECT * FROM fuzzy_terms WHERE id = $1"
     )
     .bind(id)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::NotFound("Termo não encontrado".into()))?;
 
+    let var = sqlx::query_as::<_, FuzzyVariable>(
+        "SELECT * FROM fuzzy_variables WHERE id = $1"
+    )
+    .bind(term.variable_id)
+    .fetch_one(&state.pool)
+    .await?;
+
     sqlx::query("DELETE FROM fuzzy_terms WHERE id = $1")
         .bind(id)
         .execute(&state.pool)
         .await?;
+
+    audit::log(&state.pool, Some(var.system_id), "delete", "term",
+        Some(id),
+        &format!("Termo '{}' removido", term.label),
+        serde_json::to_value(&term).ok(), None).await;
 
     Ok(axum::http::StatusCode::NO_CONTENT)
 }

@@ -51,8 +51,10 @@ async fn create_rule(
     .fetch_one(&state.pool)
     .await?;
 
-    audit::log(&state.pool, system_id, "create", "rule",
-        &format!("Regra #{} adicionada: {}", row.position, row.rule_text)).await;
+    audit::log(&state.pool, Some(system_id), "create", "rule",
+        Some(row.id),
+        &format!("Regra #{} adicionada: {}", row.position, row.rule_text),
+        None, serde_json::to_value(&row).ok()).await;
 
     Ok((axum::http::StatusCode::CREATED, Json(row)))
 }
@@ -87,15 +89,27 @@ async fn update_rule(
         return Err(AppError::Validation("Peso deve estar entre 0.0 e 1.0".into()));
     }
 
+    let old = sqlx::query_as::<_, FuzzyRule>(
+        "SELECT * FROM fuzzy_rules WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Regra não encontrada".into()))?;
+
     let row = sqlx::query_as::<_, FuzzyRule>(
         "UPDATE fuzzy_rules SET rule_text = $1, weight = $2 WHERE id = $3 RETURNING *"
     )
     .bind(&text)
     .bind(weight)
     .bind(id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Regra não encontrada".into()))?;
+    .fetch_one(&state.pool)
+    .await?;
+
+    audit::log(&state.pool, Some(old.system_id), "update", "rule",
+        Some(id),
+        &format!("Regra #{} atualizada", old.position),
+        serde_json::to_value(&old).ok(), serde_json::to_value(&row).ok()).await;
 
     Ok(Json(row))
 }
@@ -119,8 +133,10 @@ async fn delete_rule(
         .execute(&state.pool)
         .await?;
 
-    audit::log(&state.pool, sys_id, "delete", "rule",
-        &format!("Regra removida: {}", rule.rule_text)).await;
+    audit::log(&state.pool, Some(sys_id), "delete", "rule",
+        Some(id),
+        &format!("Regra removida: {}", rule.rule_text),
+        serde_json::to_value(&rule).ok(), None).await;
 
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
