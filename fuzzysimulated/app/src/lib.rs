@@ -8,6 +8,24 @@ use leptos_router::StaticSegment;
 use server_fns::*;
 use cfg_if::cfg_if;
 
+fn status_color(status: &str) -> &'static str {
+    match status {
+        "favorito" => "tag-amber",
+        "concluido" => "tag-teal",
+        "desativado" => "tag-gray",
+        _ => "tag-green",
+    }
+}
+
+fn status_icon(status: &str) -> &'static str {
+    match status {
+        "favorito" => "ti ti-star",
+        "concluido" => "ti ti-circle-check",
+        "desativado" => "ti ti-circle-minus",
+        _ => "ti ti-circle-check",
+    }
+}
+
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
         fn spawn_async(f: impl std::future::Future<Output = ()> + 'static) {
@@ -213,6 +231,10 @@ fn Dashboard() -> impl IntoView {
                             <For each=move || list.clone() key=|s| s.id.clone() let:sys>
                                 {
                                     let sid = sys.id.clone();
+                                    let st = sys.status.clone();
+                                    let is_fav = st == "favorito";
+                                    let sys_for_status = sys.clone();
+                                    let sl2 = systems.clone();
                                     view! {
                                         <div class="system-card">
                                             <div class="system-card-top">
@@ -220,14 +242,36 @@ fn Dashboard() -> impl IntoView {
                                                     <div class="system-name">{sys.name.clone()}</div>
                                                     <div class="system-desc">{sys.description.clone().unwrap_or_default()}</div>
                                                 </div>
-                                                <span class="tag tag-green">"Ativo"</span>
+                                                <span class=format!("tag {}", status_color(&st))>
+                                                    <i class=status_icon(&st)></i>
+                                                    " " {st.clone()}
+                                                </span>
                                             </div>
                                             <div style="font-size:10px;color:var(--text3)">
                                                 "Defuzz: " <span style="color:var(--amber)">{sys.defuzz_method.clone()}</span>
                                                 " · Criado: " <span>{sys.created_at[..10].to_string()}</span>
                                             </div>
-                                            <div class="system-meta">
-                                                <span>"ID: " {sys.id[..8].to_string()}"..."</span>
+                                            <div class="system-meta" style="margin-top:8px">
+                                                <select class="text-input" style="font-size:9px;padding:2px 4px;width:auto"
+                                                    prop:value=move || sys_for_status.status.clone()
+                                                    on:change={
+                                                        let sid_clone = sid.clone();
+                                                        let sl3 = sl2.clone();
+                                                        move |e| {
+                                                            let new_st = event_target_value(&e);
+                                                            let id2 = sid_clone.clone();
+                                                            let s2 = sl3.clone();
+                                                            spawn_async(async move {
+                                                                update_system_status(&id2, &new_st).await;
+                                                                s2.set(list_systems().await);
+                                                            });
+                                                        }
+                                                    }>
+                                                    <option value="ativo">"Ativo"</option>
+                                                    <option value="favorito">"Favorito"</option>
+                                                    <option value="concluido">"Concluído"</option>
+                                                    <option value="desativado">"Desativado"</option>
+                                                </select>
                                                 <div class="system-actions">
                                                     <a class="icon-btn" href={format!("/editsys?id={}", sid)} target="_self">
                                                         <i class="ti ti-edit"></i>
@@ -235,11 +279,17 @@ fn Dashboard() -> impl IntoView {
                                                     <a class="icon-btn" href={format!("/audit?id={}", sid)}>
                                                         <i class="ti ti-history"></i>
                                                     </a>
-                                                    <form action={format!("/api/sys/{sid}/delete")} method="post" target="_self" style="display:inline">
-                                                        <button type="submit" class="icon-btn">
-                                                            <i class="ti ti-trash"></i>
-                                                        </button>
-                                                    </form>
+                                                    {if is_fav {
+                                                        view! { <span class="icon-btn" style="opacity:0.4;cursor:not-allowed" title="Remova o favorito para deletar"><i class="ti ti-lock"></i></span> }.into_any()
+                                                    } else {
+                                                        view! {
+                                                            <form action={format!("/api/sys/{sid}/delete")} method="post" target="_self" style="display:inline">
+                                                                <button type="submit" class="icon-btn">
+                                                                    <i class="ti ti-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        }.into_any()
+                                                    }}
                                                 </div>
                                             </div>
                                         </div>
@@ -264,8 +314,10 @@ fn Auditoria() -> impl IntoView {
     let selected_id = RwSignal::new(String::new());
 
     let selected_id_clone = selected_id;
+    let trigger = RwSignal::new(0u32);
     let events = LocalResource::new(move || {
         let id = selected_id_clone.get();
+        let _ = trigger.get();
         async move {
             if id.is_empty() {
                 AuditSummary { events: vec![], total: 0 }
@@ -273,6 +325,23 @@ fn Auditoria() -> impl IntoView {
                 list_audit_events(id).await
             }
         }
+    });
+
+    fn undo_event(event_id: String, trigger: RwSignal<u32>) {
+        spawn_async(async move {
+            if let Err(e) = undo_audit_event(&event_id).await {
+                leptos::logging::error!("Erro ao desfazer: {}", e);
+            }
+            trigger.update(|v| *v += 1);
+        });
+    }
+
+    let show_orphans = RwSignal::new(false);
+    let orphan_trigger = RwSignal::new(0u32);
+    let orphan_events = LocalResource::new(move || {
+        let _ = show_orphans.get();
+        let _ = orphan_trigger.get();
+        async move { list_orphan_audit_events().await }
     });
 
     view! {
@@ -283,64 +352,124 @@ fn Auditoria() -> impl IntoView {
             </div>
 
             <div class="panel" style="margin-bottom:16px">
-                <div class="panel-title">"Selecione um Sistema"</div>
-                {move || {
-                    let list = systems_list.get();
-                    view! {
-                        <select class="text-input" style="margin-top:8px"
-                            prop:value=move || selected_id.get()
-                            on:change=move |e| selected_id.set(event_target_value(&e))>
-                            <option value="">"— Selecione —"</option>
-                            {move || list.clone().unwrap_or_default().into_iter().map(|s| view! {
-                                <option value={s.id.clone()}>{s.name.clone()}</option>
-                            }).collect_view()}
-                        </select>
-                    }
-                }}
+                <div class="panel-title">"Sistemas"</div>
+                <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                    <select class="text-input" style="flex:1"
+                        prop:value=move || selected_id.get()
+                        on:change=move |e| { selected_id.set(event_target_value(&e)); show_orphans.set(false); }>
+                        <option value="">"— Selecione um sistema ativo —"</option>
+                        {move || systems_list.get().unwrap_or_default().into_iter().map(|s| view! {
+                            <option value={s.id.clone()}>{s.name.clone()}</option>
+                        }).collect_view()}
+                    </select>
+                    <button class="btn-sm btn-outline"
+                        on:click=move |_| { show_orphans.update(|v| *v = !*v); orphan_trigger.update(|v| *v += 1); }>
+                        <i class="ti ti-trash"></i> " Deletados"
+                    </button>
+                </div>
             </div>
 
-            <Suspense fallback=|| view! { <div class="loading">"Carregando..."</div> }>
-            {move || {
-                let id = selected_id.get();
-                if id.is_empty() {
-                    return view! { <div class="empty-state">"Selecione um sistema para ver o histórico."</div> }.into_any();
-                }
-
-                match events.get() {
-                    None => view! { <div class="loading">"Carregando..."</div> }.into_any(),
-                    Some(summary) => {
-                        if summary.events.is_empty() {
-                            view! { <div class="empty-state">"Nenhuma alteração registrada para este sistema."</div> }.into_any()
-                        } else {
-                            let total = summary.total;
-                            let events = summary.events;
-                            view! {
-                                <div style="font-size:11px;color:var(--text3);margin-bottom:12px">
-                                    {total}" evento(s) registrado(s)"
-                                </div>
-                                <div class="timeline">
-                                    <For each=move || events.clone() key=|e| e.id.clone() let:evt>
-                                        <div class="timeline-item">
-                                            <div class="timeline-dot" data-action=evt.action_type.clone()></div>
-                                            <div class="timeline-content">
-                                                <div class="timeline-header">
-                                                    <span class="tag tag-amber">{evt.action_type.clone()}</span>
-                                                    <span class="tag tag-teal">{evt.entity_type.clone()}</span>
-                                                    <span style="font-size:10px;color:var(--text3);margin-left:auto">
-                                                        {evt.created_at[..19].replace("T", " ")}
-                                                    </span>
+            {move || if show_orphans.get() {
+                view! {
+                    <Suspense fallback=|| view! { <div class="loading">"Carregando..."</div> }>
+                    {move || match orphan_events.get() {
+                        None => view! { <div class="loading">"Carregando..."</div> }.into_any(),
+                        Some(summary) => {
+                            if summary.events.is_empty() {
+                                view! { <div class="empty-state">"Nenhum sistema deletado encontrado."</div> }.into_any()
+                            } else {
+                                view! {
+                                    <div class="panel">
+                                        <div class="panel-title" style="color:var(--red)">"Sistemas Deletados"</div>
+                                        <div class="timeline">
+                                            <For each=move || summary.events.clone() key=|e| e.id.clone() let:evt>
+                                                <div class="timeline-item">
+                                                    <div class="timeline-dot" data-action="delete"></div>
+                                                    <div class="timeline-content">
+                                                        <div class="timeline-header">
+                                                            <span class="tag tag-red">{evt.action_type.clone()}</span>
+                                                            <span class="tag tag-teal">{evt.entity_type.clone()}</span>
+                                                            <span style="font-size:10px;color:var(--text3);margin-left:auto">
+                                                                {evt.created_at[..19].replace("T", " ")}
+                                                            </span>
+                                                        </div>
+                                                        <div class="timeline-desc">{evt.description.clone()}</div>
+                                                        {{
+                                                            let eid = evt.id.clone();
+                                                            let at = evt.action_type.clone();
+                                                            if at.starts_with("undo") {
+                                                                view! { <span class="tag" style="margin-top:6px;opacity:0.6">"Restaurado"</span> }.into_any()
+                                                            } else {
+                                                                view! { <button class="btn-sm btn-outline" style="margin-top:6px;border-color:var(--red);color:var(--red)"
+                                                                    on:click=move |_| { undo_event(eid.clone(), orphan_trigger); show_orphans.set(false); }>
+                                                                    <i class="ti ti-arrow-back-up"></i> " Restaurar Sistema"
+                                                                </button> }.into_any()
+                                                            }
+                                                        }}
+                                                    </div>
                                                 </div>
-                                                <div class="timeline-desc">{evt.description.clone()}</div>
-                                            </div>
+                                            </For>
                                         </div>
-                                    </For>
-                                </div>
-                            }.into_any()
+                                    </div>
+                                }.into_any()
+                            }
                         }
-                    }
-                }
+                    }}
+                    </Suspense>
+                }.into_any()
+            } else if selected_id.get().is_empty() {
+                view! { <div class="empty-state">"Selecione um sistema ou clique em 'Deletados'."</div> }.into_any()
+            } else {
+                view! {
+                    <Suspense fallback=|| view! { <div class="loading">"Carregando..."</div> }>
+                    {move || match events.get() {
+                        None => view! { <div class="loading">"Carregando..."</div> }.into_any(),
+                        Some(summary) => {
+                            if summary.events.is_empty() {
+                                view! { <div class="empty-state">"Nenhuma alteração registrada para este sistema."</div> }.into_any()
+                            } else {
+                                let total = summary.total;
+                                let evts = summary.events;
+                                view! {
+                                    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">
+                                        {total}" evento(s) registrado(s)"
+                                    </div>
+                                    <div class="timeline">
+                                        <For each=move || evts.clone() key=|e| e.id.clone() let:evt>
+                                            <div class="timeline-item">
+                                                <div class="timeline-dot" data-action=evt.action_type.clone()></div>
+                                                <div class="timeline-content">
+                                                    <div class="timeline-header">
+                                                        <span class="tag tag-amber">{evt.action_type.clone()}</span>
+                                                        <span class="tag tag-teal">{evt.entity_type.clone()}</span>
+                                                        <span style="font-size:10px;color:var(--text3);margin-left:auto">
+                                                            {evt.created_at[..19].replace("T", " ")}
+                                                        </span>
+                                                    </div>
+                                                    <div class="timeline-desc">{evt.description.clone()}</div>
+                                                    {{
+                                                        let at = evt.action_type.clone();
+                                                        let deid = evt.id.clone();
+                                                        if at.starts_with("undo") {
+                                                            view! { <span class="tag" style="margin-top:6px;opacity:0.6">"Desfeito"</span> }.into_any()
+                                                        } else {
+                                                            view! { <button class="btn-sm btn-outline" style="margin-top:6px"
+                                                                on:click=move |_| undo_event(deid.clone(), trigger)>
+                                                                <i class="ti ti-arrow-back-up"></i> " Desfazer"
+                                                            </button> }.into_any()
+                                                        }
+                                                    }}
+                                                </div>
+                                            </div>
+                                        </For>
+                                    </div>
+                                }.into_any()
+                            }
+                        }
+                    }}
+                    </Suspense>
+                }.into_any()
             }}
-            </Suspense>
         </div>
     }
 }
@@ -625,7 +754,7 @@ fn Variaveis() -> impl IntoView {
         let sv = selected_var.clone();
         let _ = (&ss, &v, &sv);
         spawn_async(async move {
-            let systems = list_systems().await;
+            let systems = list_systems().await.into_iter().filter(|s| s.status == "ativo" || s.status == "favorito").collect::<Vec<_>>();
             leptos::logging::log!("[Variaveis] loaded {} systems", systems.len());
             sl.set(systems);
 
@@ -775,7 +904,7 @@ fn Variaveis() -> impl IntoView {
           let sl = systems_list.clone(); let ss = selected_sys.clone(); let r = rules.clone();
           let _ = (&ss, &r);
           async move {
-              sl.set(list_systems().await);
+              sl.set(list_systems().await.into_iter().filter(|s| s.status == "ativo" || s.status == "favorito").collect());
               #[cfg(target_arch = "wasm32")]
               if let Some(s) = web_sys::window().and_then(|w| w.location().search().ok()) {
                   if let Some(id) = s.split("s=").nth(1).and_then(|x| x.split('&').next()) {
@@ -854,7 +983,7 @@ fn Variaveis() -> impl IntoView {
      let city_input = RwSignal::new(String::new());
      let weather_msg = RwSignal::new(String::new());
 
-     spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+     spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await.into_iter().filter(|s| s.status != "desativado").collect()); } });
 
      let load_vars = {
          let ss = selected_sys.clone();
