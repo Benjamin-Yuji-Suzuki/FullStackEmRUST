@@ -261,3 +261,63 @@ fn snapshot_object_fields(snapshot: &Value) -> String {
         _ => String::new(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{entity_table, snapshot_object_fields};
+    use serde_json::json;
+
+    #[test]
+    fn test_entity_table_system() {
+        assert_eq!(entity_table("system"), "fuzzy_systems");
+    }
+
+    #[test]
+    fn test_entity_table_variable() {
+        assert_eq!(entity_table("variable"), "fuzzy_variables");
+    }
+
+    #[test]
+    fn test_entity_table_term() {
+        assert_eq!(entity_table("term"), "fuzzy_terms");
+    }
+
+    #[test]
+    fn test_entity_table_rule() {
+        assert_eq!(entity_table("rule"), "fuzzy_rules");
+    }
+
+    #[test]
+    fn test_entity_table_optimization() {
+        assert_eq!(entity_table("optimization"), "optimizations");
+    }
+
+    #[test]
+    #[should_panic(expected = "entity_type desconhecido")]
+    fn test_entity_table_unknown() {
+        entity_table("invalid");
+    }
+
+    #[test]
+    fn test_snapshot_object_fields_extracts_keys() {
+        let v = json!({"id": "abc", "name": "test", "value": 42});
+        let result = snapshot_object_fields(&v);
+        let fields: Vec<&str> = result.split(", ").collect();
+        assert_eq!(fields.len(), 3);
+        assert!(fields.contains(&"id"));
+        assert!(fields.contains(&"name"));
+        assert!(fields.contains(&"value"));
+    }
+
+    #[test]
+    fn test_snapshot_object_fields_non_object() {
+        assert_eq!(snapshot_object_fields(&json!("string")), "");
+        assert_eq!(snapshot_object_fields(&json!(123)), "");
+        assert_eq!(snapshot_object_fields(&json!(null)), "");
+    }
+
+    #[test]
+    fn test_snapshot_object_fields_empty() {
+        assert_eq!(snapshot_object_fields(&json!({})), "");
+    }
+}

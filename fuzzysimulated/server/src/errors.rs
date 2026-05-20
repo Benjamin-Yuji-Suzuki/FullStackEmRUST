@@ -33,3 +33,34 @@ impl IntoResponse for AppError {
         (status, Json(json!({ "error": message }))).into_response()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+
+    fn check_status(err: AppError, expected: StatusCode) {
+        let resp = err.into_response();
+        assert_eq!(resp.status(), expected);
+    }
+
+    #[test]
+    fn test_validation_status() {
+        check_status(AppError::Validation("x".into()), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn test_not_found_status() {
+        check_status(AppError::NotFound("x".into()), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_database_status() {
+        check_status(AppError::Database(sqlx::Error::PoolTimedOut), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_external_status() {
+        check_status(AppError::External("x".into()), StatusCode::BAD_GATEWAY);
+    }
+}

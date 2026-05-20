@@ -87,3 +87,28 @@ fn urlencoding(s: &str) -> String {
     }
     encoded
 }
+
+#[cfg(test)]
+mod tests {
+    use super::urlencoding;
+
+    #[test]
+    fn test_urlencoding_ascii() {
+        assert_eq!(urlencoding("hello"), "hello");
+    }
+
+    #[test]
+    fn test_urlencoding_with_spaces() {
+        assert_eq!(urlencoding("São Paulo"), "S%C3%A3o%20Paulo");
+    }
+
+    #[test]
+    fn test_urlencoding_special_chars() {
+        assert_eq!(urlencoding("a&b=c"), "a%26b%3Dc");
+    }
+
+    #[test]
+    fn test_urlencoding_empty() {
+        assert_eq!(urlencoding(""), "");
+    }
+}

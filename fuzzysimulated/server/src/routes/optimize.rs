@@ -11,6 +11,7 @@ use crate::audit;
 use crate::errors::AppError;
 use crate::models::*;
 use crate::state::AppState;
+use server::math::{self, OptimizationInput};
 
 /// Registra as rotas de otimização.
 ///
@@ -36,109 +37,30 @@ async fn compute_optimal_point(
     State(state): State<AppState>,
     Json(req): Json<OptimizationRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    if req.x_min >= req.x_max || req.y_min >= req.y_max {
-        return Err(AppError::Validation(
-            "Domínio inválido: x_min < x_max e y_min < y_max são obrigatórios".into(),
-        ));
-    }
-
-    // Sistema linear 2x2 da condição ∇f = 0:
-    //   ∂f/∂x = 2ax + by + d = 0
-    //   ∂f/∂y = bx + 2cy + e = 0
-    //
-    // Forma matricial: | 2a  b | |x| = |-d|
-    //                  | b  2c| |y|   |-e|
-    //
-    // Determinante: D = (2a)(2c) - b² = 4ac - b²
-
-    let det = 4.0 * req.coef_a * req.coef_c - req.coef_b * req.coef_b;
-
-    if det.abs() < 1e-12 {
-        return Err(AppError::Validation(
-            "Sistema linear singular: determinante Hessiano é zero. Não é possível determinar um ponto crítico único.".into(),
-        ));
-    }
-
-    // Solução por Regra de Cramer:
-    //   x = (-2c*d + b*e) / D
-    //   y = (b*d - 2a*e) / D
-    let raw_x = (-2.0 * req.coef_c * req.coef_d + req.coef_b * req.coef_e) / det;
-    let raw_y = (req.coef_b * req.coef_d - 2.0 * req.coef_a * req.coef_e) / det;
-
-    // Restringir ao domínio informado
-    let x = raw_x.clamp(req.x_min, req.x_max);
-    let y = raw_y.clamp(req.y_min, req.y_max);
-
-    let value = req.coef_a * x * x
-        + req.coef_b * x * y
-        + req.coef_c * y * y
-        + req.coef_d * x
-        + req.coef_e * y
-        + req.coef_f;
-
-    // Hessiana: H = | 2a  b |
-    //               | b  2c |
-    let hessian_det = 4.0 * req.coef_a * req.coef_c - req.coef_b * req.coef_b;
-    let _hessian_trace = 2.0 * req.coef_a + 2.0 * req.coef_c;
-
-    let (point_type, explanation) = if hessian_det > 0.0 && 2.0 * req.coef_a > 0.0 {
-        (
-            "mínimo".to_string(),
-            format!(
-                "det(H) = {:.4} > 0 e 2a = {:.4} > 0 ⇒ ponto de **mínimo local**.\n\n\
-                 A matriz Hessiana é **definida positiva** (todos os autovalores > 0), \
-                 indicando que a função f(x,y) tem concavidade voltada para cima \
-                 em todas as direções ao redor do ponto crítico.",
-                hessian_det,
-                2.0 * req.coef_a
-            ),
-        )
-    } else if hessian_det > 0.0 && 2.0 * req.coef_a < 0.0 {
-        (
-            "máximo".to_string(),
-            format!(
-                "det(H) = {:.4} > 0 e 2a = {:.4} < 0 ⇒ ponto de **máximo local**.\n\n\
-                 A matriz Hessiana é **definida negativa** (todos os autovalores < 0), \
-                 indicando que a função f(x,y) tem concavidade voltada para baixo \
-                 em todas as direções ao redor do ponto crítico.",
-                hessian_det,
-                2.0 * req.coef_a
-            ),
-        )
-    } else if hessian_det < 0.0 {
-        (
-            "sela".to_string(),
-            format!(
-                "det(H) = {:.4} < 0 ⇒ **ponto de sela**.\n\n\
-                 A matriz Hessiana tem autovalores de sinais opostos, \
-                 indicando que f(x,y) cresce em uma direção e decresce em outra. \
-                 O ponto crítico não é nem mínimo nem máximo local.",
-                hessian_det
-            ),
-        )
-    } else {
-        (
-            "indeterminado".to_string(),
-            format!(
-                "det(H) = {:.4} = 0 ⇒ classificação **indeterminada**.\n\n\
-                 O teste da Hessiana é inconclusivo. Análise adicional de termos \
-                 de ordem superior seria necessária para classificar o ponto crítico.",
-                hessian_det
-            ),
-        )
+    let input = OptimizationInput {
+        coef_a: req.coef_a,
+        coef_b: req.coef_b,
+        coef_c: req.coef_c,
+        coef_d: req.coef_d,
+        coef_e: req.coef_e,
+        coef_f: req.coef_f,
+        x_min: req.x_min,
+        x_max: req.x_max,
+        y_min: req.y_min,
+        y_max: req.y_max,
     };
 
-    // Gradiente no ponto ótimo (deve ser ≈ 0)
-    let grad_x = 2.0 * req.coef_a * x + req.coef_b * y + req.coef_d;
-    let grad_y = req.coef_b * x + 2.0 * req.coef_c * y + req.coef_e;
-
-    let gradient = [grad_x, grad_y];
-    let hessian = [
-        [2.0 * req.coef_a, req.coef_b],
-        [req.coef_b, 2.0 * req.coef_c],
-    ];
+    let result = math::solve_quadratic_optimization(&input)
+        .map_err(AppError::Validation)?;
 
     // Persistir no banco
+    let x = result.optimal_x;
+    let y = result.optimal_y;
+    let value = result.optimal_value;
+    let point_type = &result.critical_point_type;
+    let explanation = &result.explanation;
+    let gradient = result.gradient_at_optimum;
+    let hessian = result.hessian_matrix;
     let record_id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO optimizations \
          (system_id, coef_a, coef_b, coef_c, coef_d, coef_e, coef_f, \
