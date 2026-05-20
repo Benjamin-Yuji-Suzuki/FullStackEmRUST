@@ -73,6 +73,7 @@ pub fn App() -> impl IntoView {
                         <Route path=StaticSegment("batch")  view=BatchDashboard/>
                         <Route path=StaticSegment("analysis") view=Analise/>
                         <Route path=StaticSegment("audit")  view=Auditoria/>
+                        <Route path=StaticSegment("opt")   view=OptimizePage/>
                     </Routes>
                 </div>
             </div>
@@ -137,6 +138,10 @@ fn Sidebar() -> impl IntoView {
                 <a class="nav-item" href="/audit">
                     <i class="ti ti-history-toggle nav-icon"></i>
                     "Auditoria"
+                </a>
+                <a class="nav-item" href="/opt">
+                    <i class="ti ti-math-function nav-icon"></i>
+                    "Otimizador"
                 </a>
             </nav>
 
@@ -341,6 +346,217 @@ fn Auditoria() -> impl IntoView {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Optimize Page (UC21-UC25)
+// ─────────────────────────────────────────────────────────────
+#[component]
+fn OptimizePage() -> impl IntoView {
+    let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
+    let selected_sys = RwSignal::new(String::new());
+    let coef_a = RwSignal::new("1.0".to_string());
+    let coef_b = RwSignal::new("0.0".to_string());
+    let coef_c = RwSignal::new("1.0".to_string());
+    let coef_d = RwSignal::new("0.0".to_string());
+    let coef_e = RwSignal::new("0.0".to_string());
+    let coef_f = RwSignal::new("0.0".to_string());
+    let x_min = RwSignal::new("-10".to_string());
+    let x_max = RwSignal::new("10".to_string());
+    let y_min = RwSignal::new("-10".to_string());
+    let y_max = RwSignal::new("10".to_string());
+    let result = RwSignal::new(None::<OptimizationResult>);
+    let loading = RwSignal::new(false);
+    let error_msg = RwSignal::new(String::new());
+
+    spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+
+    let calculate = move || {
+        let parse_or = |s: &str, _name: &str| -> Option<f64> {
+            let v: f64 = s.trim().parse().ok()?;
+            Some(v)
+        };
+
+        let a = match parse_or(&coef_a.get(), "a") { Some(v) => v, None => { error_msg.set("Coeficiente 'a' inválido".into()); return; } };
+        let b = match parse_or(&coef_b.get(), "b") { Some(v) => v, None => { error_msg.set("Coeficiente 'b' inválido".into()); return; } };
+        let c = match parse_or(&coef_c.get(), "c") { Some(v) => v, None => { error_msg.set("Coeficiente 'c' inválido".into()); return; } };
+        let d = match parse_or(&coef_d.get(), "d") { Some(v) => v, None => { error_msg.set("Coeficiente 'd' inválido".into()); return; } };
+        let e = match parse_or(&coef_e.get(), "e") { Some(v) => v, None => { error_msg.set("Coeficiente 'e' inválido".into()); return; } };
+        let f = match parse_or(&coef_f.get(), "f") { Some(v) => v, None => { error_msg.set("Coeficiente 'f' inválido".into()); return; } };
+        let xmn = match parse_or(&x_min.get(), "x_min") { Some(v) => v, None => { error_msg.set("x_min inválido".into()); return; } };
+        let xmx = match parse_or(&x_max.get(), "x_max") { Some(v) => v, None => { error_msg.set("x_max inválido".into()); return; } };
+        let ymn = match parse_or(&y_min.get(), "y_min") { Some(v) => v, None => { error_msg.set("y_min inválido".into()); return; } };
+        let ymx = match parse_or(&y_max.get(), "y_max") { Some(v) => v, None => { error_msg.set("y_max inválido".into()); return; } };
+
+        if xmn >= xmx { error_msg.set("x_min deve ser menor que x_max".into()); return; }
+        if ymn >= ymx { error_msg.set("y_min deve ser menor que y_max".into()); return; }
+
+        loading.set(true);
+        error_msg.set(String::new());
+        let sys_id = selected_sys.get();
+        let sys_opt_owned = if sys_id.is_empty() { None } else { Some(sys_id) };
+        let r2 = result.clone();
+        let ld = loading.clone();
+        let em = error_msg.clone();
+        spawn_async(async move {
+            let res = optimize_function(
+                sys_opt_owned.as_deref(), a, b, c, d, e, f, xmn, xmx, ymn, ymx
+            ).await;
+            match res {
+                Some(val) => { r2.set(Some(val)); }
+                None => { em.set("Erro ao calcular. Verifique os coeficientes.".into()); }
+            }
+            ld.set(false);
+        });
+    };
+
+    view! {
+        <Topbar breadcrumb="Otimizador"/>
+        <div class="content">
+            <div class="section-header" style="margin-bottom:16px">
+                <div class="section-title">"Otimizador de Função Objetivo (UC21–UC25)"</div>
+            </div>
+
+            <div class="opt-layout">
+                <div class="panel">
+                    <div class="panel-title">"Função Objetivo"</div>
+                    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;font-family:monospace">
+                        "f(x, y) = ax² + bxy + cy² + dx + ey + f"
+                    </div>
+
+                    <div class="opt-grid">
+                        <div>
+                            <label class="input-label">"a"</label>
+                            <input type="text" class="text-input" prop:value=move || coef_a.get() on:input=move |e| coef_a.set(event_target_value(&e))/>
+                        </div>
+                        <div>
+                            <label class="input-label">"b"</label>
+                            <input type="text" class="text-input" prop:value=move || coef_b.get() on:input=move |e| coef_b.set(event_target_value(&e))/>
+                        </div>
+                        <div>
+                            <label class="input-label">"c"</label>
+                            <input type="text" class="text-input" prop:value=move || coef_c.get() on:input=move |e| coef_c.set(event_target_value(&e))/>
+                        </div>
+                        <div>
+                            <label class="input-label">"d"</label>
+                            <input type="text" class="text-input" prop:value=move || coef_d.get() on:input=move |e| coef_d.set(event_target_value(&e))/>
+                        </div>
+                        <div>
+                            <label class="input-label">"e"</label>
+                            <input type="text" class="text-input" prop:value=move || coef_e.get() on:input=move |e| coef_e.set(event_target_value(&e))/>
+                        </div>
+                        <div>
+                            <label class="input-label">"f"</label>
+                            <input type="text" class="text-input" prop:value=move || coef_f.get() on:input=move |e| coef_f.set(event_target_value(&e))/>
+                        </div>
+                    </div>
+
+                    <div class="panel-title" style="margin-top:16px">"Domínio"</div>
+                    <div class="opt-grid">
+                        <div>
+                            <label class="input-label">"x_min"</label>
+                            <input type="text" class="text-input" prop:value=move || x_min.get() on:input=move |e| x_min.set(event_target_value(&e))/>
+                        </div>
+                        <div>
+                            <label class="input-label">"x_max"</label>
+                            <input type="text" class="text-input" prop:value=move || x_max.get() on:input=move |e| x_max.set(event_target_value(&e))/>
+                        </div>
+                        <div>
+                            <label class="input-label">"y_min"</label>
+                            <input type="text" class="text-input" prop:value=move || y_min.get() on:input=move |e| y_min.set(event_target_value(&e))/>
+                        </div>
+                        <div>
+                            <label class="input-label">"y_max"</label>
+                            <input type="text" class="text-input" prop:value=move || y_max.get() on:input=move |e| y_max.set(event_target_value(&e))/>
+                        </div>
+                    </div>
+
+                    <div class="panel" style="margin-top:12px;padding:8px 12px">
+                        <label class="input-label">"Sistema (opcional, para auditoria)"</label>
+                        <select class="text-input" prop:value=move || selected_sys.get()
+                            on:change=move |e| selected_sys.set(event_target_value(&e))>
+                            <option value="">"— Nenhum —"</option>
+                            {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                        </select>
+                    </div>
+
+                    {move || { let m = error_msg.get(); if !m.is_empty() { view! { <div style="color:var(--coral);font-size:11px;margin-top:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+
+                    <button class="btn btn-primary" style="margin-top:12px" on:click=move |_| calculate()>
+                        <i class="ti ti-math-function"></i>"Calcular Ponto Ótimo"
+                    </button>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">"Resultado da Otimização"</div>
+                    {move || {
+                        if loading.get() {
+                            return view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Calculando..."</div> }.into_any();
+                        }
+                        match result.get() {
+                            None => view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Preencha os coeficientes e clique em \"Calcular Ponto Ótimo\"."</div> }.into_any(),
+                            Some(r) => {
+                                let ptype = r.critical_point_type.clone();
+                                let type_color = match ptype.as_str() {
+                                    "mínimo" => "var(--green)",
+                                    "máximo" => "var(--coral)",
+                                    "sela" => "var(--amber)",
+                                    _ => "var(--text1)",
+                                };
+                                view! {
+                                    <div class="opt-result-grid">
+                                        <div class="opt-result-card">
+                                            <div class="opt-result-label">"x*"</div>
+                                            <div class="opt-result-value">{format!("{:.6}", r.optimal_x)}</div>
+                                        </div>
+                                        <div class="opt-result-card">
+                                            <div class="opt-result-label">"y*"</div>
+                                            <div class="opt-result-value">{format!("{:.6}", r.optimal_y)}</div>
+                                        </div>
+                                        <div class="opt-result-card">
+                                            <div class="opt-result-label">"f(x*, y*)"</div>
+                                            <div class="opt-result-value">{format!("{:.6}", r.optimal_value)}</div>
+                                        </div>
+                                        <div class="opt-result-card">
+                                            <div class="opt-result-label">"Tipo"</div>
+                                            <div class="opt-result-value" style=format!("color:{}", type_color)>{ptype}</div>
+                                        </div>
+                                    </div>
+
+                                    <div style="margin-top:16px;font-size:11px;color:var(--text3);font-family:monospace;white-space:pre-wrap;background:var(--surface1);padding:12px;border-radius:6px;line-height:1.6">
+                                        {r.explanation.clone()}
+                                    </div>
+
+                                    <details style="margin-top:12px">
+                                        <summary style="cursor:pointer;font-size:11px;color:var(--teal)">"Detalhes Matemáticos"</summary>
+                                        <div style="margin-top:8px;font-size:10px;font-family:monospace;background:var(--surface1);padding:12px;border-radius:6px;line-height:1.8">
+                                            <div>"Gradiente ∇f no ponto ótimo:"</div>
+                                            <div style="padding-left:16px">
+                                                "∂f/∂x = " {format!("{:.10}", r.gradient_at_optimum[0])}
+                                            </div>
+                                            <div style="padding-left:16px">
+                                                "∂f/∂y = " {format!("{:.10}", r.gradient_at_optimum[1])}
+                                            </div>
+                                            <div style="margin-top:8px">"Matriz Hessiana H:"</div>
+                                            <div style="padding-left:16px">
+                                                "| " {format!("{:.4}", r.hessian_matrix[0][0])} "  " {format!("{:.4}", r.hessian_matrix[0][1])} " |"
+                                            </div>
+                                            <div style="padding-left:16px">
+                                                "| " {format!("{:.4}", r.hessian_matrix[1][0])} "  " {format!("{:.4}", r.hessian_matrix[1][1])} " |"
+                                            </div>
+                                            <div style="margin-top:8px">
+                                                "det(H) = " {format!("{:.4}", r.hessian_matrix[0][0] * r.hessian_matrix[1][1] - r.hessian_matrix[0][1] * r.hessian_matrix[1][0])}
+                                            </div>
+                                        </div>
+                                    </details>
+                                }.into_any()
+                            }
+                        }
+                    }}
+                </div>
+            </div>
+        </div>
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
 // Create System (form page)
 // ─────────────────────────────────────────────────────────────
 #[component]
@@ -478,6 +694,9 @@ fn Variaveis() -> impl IntoView {
                                     let dot = if role=="antecedent"{"var(--amber)"}else{"var(--teal)"};
                                     let is_sel = sel_var_id == vid;
                                     let sel_style = if is_sel { "background:var(--surface2);border-left:3px solid var(--blue)" } else { "" };
+                                    let vid_del = vid.clone();
+                                    let sid_del = sid.clone();
+                                    let vars_del = variables.clone();
                                     view! {
                                         <div class="var-item" style=sel_style
                                             on:click=move |_| { selected_var.set(vid.clone()); }>
@@ -486,6 +705,10 @@ fn Variaveis() -> impl IntoView {
                                             <a class="icon-btn" style="font-size:9px;padding:2px" href={format!("/edit-var?id={}&s={}", vid, sid)}>
                                                 <i class="ti ti-edit"></i>
                                             </a>
+                                            <button class="icon-btn" style="font-size:9px;padding:2px;color:var(--coral)" 
+                                                on:click=move |e| { e.stop_propagation(); let id = vid_del.clone(); spawn_async({ let v = vars_del.clone(); let s = sid_del.clone(); async move { delete_variable(&id).await; v.set(list_variables(&s).await); } }); }>
+                                                <i class="ti ti-trash"></i>
+                                            </button>
                                         </div>
                                     }
                                 }).collect_view().into_any()
@@ -510,12 +733,19 @@ fn Variaveis() -> impl IntoView {
                                                 let tid = t["id"].as_str().unwrap_or("").to_string();
                                                 let label = t["label"].as_str().unwrap_or("?").to_string();
                                                 let mf = t["mf_type"].as_str().unwrap_or("").to_string();
+                                                let tid_del = tid.clone();
+                                                let sys_id_del = sys_id.clone();
+                                                let vars_del = variables.clone();
                                                 view! {
                                                     <div class="term-chip active" style="display:inline-flex;align-items:center;gap:4px">
                                                         {label}" ["{mf}"]"
                                                         <a class="icon-btn" style="font-size:7px;padding:1px 3px" href={format!("/edit-term?id={}&s={}", tid, sys_id)}>
                                                             <i class="ti ti-edit"></i>
                                                         </a>
+                                                        <button class="icon-btn" style="font-size:7px;padding:1px 3px;color:var(--coral)" 
+                                                            on:click=move |e| { e.stop_propagation(); let id = tid_del.clone(); spawn_async({ let v = vars_del.clone(); let s = sys_id_del.clone(); async move { delete_term(&id).await; v.set(list_variables(&s).await); } }); }>
+                                                            <i class="ti ti-trash"></i>
+                                                        </button>
                                                     </div>
                                                 }
                                             }).collect_view()
@@ -587,6 +817,9 @@ fn Variaveis() -> impl IntoView {
                                   let text = r["rule_text"].as_str().unwrap_or("").to_string();
                                   let rid = r["id"].as_str().unwrap_or("").to_string();
                                   let rsid = selected_sys.get();
+                                  let rid_del = rid.clone();
+                                  let rsid_del = rsid.clone();
+                                  let rules_del = rules.clone();
                                   view! {
                                       <div class="rule-row">
                                           <div class="rule-num">{r["position"].as_i64().unwrap_or(0)}</div>
@@ -595,6 +828,10 @@ fn Variaveis() -> impl IntoView {
                                           <a class="icon-btn" style="margin-left:8px" href={format!("/edit-rule?id={}&s={}", rid, rsid)}>
                                               <i class="ti ti-edit"></i>
                                           </a>
+                                          <button class="icon-btn" style="color:var(--coral)" 
+                                              on:click=move |_| { let id = rid_del.clone(); spawn_async({ let r = rules_del.clone(); let s = rsid_del.clone(); async move { delete_rule(&id).await; r.set(serde_json::to_value(list_rules(&s).await).unwrap_or_default().as_array().cloned().unwrap_or_default()); } }); }>
+                                              <i class="ti ti-trash"></i>
+                                          </button>
                                       </div>
                                   }
                               }).collect_view()}
