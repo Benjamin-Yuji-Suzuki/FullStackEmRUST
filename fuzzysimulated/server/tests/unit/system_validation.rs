@@ -1,21 +1,4 @@
-fn validate_system_name(name: &str) -> Result<(), String> {
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        return Err("Nome obrigatório".into());
-    }
-    if trimmed.len() > 255 {
-        return Err("Máximo 255 caracteres".into());
-    }
-    Ok(())
-}
-
-fn validate_defuzz_method(method: &str) -> Result<(), String> {
-    let valid = ["centroid", "bisector", "mom", "lom", "som"];
-    if !valid.contains(&method) {
-        return Err(format!("Método inválido: {method}"));
-    }
-    Ok(())
-}
+use server::validation::{validate_system_name, validate_defuzz_method};
 
 #[test]
 fn test_validate_system_name_ok() {
