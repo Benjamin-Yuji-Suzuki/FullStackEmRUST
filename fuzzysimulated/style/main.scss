@@ -528,3 +528,18 @@ html, body {
 // ── 404
 .not-found { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; color: var(--text3); font-size: 12px; gap: 12px; }
 .not-found-code { font-family: var(--display); font-size: 64px; font-weight: 800; color: var(--border2); }
+
+// ── optimizer
+.opt-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+.opt-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+.opt-result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.opt-result-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; text-align: center; }
+
+.opt-result-label { font-size: 10px; color: var(--text3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.opt-result-value { font-size: 18px; font-weight: 600; color: var(--text1); font-family: var(--mono); }
+
+@media (max-width: 800px) { .opt-layout, .opt-grid { grid-template-columns: 1fr; } }
