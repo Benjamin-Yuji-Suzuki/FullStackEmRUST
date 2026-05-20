@@ -2,7 +2,7 @@
 
 > Plataforma web full-stack para construção, persistência e simulação de Sistemas de Inferência Fuzzy Mamdani e TSK — com visualização interativa, histórico, auditoria e otimização por PSO.
 
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 01/2026  
+**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 02/2026  
 **Modalidade (IA):** Opção B + Opção C-B (TSK) + Pontuação Extra (PSO)  
 **Equipe:** Benjamin Yuji Suzuki  
 **Repositório principal:** https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST
@@ -208,7 +208,7 @@ npx playwright test
 
 ---
 
-## Declaração de Uso de IA (Obrigatória — Lauda IA §9)
+## Declaração de Uso de IA
 
 Conforme exigido pela disciplina de Inteligência Artificial e Computacional, declaramos abaixo o uso de ferramentas de IA generativa e agentes de desenvolvimento, com transparência sobre finalidade, prompts resumidos e revisão humana.
 
