@@ -164,7 +164,7 @@ fn Sidebar() -> impl IntoView {
             </nav>
 
             <div class="sidebar-footer">
-                <span class="sprint-badge">"⬡ Sprint 2 — CRUDs + API"</span>
+                <span class="sprint-badge">"⬡ Sprint 3 — Entrega Final"</span>
                 <div class="sidebar-course">"Disciplina QPS · CESUPA"</div>
             </div>
         </aside>
@@ -1207,7 +1207,13 @@ fn Variaveis() -> impl IntoView {
 
  #[component]
  fn Analise() -> impl IntoView {
-     view! { <Topbar breadcrumb="Análise"/><div class="content"><div class="empty-state">"Análise — em construção"</div></div> }
+     view! {
+         <Topbar breadcrumb="Análise"/>
+         <div class="content">
+             <div class="section-header"><div class="section-title">"Superfície & Matriz (UC07)"</div></div>
+             <div class="empty-state">"Análise — em construção"</div>
+         </div>
+     }
  }
 
 // ─────────────────────────────────────────────────────────────
