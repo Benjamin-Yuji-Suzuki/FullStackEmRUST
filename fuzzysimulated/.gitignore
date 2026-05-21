@@ -15,3 +15,6 @@ playwright/.cache/
 RELATORIO_TESTES.md
 generate_test_report.sh
 lcov*.info
+
+# coverage reports from cargo-llvm-cov
+coverage/
