@@ -23,9 +23,9 @@ impl IntoResponse for AppError {
         let (status, message) = match &self {
             AppError::Validation(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg.clone()),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
-            AppError::Database(_) => (
+            AppError::Database(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error".to_string(),
+                format!("Database error: {e}"),
             ),
             AppError::External(msg) => (StatusCode::BAD_GATEWAY, msg.clone()),
         };
