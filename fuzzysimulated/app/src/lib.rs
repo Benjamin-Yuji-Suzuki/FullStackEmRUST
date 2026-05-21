@@ -1142,15 +1142,23 @@ fn Variaveis() -> impl IntoView {
                          }
                          match result.get() {
                              None => view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Execute uma simulação para ver o resultado."</div> }.into_any(),
-                             Some(r) => {
-                                 let output_val = r["outputs"]["resultado"].as_f64().unwrap_or(0.0);
-                                 view! {
-                                     <div class="output-display">
-                                         <div class="output-val">{format!("{:.2}", output_val)}</div>
-                                         <div class="output-label">"Saída Defuzzificada"</div>
-                                     </div>
-                                 }.into_any()
-                             }
+                              Some(r) => {
+                                  let outputs = r["outputs"].as_object().cloned().unwrap_or_default();
+                                  let items = outputs.into_iter().collect::<Vec<_>>();
+                                  view! {
+                                      <For each=move || items.clone() key=|(k, _)| k.clone() let:item>
+                                          {
+                                              let v = item.1.as_f64().unwrap_or(0.0);
+                                              view! {
+                                                  <div class="output-display">
+                                                      <div class="output-val">{format!("{:.2}", v)}</div>
+                                                      <div class="output-label">{item.0.clone()}</div>
+                                                  </div>
+                                              }
+                                          }
+                                      </For>
+                                  }.into_any()
+                              }
                          }
                      }}
                  </div>
