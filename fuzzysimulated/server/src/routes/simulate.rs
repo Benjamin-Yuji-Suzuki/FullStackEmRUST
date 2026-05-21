@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::engine;
 use crate::errors::AppError;
 use crate::models::*;
 use crate::state::AppState;
@@ -80,23 +81,21 @@ async fn simulate(
         return Err(AppError::Validation("Sistema incompleto: precisa de ao menos 2 variáveis e 1 regra".into()));
     }
 
-    // mock simulation result (will integrate logicfuzzy-academic later)
-    let output_value = req.inputs.values().sum::<f64>() / req.inputs.len() as f64;
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+    let outputs = engine::evaluate_mamdani(&var_infos, &rule_infos, &req.inputs);
+    let outputs_json = serde_json::to_value(&outputs).unwrap_or_else(|_| json!({}));
 
-    let outputs = json!({ "resultado": output_value });
-
-    // persist
     sqlx::query(
         "INSERT INTO simulations (system_id, inputs, outputs) VALUES ($1, $2, $3)"
     )
     .bind(system_id)
     .bind(json!(req.inputs))
-    .bind(&outputs)
+    .bind(&outputs_json)
     .execute(&state.pool)
     .await?;
 
     Ok(Json(json!({
-        "outputs": outputs,
+        "outputs": outputs_json,
         "inputs": req.inputs,
         "system_id": system_id,
     })))
@@ -403,9 +402,70 @@ async fn import_system(
     Ok((axum::http::StatusCode::CREATED, Json(system)))
 }
 
+async fn load_engine_data(
+    pool: &sqlx::PgPool,
+    system_id: Uuid,
+) -> Result<(Vec<engine::VarInfo>, Vec<engine::RuleInfo>), AppError> {
+    let variables = sqlx::query_as::<_, FuzzyVariable>(
+        "SELECT * FROM fuzzy_variables WHERE system_id = $1"
+    )
+    .bind(system_id)
+    .fetch_all(pool)
+    .await?;
+
+    let all_terms: Vec<FuzzyTerm> = sqlx::query_as(
+        "SELECT ft.* FROM fuzzy_terms ft \
+         JOIN fuzzy_variables fv ON fv.id = ft.variable_id \
+         WHERE fv.system_id = $1"
+    )
+    .bind(system_id)
+    .fetch_all(pool)
+    .await?;
+
+    let rules = sqlx::query_as::<_, FuzzyRule>(
+        "SELECT * FROM fuzzy_rules WHERE system_id = $1 ORDER BY position"
+    )
+    .bind(system_id)
+    .fetch_all(pool)
+    .await?;
+
+    let var_infos: Vec<engine::VarInfo> = variables.iter().map(|v| {
+        let terms: Vec<engine::TermInfo> = all_terms.iter()
+            .filter(|t| t.variable_id == v.id)
+            .map(|t| {
+                let params: Vec<f64> = t.params.as_array()
+                    .map(|a| a.iter().filter_map(|x| x.as_f64()).collect())
+                    .unwrap_or_default();
+                engine::TermInfo {
+                    term_id: t.id,
+                    label: t.label.clone(),
+                    mf_type: t.mf_type.clone(),
+                    params,
+                }
+            })
+            .collect();
+        engine::VarInfo {
+            var_id: v.id,
+            name: v.name.clone(),
+            role: v.role.clone(),
+            universe_min: v.universe_min,
+            universe_max: v.universe_max,
+            resolution: v.resolution as usize,
+            terms,
+        }
+    }).collect();
+
+    let rule_infos: Vec<engine::RuleInfo> = rules.iter().map(|r| engine::RuleInfo {
+        rule_text: r.rule_text.clone(),
+        weight: r.weight,
+    }).collect();
+
+    Ok((var_infos, rule_infos))
+}
+
 async fn sweep(
-    State(_state): State<AppState>,
-    Path(_system_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
     Json(req): Json<SweepRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     if req.start >= req.end {
@@ -415,13 +475,16 @@ async fn sweep(
         return Err(AppError::Validation("Passo deve ser maior que zero".into()));
     }
 
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+
     let mut points = Vec::new();
     let mut x = req.start;
     while x <= req.end {
         let mut inputs = req.fixed.clone();
         inputs.insert(req.variable.clone(), x);
-        let output = inputs.values().sum::<f64>() / inputs.len() as f64;
-        points.push(json!({ "x": x, "y": output }));
+        let outputs = engine::evaluate_mamdani(&var_infos, &rule_infos, &inputs);
+        let y = outputs.values().copied().sum::<f64>() / outputs.len().max(1) as f64;
+        points.push(json!({ "x": x, "y": y }));
         x += req.step;
     }
 
@@ -453,22 +516,37 @@ async fn rule_matrix(
 }
 
 async fn surface(
-    State(_state): State<AppState>,
-    Path(_system_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
     Json(req): Json<SurfaceRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let x_res = req.x_resolution.unwrap_or(20).min(100);
-    let y_res = req.y_resolution.unwrap_or(20).min(100);
+    let x_res = req.x_resolution.unwrap_or(20).min(50);
+    let y_res = req.y_resolution.unwrap_or(20).min(50);
+    let x_name = req.x.clone();
+    let y_name = req.y.clone();
+
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+
+    let x_range = var_infos.iter().find(|v| v.name == x_name)
+        .map(|v| (v.universe_min, v.universe_max))
+        .ok_or_else(|| AppError::Validation(format!("Variável '{x_name}' não encontrada")))?;
+    let y_range = var_infos.iter().find(|v| v.name == y_name)
+        .map(|v| (v.universe_min, v.universe_max))
+        .ok_or_else(|| AppError::Validation(format!("Variável '{y_name}' não encontrada")))?;
 
     let mut grid = Vec::new();
     for xi in 0..x_res {
         for yi in 0..y_res {
-            let x_val = (xi as f64 / (x_res - 1) as f64) * 100.0;
-            let y_val = (yi as f64 / (y_res - 1) as f64) * 100.0;
-            let z = (x_val + y_val) / 2.0; // mock
+            let x_val = x_range.0 + (xi as f64 / (x_res - 1) as f64) * (x_range.1 - x_range.0);
+            let y_val = y_range.0 + (yi as f64 / (y_res - 1) as f64) * (y_range.1 - y_range.0);
+            let mut inputs = std::collections::HashMap::new();
+            inputs.insert(x_name.clone(), x_val);
+            inputs.insert(y_name.clone(), y_val);
+            let outputs = engine::evaluate_mamdani(&var_infos, &rule_infos, &inputs);
+            let z = outputs.values().copied().sum::<f64>() / outputs.len().max(1) as f64;
             grid.push(json!({ "x": x_val, "y": y_val, "z": z }));
         }
     }
 
-    Ok(Json(json!({ "grid": grid, "x_var": req.x, "y_var": req.y })))
+    Ok(Json(json!({ "grid": grid, "x_var": x_name, "y_var": y_name })))
 }
