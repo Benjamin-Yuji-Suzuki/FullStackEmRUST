@@ -30,3 +30,4 @@ mime_guess = "2"
 
 [dev-dependencies]
 http.workspace = true
+serial_test.workspace = true
