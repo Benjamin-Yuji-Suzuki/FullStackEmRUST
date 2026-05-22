@@ -82,8 +82,8 @@ fn extract_term(text: &str, var_name: &str) -> String {
     if let Some(pos) = lower.find(&vn_lower) {
         let after = &text[pos + vn_lower.len()..];
         for sep in &separators {
-            if after.starts_with(sep) {
-                let rest = after[sep.len()..].trim();
+            if let Some(stripped) = after.strip_prefix(sep) {
+                let rest = stripped.trim();
                 let word_end = rest
                     .find([' ', ',', '.'])
                     .unwrap_or(rest.len());
@@ -186,12 +186,12 @@ pub fn evaluate_mamdani(
             }
             has_active_rule = true;
             if let Some(cons_term) = cons_var.terms.iter().find(|t| t.label == cons_term_label) {
-                for i in 0..resolution {
+                for (i, agg) in aggregated.iter_mut().enumerate().take(resolution) {
                     let y = cons_var.universe_min + i as f64 * step;
                     let mu_y = membership(y, &cons_term.mf_type, &cons_term.params);
                     let clipped = mu_y.min(alpha);
-                    if clipped > aggregated[i] {
-                        aggregated[i] = clipped;
+                    if clipped > *agg {
+                        *agg = clipped;
                     }
                 }
             }
@@ -201,10 +201,10 @@ pub fn evaluate_mamdani(
         } else {
             let mut num = 0.0_f64;
             let mut den = 0.0_f64;
-            for i in 0..resolution {
+            for (i, agg) in aggregated.iter().enumerate().take(resolution) {
                 let y = cons_var.universe_min + i as f64 * step;
-                num += y * aggregated[i];
-                den += aggregated[i];
+                num += y * agg;
+                den += agg;
             }
             if den.abs() < f64::EPSILON {
                 (cons_var.universe_min + cons_var.universe_max) / 2.0
