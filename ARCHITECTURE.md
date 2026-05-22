@@ -158,39 +158,50 @@ FullStackEmRUST/
 ├── FUZZY_MODEL.md       # Modelos Mamdani + TSK + PSO
 ├── ARCHITECTURE.md      # Este documento
 ├── README.md
+├── roteiro-apresentacao.md  # Slides de apresentação
+├── coverage.sh              # Script de cobertura (cargo-llvm-cov)
 └── fuzzysimulated/
-    ├── Cargo.toml        # workspace Rust (Leptos, Axum, SQLx, reqwest)
+    ├── Cargo.toml        # workspace Rust (serial_test, Leptos, Axum, SQLx, reqwest)
     ├── app/              # crate compartilhada Leptos (SSR + CSR)
     │   └── src/
-    │       ├── lib.rs         # componentes e páginas
-    │       └── server_fns.rs  # chamadas à REST API (gloo-net/reqwest)
+    │       ├── lib.rs         # ~1800 linhas, 17 componentes Leptos
+    │       └── server_fns.rs  # API client (gloo-net WASM / reqwest SSR)
     ├── server/            # crate Axum — REST API
+    │   ├── Cargo.toml
     │   ├── src/
     │   │   ├── main.rs        # entry point, router, static files
-    │   │   ├── audit.rs       # helper de registro de auditoria
-    │   │   ├── errors.rs      # AppError
-    │   │   ├── models/        # FuzzySystem, Variable, Term, Rule, etc.
-    │   │   ├── routes/        # systems, variables, rules, simulate, weather, audit
-    │   │   └── state.rs       # AppState
+    │   │   ├── engine.rs      # Motor Mamdani (fuzzificação → agregação → defuzz centroide)
+    │   │   ├── math.rs        # Otimização quadrática (Hessiana, gradiente, Cramer)
+    │   │   ├── validation.rs  # Validação de MF (trimf/trapmf/gaussmf) e sistema
+    │   │   ├── audit.rs       # Helper de registro de auditoria
+    │   │   ├── errors.rs      # AppError (422/404/500/502)
+    │   │   ├── models/        # FuzzySystem, Variable, Term, Rule, Simulation, Optimization
+    │   │   ├── routes/        # systems, variables, rules, simulate, weather, audit, optimize
+    │   │   └── state.rs       # AppState { pool, leptos_options }
     │   ├── migrations/
-    │   │   ├── 001_schema.sql      # schema: 7 tabelas + índices
-    │   │   ├── 002_seed.sql        # seed: sistema Conforto Térmico
-    │   │   └── 003_optimization.sql # otimização (UC21-UC25)
+    │   │   ├── 001_schema.sql      # Schema: 8 tabelas + índices
+    │   │   ├── 002_seed.sql        # Seed: sistema Conforto Térmico
+    │   │   ├── 003_optimization.sql # Tabela optimizations (UC21-UC25)
+    │   │   ├── 004_audit_orphan.sql # FK audit_events ON DELETE SET NULL
+    │   │   └── 005_system_status.sql # Coluna status (ativo/favorito/concluido/desativado)
     │   └── tests/
-    │       ├── api_test.rs         # entry point
+    │       ├── axum_api.rs         # 39 testes HTTP (serializados via serial_test)
+    │       ├── api_test.rs         # Entry point com helpers compartilhados
+    │       ├── common/mod.rs       # TestApp helper (pool + router)
     │       ├── unit/               # 22 unit tests
-    │       │   ├── system_validation.rs
     │       │   ├── mf_validation.rs
+    │       │   ├── system_validation.rs
     │       │   └── optimization.rs
-    │       └── integration/        # 8 integration tests
+    │       └── integration/        # 8 integration tests (ignored, transaction rollback)
     │           ├── systems.rs
     │           ├── variables.rs
     │           ├── simulate.rs
     │           └── optimize.rs
     ├── frontend/          # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── end2end/           # Playwright (E2E) — testes de navegação
-    ├── style/main.scss    # SCSS global (tema escuro)
+    ├── end2end/           # Playwright E2E (3 testes: home, navegação, criar sistema, simulador)
+    ├── style/main.scss    # Tema escuro Catppuccin
+    ├── coverage/          # Relatórios HTML de cobertura
     └── public/            # assets estáticos
 ```
 
@@ -210,7 +221,7 @@ Navegador (WASM)
         │     ├── systems.rs      → CRUD sistemas
         │     ├── variables.rs    → CRUD variáveis e termos
         │     ├── rules.rs        → CRUD regras
-│         ├── simulate.rs     → simulação, histórico, import/export, etc.
+│         ├── simulate.rs     → simulação (Mamdani real), sweep, surface, duplicate, import/export
 │         ├── weather.rs      → OpenWeather API
 │         ├── audit_routes.rs → auditoria
 │         └── optimize.rs     → otimização de função objetivo (UC21-UC25)
