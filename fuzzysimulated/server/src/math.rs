@@ -38,6 +38,7 @@ pub fn cramer_y(a: f64, b: f64, _c: f64, d: f64, e: f64, det: f64) -> f64 {
     (b * d - 2.0 * a * e) / det
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn quadratic_value(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, x: f64, y: f64) -> f64 {
     a * x * x + b * x * y + c * y * y + d * x + e * y + f
 }

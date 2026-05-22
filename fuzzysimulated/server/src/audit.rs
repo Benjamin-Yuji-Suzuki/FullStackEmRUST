@@ -20,6 +20,7 @@ use serde_json::Value;
 /// # Observação
 /// Esta função é fire-and-forget: erros de INSERT são ignorados para não
 /// bloquear a operação principal.
+#[allow(clippy::too_many_arguments)]
 pub async fn log(
     pool: &PgPool,
     system_id: Option<Uuid>,
