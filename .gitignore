@@ -40,3 +40,7 @@ BACKEND_FULL_CONTEXT.md
 RELATORIO_TESTES.md
 generate_test_report.sh
 lcov.info
+lcov_unit.info
+
+# Cobertura de testes (gerado localmente)
+coverage.sh
