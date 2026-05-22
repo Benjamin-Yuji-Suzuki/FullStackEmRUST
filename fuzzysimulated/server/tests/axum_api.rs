@@ -5,6 +5,7 @@ use axum::body::Body;
 use common::TestApp;
 use http::StatusCode;
 use serde_json::Value;
+use serial_test::serial;
 use uuid::Uuid;
 
 fn unique_str() -> String {
@@ -47,6 +48,7 @@ fn json_delete(path: &str) -> http::Request<Body> {
 
 // ─── Systems ───────────────────────────────────────────────────────────────────
 
+#[serial]
 #[tokio::test]
 async fn test_create_system() {
     let mut app = TestApp::new().await;
@@ -60,6 +62,7 @@ async fn test_create_system() {
     assert_eq!(body["name"], "Sistema Teste");
 }
 
+#[serial]
 #[tokio::test]
 async fn test_list_systems() {
     let mut app = TestApp::new().await;
@@ -70,6 +73,7 @@ async fn test_list_systems() {
     assert!(body.is_array());
 }
 
+#[serial]
 #[tokio::test]
 async fn test_get_system_by_id() {
     let mut app = TestApp::new().await;
@@ -81,6 +85,7 @@ async fn test_get_system_by_id() {
     assert_eq!(body["name"], "Get Test");
 }
 
+#[serial]
 #[tokio::test]
 async fn test_update_system() {
     let mut app = TestApp::new().await;
@@ -95,6 +100,7 @@ async fn test_update_system() {
     assert_eq!(body["name"], "Update After");
 }
 
+#[serial]
 #[tokio::test]
 async fn test_delete_system() {
     let mut app = TestApp::new().await;
@@ -107,6 +113,7 @@ async fn test_delete_system() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_update_system_status() {
     let mut app = TestApp::new().await;
@@ -121,6 +128,7 @@ async fn test_update_system_status() {
     assert_eq!(body["status"], "ativo");
 }
 
+#[serial]
 #[tokio::test]
 async fn test_system_not_found() {
     let mut app = TestApp::new().await;
@@ -130,6 +138,7 @@ async fn test_system_not_found() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_create_system_validation_error() {
     let mut app = TestApp::new().await;
@@ -157,6 +166,7 @@ async fn create_test_system(app: &mut TestApp, name: &str) -> String {
     body["id"].as_str().unwrap().to_string()
 }
 
+#[serial]
 #[tokio::test]
 async fn test_create_variable() {
     let mut app = TestApp::new().await;
@@ -171,6 +181,7 @@ async fn test_create_variable() {
     assert_eq!(body["name"], "Temperatura");
 }
 
+#[serial]
 #[tokio::test]
 async fn test_list_variables() {
     let mut app = TestApp::new().await;
@@ -182,6 +193,7 @@ async fn test_list_variables() {
     assert!(body.is_array());
 }
 
+#[serial]
 #[tokio::test]
 async fn test_get_variable() {
     let mut app = TestApp::new().await;
@@ -211,6 +223,7 @@ async fn create_test_variable(app: &mut TestApp, sys_id: &str, name: &str) -> St
     body["id"].as_str().unwrap().to_string()
 }
 
+#[serial]
 #[tokio::test]
 async fn test_update_variable() {
     let mut app = TestApp::new().await;
@@ -227,6 +240,7 @@ async fn test_update_variable() {
     assert_eq!(body["universe_max"], 50.0);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_delete_variable() {
     let mut app = TestApp::new().await;
@@ -237,6 +251,7 @@ async fn test_delete_variable() {
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_variable_not_found() {
     let mut app = TestApp::new().await;
@@ -245,6 +260,7 @@ async fn test_variable_not_found() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_create_variable_validation_error() {
     let mut app = TestApp::new().await;
@@ -259,6 +275,7 @@ async fn test_create_variable_validation_error() {
 
 // ─── Terms ─────────────────────────────────────────────────────────────────────
 
+#[serial]
 #[tokio::test]
 async fn test_create_term() {
     let mut app = TestApp::new().await;
@@ -274,6 +291,7 @@ async fn test_create_term() {
     assert_eq!(body["label"], "Baixa");
 }
 
+#[serial]
 #[tokio::test]
 async fn test_get_term() {
     let mut app = TestApp::new().await;
@@ -297,6 +315,7 @@ async fn create_test_term(app: &mut TestApp, var_id: &str, label: &str, mf_type:
     body["id"].as_str().unwrap().to_string()
 }
 
+#[serial]
 #[tokio::test]
 async fn test_update_term() {
     let mut app = TestApp::new().await;
@@ -313,6 +332,7 @@ async fn test_update_term() {
     assert_eq!(body["label"], "Depois");
 }
 
+#[serial]
 #[tokio::test]
 async fn test_delete_term() {
     let mut app = TestApp::new().await;
@@ -324,6 +344,7 @@ async fn test_delete_term() {
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_create_term_validation_error() {
     let mut app = TestApp::new().await;
@@ -339,6 +360,7 @@ async fn test_create_term_validation_error() {
 
 // ─── Rules ─────────────────────────────────────────────────────────────────────
 
+#[serial]
 #[tokio::test]
 async fn test_create_rule() {
     let mut app = TestApp::new().await;
@@ -379,6 +401,7 @@ async fn create_minimal_system(app: &mut TestApp) -> (String, String) {
     (sys_id, cons_id)
 }
 
+#[serial]
 #[tokio::test]
 async fn test_get_rule() {
     let mut app = TestApp::new().await;
@@ -401,6 +424,7 @@ async fn create_test_rule(app: &mut TestApp, sys_id: &str) -> String {
     body["id"].as_str().unwrap().to_string()
 }
 
+#[serial]
 #[tokio::test]
 async fn test_update_rule() {
     let mut app = TestApp::new().await;
@@ -417,6 +441,7 @@ async fn test_update_rule() {
     assert!((body["weight"].as_f64().unwrap() - 0.5).abs() < 1e-6);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_delete_rule() {
     let mut app = TestApp::new().await;
@@ -427,6 +452,7 @@ async fn test_delete_rule() {
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_rule_not_found() {
     let mut app = TestApp::new().await;
@@ -437,6 +463,7 @@ async fn test_rule_not_found() {
 
 // ─── Simulation ────────────────────────────────────────────────────────────────
 
+#[serial]
 #[tokio::test]
 async fn test_simulate() {
     let mut app = TestApp::new().await;
@@ -451,6 +478,7 @@ async fn test_simulate() {
     assert!(body["outputs"].is_object());
 }
 
+#[serial]
 #[tokio::test]
 async fn test_simulate_missing_input() {
     let mut app = TestApp::new().await;
@@ -464,6 +492,7 @@ async fn test_simulate_missing_input() {
     assert!(resp.status() == StatusCode::OK || resp.status() == StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_list_simulations() {
     let mut app = TestApp::new().await;
@@ -482,6 +511,7 @@ async fn test_list_simulations() {
     assert!(body.is_array());
 }
 
+#[serial]
 #[tokio::test]
 async fn test_duplicate_system() {
     let mut app = TestApp::new().await;
@@ -496,6 +526,7 @@ async fn test_duplicate_system() {
     assert_eq!(body["name"], "Copia do Sistema");
 }
 
+#[serial]
 #[tokio::test]
 async fn test_export_system() {
     let mut app = TestApp::new().await;
@@ -507,6 +538,7 @@ async fn test_export_system() {
     assert!(body.get("variables").is_some());
 }
 
+#[serial]
 #[tokio::test]
 async fn test_rule_matrix() {
     let mut app = TestApp::new().await;
@@ -520,6 +552,7 @@ async fn test_rule_matrix() {
 
 // ─── Optimize ─────────────────────────────────────────────────────────────────
 
+#[serial]
 #[tokio::test]
 async fn test_optimize_compute() {
     let mut app = TestApp::new().await;
@@ -539,6 +572,7 @@ async fn test_optimize_compute() {
     assert!(body.get("optimal_x").is_some());
 }
 
+#[serial]
 #[tokio::test]
 async fn test_optimize_validation_error() {
     let mut app = TestApp::new().await;
@@ -555,6 +589,7 @@ async fn test_optimize_validation_error() {
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_list_optimizations() {
     let mut app = TestApp::new().await;
@@ -575,6 +610,7 @@ async fn test_list_optimizations() {
 
 // ─── Audit ────────────────────────────────────────────────────────────────────
 
+#[serial]
 #[tokio::test]
 async fn test_list_audit() {
     let mut app = TestApp::new().await;
@@ -586,6 +622,7 @@ async fn test_list_audit() {
     assert!(body.get("events").is_some());
 }
 
+#[serial]
 #[tokio::test]
 async fn test_list_orphan_audit() {
     let mut app = TestApp::new().await;
@@ -599,6 +636,7 @@ async fn test_list_orphan_audit() {
 
 // ─── Weather (error cases — no API key) ────────────────────────────────────────
 
+#[serial]
 #[tokio::test]
 async fn test_weather_missing_city() {
     let mut app = TestApp::new().await;
@@ -607,6 +645,7 @@ async fn test_weather_missing_city() {
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+#[serial]
 #[tokio::test]
 async fn test_weather_missing_api_key() {
     let mut app = TestApp::new().await;
@@ -617,8 +656,104 @@ async fn test_weather_missing_api_key() {
     assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
 }
 
+// ─── Sweep ─────────────────────────────────────────────────────────────────────
+
+#[serial]
+#[tokio::test]
+async fn test_sweep() {
+    let mut app = TestApp::new().await;
+    let (sys_id, _) = create_minimal_system(&mut app).await;
+    let req = json_post(
+        &format!("/api/systems/{sys_id}/sweep"),
+        &serde_json::json!({
+            "variable": "Temperatura",
+            "start": 0.0, "end": 100.0, "step": 50.0,
+            "fixed": {}
+        }),
+    );
+    let resp = app.call(req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = hyper_body_to_json(resp).await;
+    assert!(body["points"].is_array());
+}
+
+#[serial]
+#[tokio::test]
+async fn test_sweep_validation_error() {
+    let mut app = TestApp::new().await;
+    let (sys_id, _) = create_minimal_system(&mut app).await;
+    let req = json_post(
+        &format!("/api/systems/{sys_id}/sweep"),
+        &serde_json::json!({
+            "variable": "Temperatura",
+            "start": 100.0, "end": 0.0, "step": -1.0,
+            "fixed": {}
+        }),
+    );
+    let resp = app.call(req).await;
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+// ─── Surface ───────────────────────────────────────────────────────────────────
+
+#[serial]
+#[tokio::test]
+async fn test_surface() {
+    let mut app = TestApp::new().await;
+    let suffix = unique_str();
+    let sys_id = create_test_system(&mut app, &format!("Surface Sys {suffix}")).await;
+    let temp_name = format!("Temp_{suffix}");
+    let risco_name = format!("Risco_{suffix}");
+    let ant_id = create_test_variable(&mut app, &sys_id, &temp_name).await;
+    create_test_term(&mut app, &ant_id, "Alta", "trimf", &[50.0, 75.0, 100.0]).await;
+    let req = json_post(
+        &format!("/api/systems/{sys_id}/variables"),
+        &serde_json::json!({"name": risco_name, "role": "consequent", "universe_min": 0.0, "universe_max": 1.0}),
+    );
+    let resp = app.call(req).await;
+    let body: Value = hyper_body_to_json(resp).await;
+    let cons_id = body["id"].as_str().unwrap().to_string();
+    create_test_term(&mut app, &cons_id, "Alto", "trimf", &[0.0, 0.5, 1.0]).await;
+    let _ = app.call(json_post(
+        &format!("/api/systems/{sys_id}/rules"),
+        &serde_json::json!({"rule_text": format!("SE {temp_name} = Alta ENTAO {risco_name} = Alto"), "weight": 1.0}),
+    )).await;
+
+    let req = json_post(
+        &format!("/api/systems/{sys_id}/surface"),
+        &serde_json::json!({"x": temp_name, "y": temp_name, "x_resolution": 5, "y_resolution": 5}),
+    );
+    let resp = app.call(req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = hyper_body_to_json(resp).await;
+    assert!(body["grid"].is_array());
+}
+
+// ─── Audit Undo ────────────────────────────────────────────────────────────────
+
+#[serial]
+#[tokio::test]
+async fn test_audit_undo_system_delete() {
+    let mut app = TestApp::new().await;
+    let sys_id = create_test_system(&mut app, "Undo Test").await;
+    let req = json_delete(&format!("/api/systems/{sys_id}"));
+    let _ = app.call(req).await;
+    // After delete, FK ON DELETE SET NULL makes events orphans
+    let req = json_get("/api/audit/orphans");
+    let resp = app.call(req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = hyper_body_to_json(resp).await;
+    let events = body["events"].as_array().unwrap();
+    let delete_event = events.iter().find(|e| e["action_type"] == "delete").unwrap();
+    let event_id = delete_event["id"].as_str().unwrap();
+    let req = json_post(&format!("/api/audit/{event_id}/undo"), &serde_json::json!({}));
+    let resp = app.call(req).await;
+    assert!(resp.status() == StatusCode::OK || resp.status() == StatusCode::NOT_FOUND);
+}
+
 // ─── 404 edge cases ───────────────────────────────────────────────────────────
 
+#[serial]
 #[tokio::test]
 async fn test_all_404_endpoints() {
     let mut app = TestApp::new().await;
