@@ -2111,17 +2111,21 @@ fn Variaveis() -> impl IntoView {
              <div style="display:flex;gap:20px;flex-wrap:wrap">
                  <div class="panel" style="flex:1;min-width:300px">
                      <div class="panel-title">"Processar Lote"</div>
-                     <div style="margin-bottom:8px">
-                         <label class="input-label">"Inputs (array JSON)"</label>
-                         <textarea class="text-input" style="min-height:150px;font-family:monospace;font-size:10px;width:100%;resize:vertical"
-                             prop:value=move || json_input.get()
-                             on:input=move |e| json_input.set(event_target_value(&e))
-                             placeholder=r#"[
-  {"impacto_financeiro": 70, "impacto_mercado": 10},
-  {"impacto_financeiro": 30, "impacto_mercado": 80},
-  {"impacto_financeiro": 90, "impacto_mercado": 90}
+                      <div style="margin-bottom:8px">
+                          <label class="input-label">"Inputs (array JSON)"</label>
+                          <textarea class="text-input" style="min-height:150px;font-family:monospace;font-size:10px;width:100%;resize:vertical"
+                              prop:value=move || json_input.get()
+                              on:input=move |e| json_input.set(event_target_value(&e))
+                              placeholder=r#"[
+  {"temperatura": 10, "umidade": 20},
+  {"temperatura": 24, "umidade": 55},
+  {"temperatura": 35, "umidade": 85}
 ]"#></textarea>
-                     </div>
+                          <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                              <span style="font-size:8px;color:var(--text3)">"Dica: use o script para converter CSV/Parquet em JSON:"</span>
+                              <code style="font-size:8px;background:var(--surface1);padding:2px 6px;border-radius:3px">"scripts/importar_dados.py dados.csv"</code>
+                          </div>
+                      </div>
                      <button class="btn btn-primary"
                          on:click=move |_| run_batch()
                          disabled=move || batch_loading.get()>
