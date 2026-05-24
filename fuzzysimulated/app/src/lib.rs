@@ -775,8 +775,19 @@ fn OptimizePage() -> impl IntoView {
                 // UC17: PSO - Otimização de Parâmetros MF
                 <div class="panel">
                     <div class="panel-title">"Otimização PSO de MF (UC17)"</div>
-                    <div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+                    <div style="font-size:11px;color:var(--text3);margin-bottom:6px">
                         "Otimiza parâmetros das funções de pertinência via PSO com dados de referência."
+                    </div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+                        <span style="font-size:9px;color:var(--text3);align-self:center">"Presets:"</span>
+                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
+                            let ti = pso_target_in.clone(); let to = pso_target_out.clone();
+                            move |_| { ti.set(r#"[{"temperatura":10,"umidade":20},{"temperatura":24,"umidade":55},{"temperatura":35,"umidade":85}]"#.into()); to.set(r#"[{"conforto":2},{"conforto":8},{"conforto":1}]"#.into()); }
+                        }>"Conforto Térmico"</button>
+                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
+                            let ti = pso_target_in.clone(); let to = pso_target_out.clone();
+                            move |_| { ti.set(r#"[{"probabilidade":10,"impacto":10},{"probabilidade":50,"impacto":50},{"probabilidade":90,"impacto":90}]"#.into()); to.set(r#"[{"risco":10},{"risco":50},{"risco":90}]"#.into()); }
+                        }>"Análise de Risco"</button>
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
                         <div>
@@ -1219,29 +1230,53 @@ fn Variaveis() -> impl IntoView {
          }
      };
 
-     let fetch_weather = {
-         let ci = city_input.clone();
-         let wm = weather_msg.clone();
-         let inp = inputs.clone();
-         move || {
-             let city = ci.get();
-             if city.trim().is_empty() { wm.set("Informe uma cidade".into()); return; }
-             let wm2 = wm.clone();
-             let inp2 = inp.clone();
-             spawn_async(async move {
-                 match get_weather(&city).await {
-                     Ok(w) => {
-                         let mut current = inp2.get();
-                         current.insert("temperatura".to_string(), w.temp);
-                         current.insert("umidade".to_string(), w.humidity);
-                         inp2.set(current);
-                         wm2.set(format!("{}: {}°C, {}%", w.city, w.temp, w.humidity));
-                     }
-                     Err(e) => wm2.set(format!("Erro: {e}")),
-                 }
-             });
-         }
-     };
+      let fetch_weather = {
+          let ci = city_input.clone();
+          let wm = weather_msg.clone();
+          let inp = inputs.clone();
+          let v = variables.clone();
+          move || {
+              let city = ci.get();
+              if city.trim().is_empty() { wm.set("Informe uma cidade".into()); return; }
+              let wm2 = wm.clone();
+              let inp2 = inp.clone();
+              let v2 = v.clone();
+              spawn_async(async move {
+                  match get_weather(&city).await {
+                      Ok(w) => {
+                          let mut current = inp2.get();
+                          let vars = v2.get();
+                          let var_names: Vec<String> = vars.iter()
+                              .filter(|x| x["role"].as_str() == Some("antecedent"))
+                              .filter_map(|x| x["name"].as_str().map(String::from))
+                              .collect();
+                          let match_name = |aliases: &[&str]| -> Option<String> {
+                              let lower_aliases: Vec<String> = aliases.iter().map(|a| a.to_lowercase()).collect();
+                              var_names.iter().find(|name| {
+                                  let n = name.to_lowercase();
+                                  lower_aliases.iter().any(|alias| n == *alias || n.contains(alias.as_str()) || alias.contains(&n))
+                              }).cloned()
+                          };
+                          if let Some(t_name) = match_name(&["temperatura", "temp", "temperature", "t"]) {
+                              current.insert(t_name, w.temp);
+                          }
+                          if let Some(h_name) = match_name(&["umidade", "humidity", "humid", "umid", "h"]) {
+                              current.insert(h_name, w.humidity);
+                          }
+                          inp2.set(current);
+                          let matched_t = match_name(&["temperatura", "temp", "temperature", "t"]);
+                          let matched_h = match_name(&["umidade", "humidity", "humid", "umid", "h"]);
+                          let mut msg = format!("{}: {}°C, {}%", w.city, w.temp, w.humidity);
+                          if matched_t.is_none() || matched_h.is_none() {
+                              msg.push_str(" — Nenhuma variavel com nome temperatura/umidade encontrada, insira manualmente");
+                          }
+                          wm2.set(msg);
+                      }
+                      Err(e) => wm2.set(format!("Erro: {e}")),
+                  }
+              });
+          }
+      };
 
      let save_scenario = {
          let ss = selected_sys.clone();
