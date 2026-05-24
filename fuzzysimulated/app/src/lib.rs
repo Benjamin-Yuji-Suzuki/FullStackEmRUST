@@ -2286,43 +2286,52 @@ fn Variaveis() -> impl IntoView {
                      }}
                  </div>
 
-                 <div class="panel" style="flex:1;min-width:300px">
-                     <div class="panel-title">"Matriz de Regras Ativadas (UC14)"</div>
-                     <div style="display:flex;gap:6px;margin-bottom:8px">
-                         <button class="btn btn-primary" style="font-size:10px;padding:4px 10px" on:click=move |_| run_matrix()>
-                             <i class="ti ti-list"></i>"Calcular Ativacoes (valores medios)"
-                         </button>
-                     </div>
-                     {move || {
-                         if matrix_loading.get() { return view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Calculando..."</div> }.into_any(); }
-                         match matrix_result.get() {
-                             None => view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Clique em Calcular Ativacoes."</div> }.into_any(),
-                             Some(res) => {
-                                 let rules = res["rules"].as_array().cloned().unwrap_or_default();
-                                 if rules.is_empty() { return view! { <div style="font-size:10px;color:var(--text3)">"Nenhuma regra."</div> }.into_any(); }
-                                 view! {
-                                     <div style="max-height:400px;overflow-y:auto">
-                                         <table style="width:100%;font-size:10px;border-collapse:collapse">
-                                             <thead><tr style="background:var(--surface2)"><th style="padding:4px;text-align:left">"#"</th><th style="padding:4px;text-align:left">"Regra"</th><th style="padding:4px;text-align:right">"ativacao"</th></tr></thead>
-                                             <tbody>{rules.iter().map(|r| {
-                                                 let act = r["activation"].as_f64().unwrap_or(0.0);
-                                                 let pct = (act * 100.0).round();
-                                                 let shade = if act > 0.5 { "var(--teal)" } else if act > 0.0 { "var(--amber)" } else { "var(--text3)" };
-                                                 view! {
-                                                     <tr style="border-bottom:1px solid var(--border)">
-                                                         <td style="padding:4px">{r["position"].as_i64().unwrap_or(0) + 1}</td>
-                                                         <td style="padding:4px;font-size:9px">{r["rule_text"].as_str().unwrap_or("")}</td>
-                                                         <td style={format!("padding:4px;text-align:right;color:{}", shade)}>{pct}"%"</td>
-                                                     </tr>
-                                                 }
-                                             }).collect_view()}</tbody>
-                                         </table>
-                                     </div>
-                                 }.into_any()
-                             }
-                         }
-                     }}
-                 </div>
+                  <div class="panel" style="flex:1;min-width:300px">
+                      <div class="panel-title">"Matriz de Regras Ativadas (UC14)"</div>
+                      <div style="display:flex;gap:6px;margin-bottom:8px">
+                          <button class="btn btn-primary" style="font-size:10px;padding:4px 10px;white-space:nowrap" on:click=move |_| run_matrix()>
+                              <i class="ti ti-list"></i>"Calcular Ativacoes (valores medios)"
+                          </button>
+                      </div>
+                      {move || {
+                          if matrix_loading.get() { return view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Calculando..."</div> }.into_any(); }
+                          match matrix_result.get() {
+                              None => view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Clique em Calcular Ativacoes."</div> }.into_any(),
+                              Some(res) => {
+                                  let rules = res["rules"].as_array().cloned().unwrap_or_default();
+                                  if rules.is_empty() { return view! { <div style="font-size:10px;color:var(--text3)">"Nenhuma regra."</div> }.into_any(); }
+                                  let cols = (rules.len() as f64).sqrt().ceil() as usize;
+                                  let cell = 20usize;
+                                  view! {
+                                      <div style="margin-bottom:6px;font-size:9px;color:var(--text3)">
+                                          {format!("{} regras ~ grid {}x{}  celula {}px", rules.len(), cols, (rules.len() + cols - 1) / cols, cell)}
+                                      </div>
+                                      <div style=format!("display:grid;grid-template-columns:repeat({},{}px);gap:2px;padding:6px;border:1px solid var(--border);border-radius:4px;width:fit-content;max-height:400px;overflow-y:auto", cols, cell)>
+                                          {rules.iter().map(|r| {
+                                              let act = r["activation"].as_f64().unwrap_or(0.0);
+                                              let pct = (act * 100.0).round();
+                                              let pos = r["position"].as_i64().unwrap_or(0) + 1;
+                                              let rule_text = r["rule_text"].as_str().unwrap_or("");
+                                              let intensity = (act * 0.85 + 0.15).clamp(0.15, 1.0);
+                                              let r_ch = (255.0 * (1.0 - intensity)) as u8;
+                                              let g_ch = (255.0 * (0.3 + 0.7 * intensity)) as u8;
+                                              let b_ch = (255.0 * (0.1 + 0.2 * intensity)) as u8;
+                                              view! {
+                                                  <div style=format!("width:{}px;height:{}px;background:rgb({r_ch},{g_ch},{b_ch});border-radius:2px;cursor:pointer", cell, cell)
+                                                      title=format!("#{pos}  {pct}%  {rule_text}")></div>
+                                              }
+                                          }).collect_view()}
+                                      </div>
+                                      <div style="display:flex;gap:8px;margin-top:6px;font-size:8px;color:var(--text3);align-items:center">
+                                          <span>"0%"</span>
+                                          <div style="flex:1;height:6px;border-radius:3px;background:linear-gradient(to right,rgb(217,76,76),rgb(76,217,76))"></div>
+                                          <span>"100%"</span>
+                                      </div>
+                                  }.into_any()
+                              }
+                          }
+                      }}
+                  </div>
              </div>
          </div>
      }
