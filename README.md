@@ -70,7 +70,8 @@ FullStackEmRUST/
 │   │   ├── 002_seed.sql
 │   │   ├── 003_optimization.sql
 │   │   ├── 004_audit_orphan.sql
-│   │   └── 005_system_status.sql
+│   │   ├── 005_system_status.sql
+│   │   └── 006_scenarios.sql
     │       └── tests/
     │           ├── axum_api.rs    # 43 testes HTTP (serializados)
     │           ├── api_test.rs    # 22 unit + 8 integration tests
@@ -96,10 +97,12 @@ FullStackEmRUST/
 | 3 | Editor de Regras | UC03 | ✅ Funcional | Lista regras, add regra, editar regra |
 | 4 | Simulador | UC04, UC05, UC12, UC13 | ✅ Funcional | Sliders por variável, busca clima OpenWeather, executa simulação |
 | 5 | Histórico | UC06, UC08, UC09 | ✅ Funcional | Lista simulações por sistema |
-| 6 | Dashboard Batch | UC07 | ❌ Placeholder | — |
-| 7 | Análise | UC14, UC15 | ❌ Placeholder | — |
+| 6 | Dashboard Batch | UC07 | ✅ Funcional | Upload CSV/Parquet, mapear colunas, inferência em lote |
+| 7 | Análise | UC13, UC14, UC15 | ✅ Funcional | Varredura, matriz de regras ativadas, superfície de controle |
 | 8 | Auditoria | UC16 | ✅ Funcional | Timeline + undo real com snapshots + recuperação de sistemas deletados |
 | 9 | Estados do Sistema | — | ✅ Funcional | Ativo/Favorito/Concluído/Desativado com proteção e filtros |
+| 10 | Otimizador | UC17, UC21–UC25 | ✅ Funcional | Hessiana/gradiente, histórico, export resultado |
+| 11 | Importar Sistema | UC11 | ✅ Funcional | Upload JSON com validação de estrutura |
 
 ---
 
@@ -129,6 +132,11 @@ Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
 | UC18 | Executar Inferência TSK | Usuário |
 | UC19 | Exportar Visualizações SVG | Usuário |
 | UC20 | Visualizar Relatório de Diagnóstico | Usuário |
+| UC21 | Definir Função Objetivo | Usuário |
+| UC22 | Calcular Ponto Ótimo | Usuário |
+| UC23 | Visualizar Justificativa Matemática | Usuário |
+| UC24 | Consultar Histórico de Otimizações | Usuário |
+| UC25 | Exportar Resultado de Otimização | Usuário |
 
 ---
 

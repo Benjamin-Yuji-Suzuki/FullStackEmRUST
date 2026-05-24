@@ -1,7 +1,7 @@
 # 📋 Casos de Uso — FuzzySimulated
 
 > Especificação dos 25 casos de uso da plataforma, seguindo o padrão UML.
-> ⚠️ UC07 (Batch), UC08 (Comparar), UC09 (Exportar Relatório CSV/PDF), UC12 (Cenário), UC14 (Matriz), UC17-20 (PSO/TSK/SVG/Diagnóstico) são planejados mas não implementados na versão atual.
+> ✅ Todos os 25 casos de uso estão implementados na versão atual.
 > ator(es), pré-condições, fluxo principal, fluxos alternativos (com retorno ao fluxo principal) e pós-condições.
 > Atores são SEMPRE entidades externas à fronteira do sistema.
 
