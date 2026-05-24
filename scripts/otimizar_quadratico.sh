@@ -23,8 +23,8 @@ echo "---"
 
 BODY=$(cat <<EOF
 {
-  "function": {"a":$A,"b":$B,"c":$C,"d":$D,"e":$E,"f":$F},
-  "domain": {"x_min":$XMIN,"x_max":$XMAX,"y_min":$YMIN,"y_max":$YMAX}
+  "coef_a":$A,"coef_b":$B,"coef_c":$C,"coef_d":$D,"coef_e":$E,"coef_f":$F,
+  "x_min":$XMIN,"x_max":$XMAX,"y_min":$YMIN,"y_max":$YMAX
 EOF
 )
 
