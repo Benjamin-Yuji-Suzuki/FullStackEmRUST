@@ -594,8 +594,39 @@ fn OptimizePage() -> impl IntoView {
             <div class="opt-layout">
                 <div class="panel">
                     <div class="panel-title">"Função Objetivo"</div>
-                    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;font-family:monospace">
+                    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;font-family:monospace">
                         "f(x, y) = ax² + bxy + cy² + dx + ey + f"
+                    </div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+                        <span style="font-size:9px;color:var(--text3);align-self:center">"Presets:"</span>
+                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
+                            let ca = coef_a.clone(); let cb = coef_b.clone(); let cc = coef_c.clone();
+                            let cd = coef_d.clone(); let ce = coef_e.clone(); let cf = coef_f.clone();
+                            let xmn = x_min.clone(); let xmx = x_max.clone();
+                            let ymn = y_min.clone(); let ymx = y_max.clone();
+                            move |_| { ca.set("1".into()); cb.set("0".into()); cc.set("1".into()); cd.set("0".into()); ce.set("0".into()); cf.set("0".into()); xmn.set("-10".into()); xmx.set("10".into()); ymn.set("-10".into()); ymx.set("10".into()); }
+                        }>"f=x²+y² (mínimo)"</button>
+                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
+                            let ca = coef_a.clone(); let cb = coef_b.clone(); let cc = coef_c.clone();
+                            let cd = coef_d.clone(); let ce = coef_e.clone(); let cf = coef_f.clone();
+                            let xmn = x_min.clone(); let xmx = x_max.clone();
+                            let ymn = y_min.clone(); let ymx = y_max.clone();
+                            move |_| { ca.set("-1".into()); cb.set("0".into()); cc.set("-1".into()); cd.set("0".into()); ce.set("0".into()); cf.set("0".into()); xmn.set("-10".into()); xmx.set("10".into()); ymn.set("-10".into()); ymx.set("10".into()); }
+                        }>"f=-x²-y² (máximo)"</button>
+                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
+                            let ca = coef_a.clone(); let cb = coef_b.clone(); let cc = coef_c.clone();
+                            let cd = coef_d.clone(); let ce = coef_e.clone(); let cf = coef_f.clone();
+                            let xmn = x_min.clone(); let xmx = x_max.clone();
+                            let ymn = y_min.clone(); let ymx = y_max.clone();
+                            move |_| { ca.set("1".into()); cb.set("0".into()); cc.set("-1".into()); cd.set("0".into()); ce.set("0".into()); cf.set("0".into()); xmn.set("-5".into()); xmx.set("5".into()); ymn.set("-5".into()); ymx.set("5".into()); }
+                        }>"f=x²-y² (sela)"</button>
+                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
+                            let ca = coef_a.clone(); let cb = coef_b.clone(); let cc = coef_c.clone();
+                            let cd = coef_d.clone(); let ce = coef_e.clone(); let cf = coef_f.clone();
+                            let xmn = x_min.clone(); let xmx = x_max.clone();
+                            let ymn = y_min.clone(); let ymx = y_max.clone();
+                            move |_| { ca.set("2".into()); cb.set("3".into()); cc.set("-4".into()); cd.set("1".into()); ce.set("-2".into()); cf.set("5".into()); xmn.set("-10".into()); xmx.set("10".into()); ymn.set("-10".into()); ymx.set("10".into()); }
+                        }>"f=2x²+3xy-4y²+x-2y+5"</button>
                     </div>
 
                     <div class="opt-grid">
