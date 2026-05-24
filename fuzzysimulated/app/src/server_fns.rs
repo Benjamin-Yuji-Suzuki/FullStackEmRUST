@@ -524,6 +524,11 @@ pub async fn run_pso_optimization(
     api_post(&format!("/api/systems/{system_id}/optimize-pso"), &body).await
 }
 
+pub async fn apply_pso_params(system_id: &str, params: &Value) -> Option<Value> {
+    let body = serde_json::json!({ "params": params });
+    api_post(&format!("/api/systems/{system_id}/apply-pso-params"), &body).await
+}
+
 // ── Batch (UC07) ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

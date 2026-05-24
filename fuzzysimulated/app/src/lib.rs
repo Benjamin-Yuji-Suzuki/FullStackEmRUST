@@ -525,6 +525,7 @@ fn OptimizePage() -> impl IntoView {
     let pso_iters = RwSignal::new("50".to_string());
     let pso_result = RwSignal::new(None::<Value>);
     let pso_loading = RwSignal::new(false);
+    let pso_apply_msg = RwSignal::new(String::new());
 
     spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
 
@@ -873,10 +874,35 @@ fn OptimizePage() -> impl IntoView {
                             Some(r) => {
                                 let best_fit = r["best_fitness"].as_f64().unwrap_or(0.0);
                                 let best_pos = r["best_position"].as_array().cloned().unwrap_or_default();
+                                let ss = selected_sys.clone();
+                                let am = pso_apply_msg.clone();
                                 view! {
                                     <div style="margin-top:8px;padding:8px;background:var(--surface1);border-radius:4px;font-size:10px">
                                         <div>"Melhor Fitness: " <span style="color:var(--teal);font-weight:600">{format!("{:.6}", best_fit)}</span></div>
                                         <div style="margin-top:4px">{let joined: String = best_pos.iter().map(|p| format!("{:.4} ", p.as_f64().unwrap_or(0.0))).collect(); format!("Parâmetros: [{}]", joined)}</div>
+                                        <button class="btn btn-outline" style="margin-top:6px;font-size:9px;padding:3px 8px" on:click={
+                                            let sid = ss.clone();
+                                            let bp = best_pos.clone();
+                                            let am2 = am.clone();
+                                            move |_| {
+                                                let sid2 = sid.get();
+                                                if sid2.is_empty() { return; }
+                                                let params_val = serde_json::json!(bp);
+                                                let am3 = am2.clone();
+                                                spawn_async(async move {
+                                                    match apply_pso_params(&sid2, &params_val).await {
+                                                        Some(res) => {
+                                                            let n = res["updated_terms"].as_u64().unwrap_or(0);
+                                                            am3.set(format!("{} termos atualizados!", n));
+                                                        }
+                                                        None => am3.set("Erro ao aplicar".into()),
+                                                    }
+                                                });
+                                            }
+                                        }>
+                                            <i class="ti ti-check"></i>"Aplicar Parametros no BD"
+                                        </button>
+                                        {move || { let m = am.get(); if !m.is_empty() { view! { <div style="color:var(--teal);margin-top:4px;font-size:9px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
                                     </div>
                                 }.into_any()
                             }

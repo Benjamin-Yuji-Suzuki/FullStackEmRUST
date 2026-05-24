@@ -29,6 +29,7 @@ pub fn routes() -> Router<AppState> {
         .route("/systems/{id}/svg", get(svg_export))
         .route("/systems/{id}/diagnostic", post(diagnostic))
         .route("/systems/{id}/optimize-pso", post(optimize_pso))
+        .route("/systems/{id}/apply-pso-params", post(apply_pso_params))
 }
 
 #[derive(Deserialize)]
@@ -535,6 +536,55 @@ async fn optimize_pso(
         "best_position": best_pos,
         "best_fitness": best_fit,
     })))
+}
+
+#[derive(Deserialize)]
+pub struct ApplyPsoParamsRequest {
+    pub params: Vec<f64>,
+}
+
+async fn apply_pso_params(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+    Json(req): Json<ApplyPsoParamsRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let terms = sqlx::query_as::<_, FuzzyTerm>(
+        "SELECT ft.* FROM fuzzy_terms ft \
+         JOIN fuzzy_variables fv ON fv.id = ft.variable_id \
+         WHERE fv.system_id = $1 \
+         ORDER BY fv.name, ft.label"
+    )
+    .bind(system_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut idx = 0;
+    let mut updated = 0u32;
+    for term in &terms {
+        let n = match term.mf_type.as_str() {
+            "trimf" => 3,
+            "trapmf" => 4,
+            "gaussmf" => 2,
+            _ => continue,
+        };
+        if idx + n > req.params.len() {
+            return Err(AppError::Validation("Parametros insuficientes".into()));
+        }
+        let mut new_params: Vec<f64> = req.params[idx..idx + n].to_vec();
+        if term.mf_type == "trimf" || term.mf_type == "trapmf" {
+            new_params.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        }
+        let params_json = serde_json::to_value(&new_params).unwrap_or_default();
+        sqlx::query("UPDATE fuzzy_terms SET params = $1::jsonb WHERE id = $2")
+            .bind(&params_json)
+            .bind(term.id)
+            .execute(&state.pool)
+            .await?;
+        idx += n;
+        updated += 1;
+    }
+
+    Ok(Json(json!({ "updated_terms": updated, "system_id": system_id })))
 }
 
 async fn load_engine_data(
