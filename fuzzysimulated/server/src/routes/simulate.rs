@@ -23,8 +23,12 @@ pub fn routes() -> Router<AppState> {
         .route("/systems/{id}/export", get(export_system))
         .route("/systems/import", post(import_system))
         .route("/systems/{id}/sweep", post(sweep))
-        .route("/systems/{id}/rule-matrix", get(rule_matrix))
+        .route("/systems/{id}/rule-matrix", post(rule_matrix))
         .route("/systems/{id}/surface", post(surface))
+        .route("/systems/{id}/simulate-tsk", post(simulate_tsk))
+        .route("/systems/{id}/svg", get(svg_export))
+        .route("/systems/{id}/diagnostic", post(diagnostic))
+        .route("/systems/{id}/optimize-pso", post(optimize_pso))
 }
 
 #[derive(Deserialize)]
@@ -154,10 +158,15 @@ async fn compare_simulations(
     Ok(Json(simulations))
 }
 
+#[derive(serde::Deserialize)]
+struct ReportQuery {
+    format: Option<String>,
+}
+
 async fn export_report(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(format): Query<Option<String>>,
+    Query(query): Query<ReportQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let sim = sqlx::query_as::<_, Simulation>(
         "SELECT * FROM simulations WHERE id = $1"
@@ -167,7 +176,7 @@ async fn export_report(
     .await?
     .ok_or_else(|| AppError::NotFound("Simulação não encontrada".into()))?;
 
-    let fmt = format.unwrap_or_else(|| "json".into());
+    let fmt = query.format.unwrap_or_else(|| "json".into());
 
     Ok(Json(json!({
         "format": fmt,
@@ -402,6 +411,132 @@ async fn import_system(
     Ok((axum::http::StatusCode::CREATED, Json(system)))
 }
 
+#[derive(Deserialize)]
+pub struct TskCoeffsRequest {
+    pub inputs: std::collections::HashMap<String, f64>,
+    pub coeffs: std::collections::HashMap<String, Vec<f64>>,
+}
+
+#[derive(Deserialize)]
+pub struct DiagnosticRequest {
+    pub inputs: std::collections::HashMap<String, f64>,
+}
+
+#[derive(Deserialize)]
+pub struct OptimizePsoRequest {
+    pub target_inputs: Vec<std::collections::HashMap<String, f64>>,
+    pub target_outputs: Vec<std::collections::HashMap<String, f64>>,
+    pub population_size: Option<usize>,
+    pub max_iterations: Option<usize>,
+}
+
+async fn simulate_tsk(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+    Json(req): Json<TskCoeffsRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let _system = sqlx::query_as::<_, FuzzySystem>(
+        "SELECT * FROM fuzzy_systems WHERE id = $1"
+    )
+    .bind(system_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Sistema não encontrado".into()))?;
+
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+    let outputs = engine::evaluate_tsk(&var_infos, &rule_infos, &req.inputs, &req.coeffs);
+
+    sqlx::query(
+        "INSERT INTO simulations (system_id, inputs, outputs) VALUES ($1, $2, $3)"
+    )
+    .bind(system_id)
+    .bind(json!(req.inputs))
+    .bind(json!(outputs))
+    .execute(&state.pool)
+    .await?;
+
+    Ok(Json(json!({
+        "outputs": outputs,
+        "inputs": req.inputs,
+        "system_id": system_id,
+        "method": "tsk",
+    })))
+}
+
+async fn svg_export(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let _system = sqlx::query_as::<_, FuzzySystem>(
+        "SELECT * FROM fuzzy_systems WHERE id = $1"
+    )
+    .bind(system_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Sistema não encontrado".into()))?;
+
+    let (var_infos, _) = load_engine_data(&state.pool, system_id).await?;
+    let svgs = engine::generate_svg(&var_infos);
+
+    Ok(Json(json!({
+        "system_id": system_id,
+        "svgs": svgs.into_iter().map(|(name, svg)| json!({
+            "variable": name,
+            "svg": svg,
+        })).collect::<Vec<_>>(),
+    })))
+}
+
+async fn diagnostic(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+    Json(req): Json<DiagnosticRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let _system = sqlx::query_as::<_, FuzzySystem>(
+        "SELECT * FROM fuzzy_systems WHERE id = $1"
+    )
+    .bind(system_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Sistema não encontrado".into()))?;
+
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+    let diag = engine::generate_diagnostic(&var_infos, &rule_infos, &req.inputs)
+        .map_err(|e| AppError::Validation(e))?;
+
+    Ok(Json(diag))
+}
+
+async fn optimize_pso(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+    Json(req): Json<OptimizePsoRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let _system = sqlx::query_as::<_, FuzzySystem>(
+        "SELECT * FROM fuzzy_systems WHERE id = $1"
+    )
+    .bind(system_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Sistema não encontrado".into()))?;
+
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+    let pop = req.population_size.unwrap_or(20);
+    let iters = req.max_iterations.unwrap_or(50);
+
+    let (best_pos, best_fit, _history) = engine::optimize_with_pso(
+        &var_infos, &rule_infos,
+        &req.target_inputs, &req.target_outputs,
+        pop, iters,
+    ).map_err(|e| AppError::Validation(e))?;
+
+    Ok(Json(json!({
+        "system_id": system_id,
+        "best_position": best_pos,
+        "best_fitness": best_fit,
+    })))
+}
+
 async fn load_engine_data(
     pool: &sqlx::PgPool,
     system_id: Uuid,
@@ -491,10 +626,17 @@ async fn sweep(
     Ok(Json(json!({ "points": points, "variable": req.variable })))
 }
 
+#[derive(Deserialize)]
+pub struct RuleMatrixRequest {
+    pub inputs: std::collections::HashMap<String, f64>,
+}
+
 async fn rule_matrix(
     State(state): State<AppState>,
     Path(system_id): Path<Uuid>,
+    Json(req): Json<RuleMatrixRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    let (var_infos, _ri) = load_engine_data(&state.pool, system_id).await?;
     let rules = sqlx::query_as::<_, FuzzyRule>(
         "SELECT * FROM fuzzy_rules WHERE system_id = $1 ORDER BY position"
     )
@@ -502,17 +644,24 @@ async fn rule_matrix(
     .fetch_all(&state.pool)
     .await?;
 
+    let mut var_map = std::collections::HashMap::new();
+    for var in &var_infos {
+        var_map.insert(var.name.clone(), var);
+    }
+
     let mut rows = Vec::new();
     for rule in &rules {
+        let activation = engine::compute_rule_activation(&rule.rule_text, &var_map, &req.inputs);
         rows.push(json!({
             "rule_id": rule.id,
             "rule_text": rule.rule_text,
             "position": rule.position,
-            "activation": 0.0, // mock: no simulation data
+            "weight": rule.weight,
+            "activation": activation,
         }));
     }
 
-    Ok(Json(json!({ "rules": rows, "system_id": system_id })))
+    Ok(Json(json!({ "rules": rows, "system_id": system_id, "inputs": req.inputs })))
 }
 
 async fn surface(

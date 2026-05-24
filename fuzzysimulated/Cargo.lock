@@ -1729,6 +1729,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
+name = "logicfuzzy_academic"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02a5b4f490cfc3f0d2afb7041d2e8c785de3d1bd71ab06513f1f3cbd26202bd3"
+
+[[package]]
 name = "lru-slab"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2703,6 +2709,7 @@ dependencies = [
  "leptos_axum",
  "leptos_config",
  "log",
+ "logicfuzzy_academic",
  "mime_guess",
  "reqwest",
  "serde",

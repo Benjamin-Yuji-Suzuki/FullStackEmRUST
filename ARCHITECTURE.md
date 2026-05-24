@@ -15,6 +15,7 @@ CREATE TABLE fuzzy_systems (
     name TEXT NOT NULL,
     description TEXT,
     defuzz_method TEXT NOT NULL DEFAULT 'centroid',
+    status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo','favorito','concluido','desativado')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -73,7 +74,7 @@ CREATE TABLE batch_results (
 -- Eventos de auditoria (UC16)
 CREATE TABLE audit_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    system_id UUID NOT NULL REFERENCES fuzzy_systems(id) ON DELETE CASCADE,
+    system_id UUID REFERENCES fuzzy_systems(id) ON DELETE SET NULL,
     action_type TEXT NOT NULL,
     entity_type TEXT NOT NULL,
     entity_id UUID,
@@ -154,7 +155,7 @@ Na primeira execução, `server/migrations/002_seed.sql` insere automaticamente 
 ```
 FullStackEmRUST/
 ├── USE_CASES.md         # 25 casos de uso
-├── TEST_CASES.md        # 55 casos de teste
+├── TEST_CASES.md        # 55 casos de teste (41 unit + 22 unit tests + 43 HTTP + 8 integração + 31 E2E)
 ├── FUZZY_MODEL.md       # Modelos Mamdani + TSK + PSO
 ├── ARCHITECTURE.md      # Este documento
 ├── README.md
@@ -185,7 +186,7 @@ FullStackEmRUST/
     │   │   ├── 004_audit_orphan.sql # FK audit_events ON DELETE SET NULL
     │   │   └── 005_system_status.sql # Coluna status (ativo/favorito/concluido/desativado)
     │   └── tests/
-    │       ├── axum_api.rs         # 39 testes HTTP (serializados via serial_test)
+    │       ├── axum_api.rs         # 43 testes HTTP (serializados via serial_test)
     │       ├── api_test.rs         # Entry point com helpers compartilhados
     │       ├── common/mod.rs       # TestApp helper (pool + router)
     │       ├── unit/               # 22 unit tests
@@ -199,7 +200,7 @@ FullStackEmRUST/
     │           └── optimize.rs
     ├── frontend/          # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── end2end/           # Playwright E2E (3 testes: home, navegação, criar sistema, simulador)
+    ├── end2end/           # Playwright E2E (31 testes: CRUD, seed, validação, lifecycle, status, simulação)
     ├── style/main.scss    # Tema escuro Catppuccin
     ├── coverage/          # Relatórios HTML de cobertura
     └── public/            # assets estáticos

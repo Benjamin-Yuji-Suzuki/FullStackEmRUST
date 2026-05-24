@@ -1,12 +1,16 @@
 {
-  "name": "end2end",
+  "name": "fuzzysimulated-e2e",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {},
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "Testes E2E (Playwright) do FuzzySimulated — sistema fuzzy Mamdani/TSK/PSO para avaliação de risco em cibersegurança",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui",
+    "report": "npx playwright show-report",
+    "install-browsers": "npx playwright install chromium"
+  },
+  "keywords": ["fuzzy", "mamdani", "cybersecurity", "e2e", "playwright"],
+  "author": "CESUPA — Qualidade e Projeto de Software / IA e Computacional / Ciência de Dados — 01/2026",
+  "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.44.1",
     "@types/node": "^20.12.12",

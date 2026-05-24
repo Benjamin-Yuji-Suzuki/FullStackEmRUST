@@ -363,6 +363,92 @@ pub struct OptimizationResult {
     pub coef_f: f64,
 }
 
+// ── Scenarios (UC12) ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioInfo {
+    pub id: String,
+    pub system_id: String,
+    pub name: String,
+    pub inputs: Value,
+    pub created_at: String,
+}
+
+pub async fn list_scenarios(system_id: &str) -> Vec<ScenarioInfo> {
+    api_get(&format!("/api/systems/{system_id}/scenarios")).await.unwrap_or_default()
+}
+
+pub async fn create_scenario(system_id: &str, name: &str, inputs: &Value) -> Option<ScenarioInfo> {
+    let body = serde_json::json!({ "name": name, "inputs": inputs });
+    api_post(&format!("/api/systems/{system_id}/scenarios"), &body).await
+}
+
+pub async fn delete_scenario(id: &str) -> bool {
+    api_delete(&format!("/api/scenarios/{id}")).await
+}
+
+// ── Sweep (UC13) ──
+
+pub async fn run_sweep(
+    system_id: &str,
+    variable: &str,
+    start: f64, end: f64, step: f64,
+    fixed: &std::collections::HashMap<String, f64>,
+) -> Option<Value> {
+    let body = serde_json::json!({
+        "variable": variable, "start": start, "end": end, "step": step, "fixed": fixed
+    });
+    api_post(&format!("/api/systems/{system_id}/sweep"), &body).await
+}
+
+// ── Surface (UC15) ──
+
+pub async fn run_surface(
+    system_id: &str,
+    x: &str, y: &str,
+    x_res: Option<usize>, y_res: Option<usize>,
+) -> Option<Value> {
+    let body = serde_json::json!({
+        "x": x, "y": y, "x_resolution": x_res, "y_resolution": y_res
+    });
+    api_post(&format!("/api/systems/{system_id}/surface"), &body).await
+}
+
+// ── Rule Matrix (UC14) ──
+
+pub async fn get_rule_matrix(system_id: &str, inputs: &Value) -> Option<Value> {
+    api_post(&format!("/api/systems/{system_id}/rule-matrix"), &serde_json::json!({ "inputs": inputs })).await
+}
+
+// ── Compare (UC08) ──
+
+pub async fn compare_simulations(ids: &[String]) -> Option<Vec<SimulationInfo>> {
+    api_post("/api/simulations/compare", &serde_json::json!({ "simulation_ids": ids })).await
+}
+
+// ── Duplicate (UC10) ──
+
+pub async fn duplicate_system(id: &str, name: &str) -> Option<SystemInfo> {
+    let body = serde_json::json!({ "name": name });
+    api_post(&format!("/api/systems/{id}/duplicate"), &body).await
+}
+
+// ── Export (UC11) ──
+
+pub async fn export_system(id: &str) -> Option<Value> {
+    api_get(&format!("/api/systems/{id}/export")).await
+}
+
+pub async fn import_system(data: &Value) -> Option<SystemInfo> {
+    api_post("/api/systems/import", data).await
+}
+
+pub async fn export_simulation_report(id: &str) -> Option<Value> {
+    api_get(&format!("/api/simulations/{id}/report")).await
+}
+
+// ── Optimize ──
+
 pub async fn optimize_function(
     system_id: Option<&str>,
     coef_a: f64, coef_b: f64, coef_c: f64,
@@ -383,4 +469,95 @@ pub async fn optimize_function(
         "y_max": y_max,
     });
     api_post("/api/optimize", &body).await
+}
+
+pub async fn list_optimizations(system_id: &str) -> Vec<Value> {
+    api_get(&format!("/api/optimizations?system_id={system_id}")).await.unwrap_or_default()
+}
+
+pub async fn export_optimization(id: &str) -> Option<Value> {
+    api_get(&format!("/api/optimizations/{id}/export")).await
+}
+
+// ── TSK Inference (UC18) ──
+
+pub async fn run_tsk_simulation(
+    system_id: &str,
+    inputs: &Value,
+    coeffs: &Value,
+) -> Option<Value> {
+    let body = serde_json::json!({
+        "inputs": inputs,
+        "coeffs": coeffs,
+    });
+    api_post(&format!("/api/systems/{system_id}/simulate-tsk"), &body).await
+}
+
+// ── SVG Export (UC19) ──
+
+pub async fn get_svg_export(system_id: &str) -> Option<Value> {
+    api_get(&format!("/api/systems/{system_id}/svg")).await
+}
+
+// ── Diagnostic (UC20) ──
+
+pub async fn get_diagnostic(system_id: &str, inputs: &Value) -> Option<Value> {
+    let body = serde_json::json!({ "inputs": inputs });
+    api_post(&format!("/api/systems/{system_id}/diagnostic"), &body).await
+}
+
+// ── PSO Optimization (UC17) ──
+
+pub async fn run_pso_optimization(
+    system_id: &str,
+    target_inputs: &Value,
+    target_outputs: &Value,
+    population_size: usize,
+    max_iterations: usize,
+) -> Option<Value> {
+    let body = serde_json::json!({
+        "target_inputs": target_inputs,
+        "target_outputs": target_outputs,
+        "population_size": population_size,
+        "max_iterations": max_iterations,
+    });
+    api_post(&format!("/api/systems/{system_id}/optimize-pso"), &body).await
+}
+
+// ── Batch (UC07) ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchResultInfo {
+    pub id: String,
+    pub row_index: i32,
+    pub inputs: Value,
+    pub output: f64,
+    pub outputs_detail: Value,
+    pub executed_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchResponse {
+    pub system_id: String,
+    pub system_name: String,
+    pub total: usize,
+    pub processed: usize,
+    pub errors: usize,
+    pub results: Vec<BatchResultInfo>,
+}
+
+pub async fn process_batch(system_id: &str, inputs: &Value) -> Option<BatchResponse> {
+    let body = serde_json::json!({
+        "system_id": system_id,
+        "inputs": inputs,
+    });
+    api_post("/api/batch", &body).await
+}
+
+pub async fn list_batch_results(system_id: &str) -> Vec<Value> {
+    api_get(&format!("/api/batch/{system_id}")).await.unwrap_or_default()
+}
+
+pub async fn delete_batch_result(id: &str) -> bool {
+    api_delete(&format!("/api/batch/{id}")).await
 }

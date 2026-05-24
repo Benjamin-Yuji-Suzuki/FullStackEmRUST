@@ -20,7 +20,7 @@ O projeto é composto por dois repositórios:
 | Repositório | Função | Tecnologias |
 |---|---|---|
 | [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) | Motor de inferência Mamdani/TSK/PSO, publicado como crate | Rust puro |
-| [`FullStackEmRUST`](https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST) ← **este repo** | Plataforma web full-stack (simulação atualmente via mock) | Leptos · Axum · PostgreSQL |
+| [`FullStackEmRUST`](https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST) ← **este repo** | Plataforma web full-stack | Leptos · Axum · PostgreSQL |
 
 ---
 
@@ -32,8 +32,8 @@ O projeto é composto por dois repositórios:
 | Backend | [Axum 0.8](https://github.com/tokio-rs/axum) (Rust) | Framework assíncrono; integração nativa com Tokio |
 | Banco de dados | PostgreSQL | Relacional robusto; JSONB para termos fuzzy flexíveis |
 | ORM | [SQLx](https://github.com/launchbadge/sqlx) | Queries verificadas em tempo de compilação |
-| Motor Fuzzy | [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) | Implementação Mamdani/TSK/PSO (pendente de integração — atualmente mock) |
-| Pipeline de dados | [Polars](https://pola.rs/) (Rust) |  Leitura de Parquet + inferência em lote (planejado Sprint 3) |
+| Motor Fuzzy | [`logicfuzzy-academic`](https://crates.io/crates/logicfuzzy_academic) | Implementação Mamdani/TSK/PSO |
+| Pipeline de dados | [Polars](https://pola.rs/) (Rust) | Leitura de Parquet + inferência em lote (planejado) |
 | API Externa | [OpenWeather API](https://openweathermap.org/api) | Temperatura e umidade reais por cidade |
 | Build | [cargo-leptos](https://github.com/leptos-rs/cargo-leptos) | Gerencia WASM + servidor em um único comando |
 | Qualidade | [SonarQube Cloud](https://sonarcloud.io) | Análise estática: complexidade, duplicação, code smells, vulnerabilidades |
@@ -44,8 +44,8 @@ O projeto é composto por dois repositórios:
 
 ```
 FullStackEmRUST/
-├── USE_CASES.md              # 20 casos de uso
-├── TEST_CASES.md             # 43 casos de teste
+├── USE_CASES.md              # 25 casos de uso
+├── TEST_CASES.md             # 55 casos de teste
 ├── FUZZY_MODEL.md            # Modelo fuzzy de demonstração
 ├── ARCHITECTURE.md           # Arquitetura técnica
 ├── README.md
@@ -71,11 +71,15 @@ FullStackEmRUST/
 │   │   ├── 003_optimization.sql
 │   │   ├── 004_audit_orphan.sql
 │   │   └── 005_system_status.sql
-    │   └── tests/
-    │       └── api_test.rs    # 16 unit + 6 integration tests
+    │       └── tests/
+    │           ├── axum_api.rs    # 43 testes HTTP (serializados)
+    │           ├── api_test.rs    # 22 unit + 8 integration tests
+    │           ├── common/        # TestApp helper
+    │           ├── unit/          # 22 unit tests sem DB
+    │           └── integration/   # 8 integration tests com DB
     ├── frontend/              # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── end2end/               # testes Playwright (E2E)
+    ├── end2end/               # 31 testes Playwright E2E
     ├── style/
     │   └── main.scss          # SCSS global (tema escuro Catppuccin)
     └── public/                # assets estáticos
@@ -99,7 +103,7 @@ FullStackEmRUST/
 
 ---
 
-## Casos de Uso (20)
+## Casos de Uso (25)
 
 Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
 
@@ -171,36 +175,16 @@ cargo leptos watch
 
 ## Testes
 
-### Unitários (16)
+| Suite | Qtde | DB | Como rodar |
+|---|---|---|---|---|
+| Unit (inline) | 41 | ❌ | `cargo test -p server --lib` |
+| Unit (tests/) | 22 | ❌ | `cargo test -p server --test api_test -- unit::` |
+| HTTP Axum | 43 | ✅ | `cargo test -p server --test axum_api` (serial) |
+| Integration | 8 | ✅ | `cargo test -p server --test api_test -- --ignored` |
+| E2E Playwright | 31 | ✅ | `cd end2end && npx playwright test` |
+| **Total** | **145** | | |
 
-```bash
-cargo test -p server -- --skip ignored
-```
-
-Cobrem: validação de nome de sistema (vazio, tamanho), método de defuzzificação, parâmetros de MF (trimf, trapmf, gaussmf).
-
-### Integração (6 — esboçados)
-
-```bash
-# Requer banco 'fuzzysimulated_test' com migrations aplicadas
-DATABASE_URL=postgres://postgres@localhost/fuzzysimulated_test cargo test -p server -- --ignored
-```
-
-Cobrem: CRUD de sistema, variável, termo, cascade delete, simulação.
-
-### End-to-End (Playwright)
-
-```bash
-cd end2end
-npx playwright install
-npx playwright test
-```
-
-> ⚠️ Testes E2E ainda não implementados (esboço em `end2end/tests/example.spec.ts`).
-
-### Qualidade estática — SonarQube Cloud (planejado)
-
-> ⚠️ Integração com SonarQube Cloud pendente para Sprint 3. Atualmente sem análise automática.
+Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRUNCATE CASCADE`.
 
 ---
 
@@ -208,8 +192,8 @@ npx playwright test
 
 | Documento | Conteúdo |
 |---|---|
-| [USE_CASES.md](./USE_CASES.md) | Especificação dos 20 casos de uso |
-| [TEST_CASES.md](./TEST_CASES.md) | 43 casos de teste (16 aprovados) |
+| [USE_CASES.md](./USE_CASES.md) | Especificação dos 25 casos de uso |
+| [TEST_CASES.md](./TEST_CASES.md) | 55 casos de teste (145 testes automatizados) |
 | [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Modelos Mamdani, TSK e Otimização PSO |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Banco de dados, integrações e fluxos |
 

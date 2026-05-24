@@ -1,6 +1,7 @@
 # 📋 Casos de Uso — FuzzySimulated
 
-> Especificação dos 25 casos de uso da plataforma, seguindo o padrão UML:
+> Especificação dos 25 casos de uso da plataforma, seguindo o padrão UML.
+> ⚠️ UC07 (Batch), UC08 (Comparar), UC09 (Exportar Relatório CSV/PDF), UC12 (Cenário), UC14 (Matriz), UC17-20 (PSO/TSK/SVG/Diagnóstico) são planejados mas não implementados na versão atual.
 > ator(es), pré-condições, fluxo principal, fluxos alternativos (com retorno ao fluxo principal) e pós-condições.
 > Atores são SEMPRE entidades externas à fronteira do sistema.
 
@@ -35,7 +36,7 @@
 | [UC19](#uc19) | Exportar Visualizações SVG | [Exportar] | Usuário |
 | [UC20](#uc20) | Visualizar Relatório de Diagnóstico | [Visualização] | Usuário |
 | [UC21](#uc21) | Definir Função Objetivo | [Criar] | Usuário |
-| [UC22](#uc22) | Calcular Ponto Ótimo | [Processamento] | Usuário, Back End |
+| [UC22](#uc22) | Calcular Ponto Ótimo | [Processamento] | Usuário |
 | [UC23](#uc23) | Visualizar Justificativa Matemática | [Visualização] | Usuário |
 | [UC24](#uc24) | Consultar Histórico de Otimizações | [Ler] | Usuário |
 | [UC25](#uc25) | Exportar Resultado de Otimização | [Exportar] | Usuário |
@@ -96,11 +97,19 @@
 - **FA3 — Usuário cancela (qualquer operação):** Modal fechado sem persistir.
 - **FA4 — Falha de comunicação:** Sistema exibe mensagem de erro. Nenhuma alteração é persistida.
 
+**Fluxo Principal — Alternar status do sistema**
+
+1. Usuário clica no seletor de status de um card (Ativo / Favorito / Concluído / Desativado).
+2. **Sistema** valida a transição: Favorito bloqueia delete (422); Desativado oculta de listagens padrão.
+3. **Sistema** persiste a alteração na coluna `status`.
+4. **Sistema** reaplica os filtros de exibição conforme o novo estado.
+
 **Pós-condições**
 
 - Registro em `fuzzy_systems` criado, alterado ou removido conforme a operação.
 - Dados dependentes são removidos em cascata quando um sistema é excluído.
 - Dashboard reflete o estado atualizado.
+- Status do sistema determina visibilidade e restrições de operação.
 
 ---
 
@@ -855,7 +864,7 @@
 | Campo | Descrição |
 |---|---|
 | **Ator Primário** | Usuário |
-| **Atores Secundários** | Back End |
+| **Atores Secundários** | — |
 | **Pré-condições** | Coeficientes e domínio preenchidos (UC21). |
 
 **Fluxo Principal**

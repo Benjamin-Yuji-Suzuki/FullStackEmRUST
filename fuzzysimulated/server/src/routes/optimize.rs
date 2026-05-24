@@ -18,11 +18,13 @@ use crate::math::{self, OptimizationInput};
 /// - `POST /api/optimize` — calcula o ponto ótimo de f(x,y)
 /// - `GET /api/optimizations?system_id=UUID` — histórico de otimizações
 /// - `GET /api/optimizations/{id}` — detalhe de uma otimização
+/// - `GET /api/optimizations/{id}/export` — exporta resultado (UC25)
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/optimize", post(compute_optimal_point))
         .route("/optimizations", get(list_optimizations))
         .route("/optimizations/{id}", get(get_optimization))
+        .route("/optimizations/{id}/export", get(export_optimization))
 }
 
 /// Calcula o ponto ótimo de uma função objetivo quadrática f(x,y) = ax² + bxy + cy² + dx + ey + const.
@@ -178,6 +180,41 @@ async fn get_optimization(
     .ok_or_else(|| AppError::NotFound("Otimização não encontrada".into()))?;
 
     Ok(Json(opt))
+}
+
+/// Exporta o resultado de uma otimização como JSON para download (UC25).
+async fn export_optimization(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let opt = sqlx::query_as::<_, Optimization>(
+        "SELECT * FROM optimizations WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Otimização não encontrada".into()))?;
+
+    Ok(Json(serde_json::json!({
+        "id": opt.id,
+        "system_id": opt.system_id,
+        "function": format!("f(x,y) = {}x² + {}xy + {}y² + {}x + {}y + {}",
+            opt.coef_a, opt.coef_b, opt.coef_c, opt.coef_d, opt.coef_e, opt.coef_f),
+        "domain": {
+            "x": [opt.x_min, opt.x_max],
+            "y": [opt.y_min, opt.y_max],
+        },
+        "optimal_point": {
+            "x": opt.optimal_x,
+            "y": opt.optimal_y,
+            "value": opt.optimal_value,
+        },
+        "critical_point_type": opt.critical_point_type,
+        "explanation": opt.explanation,
+        "gradient_at_optimum": opt.gradient_at_optimum,
+        "hessian_matrix": opt.hessian_matrix,
+        "executed_at": opt.executed_at,
+    })))
 }
 
 #[derive(Debug, Deserialize)]

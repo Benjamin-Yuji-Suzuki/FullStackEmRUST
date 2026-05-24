@@ -1,3 +1,11 @@
+use logicfuzzy_academic::{
+    gaussmf, trapmf, trimf,
+    rule::{Antecedent, Connector, RuleBuilder},
+    tsk::{TskConsequent, TskEngine, TskRule},
+    pso::{PsoConfig, PsoOptimizer},
+    var_svg,
+    ExplainReport, FuzzyVariable, MamdaniEngine, MembershipFn, Term, Universe,
+};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -26,36 +34,26 @@ pub struct RuleInfo {
     pub weight: f64,
 }
 
-pub fn membership(value: f64, mf_type: &str, params: &[f64]) -> f64 {
+fn mf_from_params(mf_type: &str, params: &[f64]) -> Option<MembershipFn> {
     match mf_type {
         "trimf" if params.len() >= 3 => {
-            let (a, b, c) = (params[0], params[1], params[2]);
-            if value <= a || value >= c {
-                0.0
-            } else if (value - b).abs() < f64::EPSILON {
-                1.0
-            } else if value < b {
-                (value - a) / (b - a)
-            } else {
-                (c - value) / (c - b)
-            }
+            Some(MembershipFn::Trimf([params[0], params[1], params[2]]))
         }
         "trapmf" if params.len() >= 4 => {
-            let (a, b, c, d) = (params[0], params[1], params[2], params[3]);
-            if value <= a || value >= d {
-                0.0
-            } else if value >= b && value <= c {
-                1.0
-            } else if value < b {
-                (value - a) / (b - a)
-            } else {
-                (d - value) / (d - c)
-            }
+            Some(MembershipFn::Trapmf([params[0], params[1], params[2], params[3]]))
         }
         "gaussmf" if params.len() >= 2 => {
-            let (mean, sigma) = (params[0], params[1]);
-            (-0.5 * ((value - mean) / sigma).powi(2)).exp()
+            Some(MembershipFn::Gaussmf { mean: params[0], sigma: params[1] })
         }
+        _ => None,
+    }
+}
+
+pub fn membership(value: f64, mf_type: &str, params: &[f64]) -> f64 {
+    match mf_type {
+        "trimf" if params.len() >= 3 => trimf(value, params[0], params[1], params[2]),
+        "trapmf" if params.len() >= 4 => trapmf(value, params[0], params[1], params[2], params[3]),
+        "gaussmf" if params.len() >= 2 => gaussmf(value, params[0], params[1]),
         _ => 0.0,
     }
 }
@@ -130,91 +128,332 @@ pub fn parse_rule_conditions(
     conditions
 }
 
+pub fn compute_rule_activation(
+    rule_text: &str,
+    variables: &HashMap<String, &VarInfo>,
+    inputs: &HashMap<String, f64>,
+) -> f64 {
+    let var_names: Vec<String> = variables.keys().cloned().collect();
+    let conditions = parse_rule_conditions(rule_text, &var_names);
+    if conditions.is_empty() {
+        return 0.0;
+    }
+    let mut alpha = 1.0_f64;
+    for (var_name, term_label) in &conditions {
+        if let Some(var_info) = variables.get(var_name) {
+            if let Some(term) = var_info.terms.iter().find(|t| t.label.eq_ignore_ascii_case(term_label)) {
+                if let Some(input) = inputs.get(var_name) {
+                    let mu = membership(*input, &term.mf_type, &term.params);
+                    alpha = alpha.min(mu);
+                } else {
+                    alpha = 0.0;
+                }
+            } else {
+                alpha = 0.0;
+            }
+        } else {
+            alpha = 0.0;
+        }
+        if alpha <= 0.0 {
+            break;
+        }
+    }
+    alpha
+}
+
+fn build_engine(
+    variables: &[VarInfo],
+    rules: &[RuleInfo],
+    inputs: &HashMap<String, f64>,
+) -> MamdaniEngine {
+    let var_names: Vec<String> = variables.iter().map(|v| v.name.clone()).collect();
+    let mut engine = MamdaniEngine::new();
+
+    for var in variables {
+        let resolution = var.resolution.max(2);
+        let uni = Universe::new(var.universe_min, var.universe_max, resolution);
+        let mut fv = FuzzyVariable::new(&var.name, uni);
+        for term in &var.terms {
+            if let Some(mf) = mf_from_params(&term.mf_type, &term.params) {
+                fv.add_term(Term::new(&term.label, mf));
+            }
+        }
+        match var.role.as_str() {
+            "antecedent" | "input" => engine.add_antecedent(fv),
+            "consequent" | "output" => engine.add_consequent(fv),
+            _ => {}
+        }
+    }
+
+    for rule in rules {
+        let conditions = parse_rule_conditions(&rule.rule_text, &var_names);
+        if conditions.len() < 2 {
+            continue;
+        }
+        let ante = &conditions[..conditions.len() - 1];
+        let conseq = &conditions[conditions.len() - 1];
+
+        let mut builder = RuleBuilder::new();
+        builder = builder.when(&ante[0].0, &ante[0].1);
+        for (var_name, term_label) in &ante[1..] {
+            builder = builder.and(var_name, term_label);
+        }
+        builder = builder.then(&conseq.0, &conseq.1);
+        if (rule.weight - 1.0).abs() > f64::EPSILON {
+            builder = builder.weight(rule.weight);
+        }
+        engine.add_rule(builder.build());
+    }
+
+    for (name, value) in inputs {
+        let _ = engine.set_input(name, *value);
+    }
+
+    engine
+}
+
 pub fn evaluate_mamdani(
     variables: &[VarInfo],
     rules: &[RuleInfo],
     inputs: &HashMap<String, f64>,
 ) -> HashMap<String, f64> {
+    let engine = build_engine(variables, rules, inputs);
+    match engine.compute() {
+        Ok(outputs) => outputs,
+        Err(_) => variables
+            .iter()
+            .filter(|v| v.role == "consequent" || v.role == "output")
+            .map(|v| (v.name.clone(), (v.universe_min + v.universe_max) / 2.0))
+            .collect(),
+    }
+}
+
+/// Avalia um sistema usando inferência TSK (Takagi-Sugeno-Kang) (UC18).
+pub fn evaluate_tsk(
+    variables: &[VarInfo],
+    rules: &[RuleInfo],
+    inputs: &HashMap<String, f64>,
+    coeffs: &HashMap<String, Vec<f64>>,
+) -> HashMap<String, f64> {
     let var_names: Vec<String> = variables.iter().map(|v| v.name.clone()).collect();
-    let mut outputs = HashMap::new();
-    let consequent_vars: Vec<&VarInfo> = variables
-        .iter()
-        .filter(|v| v.role == "consequent")
-        .collect();
+    let ant_vars: Vec<&VarInfo> = variables.iter().filter(|v| v.role == "antecedent" || v.role == "input").collect();
 
-    for cons_var in &consequent_vars {
-        let resolution = cons_var.resolution.max(2);
-        let step = (cons_var.universe_max - cons_var.universe_min) / (resolution - 1) as f64;
-        let mut aggregated = vec![0.0_f64; resolution];
-        let mut has_active_rule = false;
-
-        for rule in rules {
-            let conditions = parse_rule_conditions(&rule.rule_text, &var_names);
-            if conditions.is_empty() {
-                continue;
+    let mut engine = TskEngine::new();
+    for var in &ant_vars {
+        let resolution = var.resolution.max(2);
+        let uni = Universe::new(var.universe_min, var.universe_max, resolution);
+        let mut fv = FuzzyVariable::new(&var.name, uni);
+        for term in &var.terms {
+            if let Some(mf) = mf_from_params(&term.mf_type, &term.params) {
+                fv.add_term(Term::new(&term.label, mf));
             }
-            let mut alpha = 1.0_f64;
-            let mut cons_term_label = String::new();
-            for (var_name, term_label) in &conditions {
-                let term = variables
-                    .iter()
-                    .find(|v| v.name.eq_ignore_ascii_case(var_name))
-                    .and_then(|v| v.terms.iter().find(|t| t.label.eq_ignore_ascii_case(term_label)));
-                match term {
-                    Some(t) => {
-                        if t.label == *term_label {
-                            if cons_var.name.eq_ignore_ascii_case(var_name) {
-                                cons_term_label = t.label.clone();
-                            } else if let Some(input) = inputs.get(var_name) {
-                                let mu = membership(*input, &t.mf_type, &t.params);
-                                alpha = alpha.min(mu);
-                            } else {
-                                alpha = 0.0;
+        }
+        engine.add_antecedent(fv);
+    }
+
+    for var in variables {
+        if var.role == "consequent" || var.role == "output" {
+            engine.add_output(&var.name, Universe::new(var.universe_min, var.universe_max, 101));
+        }
+    }
+
+    let sorted_ant_names: Vec<String> = {
+        let mut names: Vec<String> = ant_vars.iter().map(|v| v.name.clone()).collect();
+        names.sort();
+        names
+    };
+
+    for rule in rules {
+        let conditions = parse_rule_conditions(&rule.rule_text, &var_names);
+        if conditions.len() < 2 { continue; }
+        let ante = &conditions[..conditions.len() - 1];
+        let conseq = &conditions[conditions.len() - 1];
+
+        let mut rule_antecedents = Vec::new();
+        for (vname, tlabel) in ante {
+            rule_antecedents.push(Antecedent::new(vname, tlabel));
+        }
+        if rule_antecedents.is_empty() { continue; }
+
+        let coeff_key = format!("{}_{}", conseq.0, conseq.1);
+        let coeffs_for_rule = coeffs.get(&coeff_key)
+            .cloned()
+            .unwrap_or_else(|| {
+                let mut c = vec![0.0; sorted_ant_names.len() + 1];
+                if let Some(first) = c.first_mut() { *first = 50.0; }
+                c
+            });
+
+        engine.add_rule(TskRule::new(
+            rule_antecedents,
+            Connector::And,
+            vec![TskConsequent::new(&conseq.0, coeffs_for_rule)],
+        ));
+    }
+
+    for (name, value) in inputs {
+        let _ = engine.set_input(name, *value);
+    }
+
+    match engine.compute() {
+        Ok(outputs) => outputs,
+        Err(_) => variables
+            .iter()
+            .filter(|v| v.role == "consequent" || v.role == "output")
+            .map(|v| (v.name.clone(), (v.universe_min + v.universe_max) / 2.0))
+            .collect(),
+    }
+}
+
+/// Gera relatório de diagnóstico explicativo de uma simulação Mamdani (UC20).
+pub fn generate_diagnostic(
+    variables: &[VarInfo],
+    rules: &[RuleInfo],
+    inputs: &HashMap<String, f64>,
+) -> Result<serde_json::Value, String> {
+    let engine = build_engine(variables, rules, inputs);
+    let _ = engine.compute();
+    let report = engine.explain().unwrap_or(ExplainReport {
+        fuzzification: Vec::new(),
+        rule_firings: Vec::new(),
+        outputs: HashMap::new(),
+        rules_fired: 0,
+        rules_skipped: 0,
+    });
+
+    Ok(serde_json::json!({
+        "fuzzification": report.fuzzification.iter().map(|fv| serde_json::json!({
+            "variable": fv.variable,
+            "crisp_input": fv.crisp_input,
+            "term_degrees": fv.term_degrees.iter().map(|(t, v)| serde_json::json!({"term": t, "mu": v})).collect::<Vec<_>>(),
+        })).collect::<Vec<_>>(),
+        "rule_firings": report.rule_firings.iter().map(|rf| serde_json::json!({
+            "rule_text": rf.rule_text,
+            "firing_degree": rf.firing_degree,
+            "fired": rf.fired,
+        })).collect::<Vec<_>>(),
+        "outputs": serde_json::json!(report.outputs),
+        "rules_fired": report.rules_fired,
+        "rules_skipped": report.rules_skipped,
+    }))
+}
+
+/// Gera SVG das funções de pertinência de um sistema (UC19).
+pub fn generate_svg(variables: &[VarInfo]) -> Vec<(String, String)> {
+    let mut svgs = Vec::new();
+    for var in variables {
+        let resolution = var.resolution.max(2);
+        let uni = Universe::new(var.universe_min, var.universe_max, resolution);
+        let mut fv = FuzzyVariable::new(&var.name, uni);
+        for term in &var.terms {
+            if let Some(mf) = mf_from_params(&term.mf_type, &term.params) {
+                fv.add_term(Term::new(&term.label, mf));
+            }
+        }
+        let svg_str = var_svg!(fv);
+        svgs.push((var.name.clone(), svg_str));
+    }
+    svgs
+}
+
+/// Otimiza parâmetros de MF usando PSO (UC17).
+pub fn optimize_with_pso(
+    variables: &[VarInfo],
+    rules: &[RuleInfo],
+    target_inputs: &[HashMap<String, f64>],
+    target_outputs: &[HashMap<String, f64>],
+    population_size: usize,
+    max_iterations: usize,
+) -> Result<(Vec<f64>, f64, Vec<(f64, f64)>), String> {
+    if target_inputs.is_empty() || target_outputs.is_empty() {
+        return Err("Dados de referência vazios".into());
+    }
+    if target_inputs.len() != target_outputs.len() {
+        return Err("Quantidade de inputs e outputs difere".into());
+    }
+
+    let all_params: Vec<(f64, f64)> = variables.iter().flat_map(|v| {
+        v.terms.iter().flat_map(|t| match t.mf_type.as_str() {
+            "trimf" => vec![
+                (v.universe_min, v.universe_max),
+                (v.universe_min, v.universe_max),
+                (v.universe_min, v.universe_max),
+            ],
+            "trapmf" => vec![
+                (v.universe_min, v.universe_max),
+                (v.universe_min, v.universe_max),
+                (v.universe_min, v.universe_max),
+                (v.universe_min, v.universe_max),
+            ],
+            "gaussmf" => vec![
+                (v.universe_min, v.universe_max),
+                (0.1, (v.universe_max - v.universe_min) / 2.0),
+            ],
+            _ => vec![],
+        })
+    }).collect();
+
+    if all_params.is_empty() {
+        return Err("Nenhum parâmetro para otimizar".into());
+    }
+
+    let config = PsoConfig {
+        population_size,
+        max_iterations,
+        bounds: all_params,
+        seed: Some(42),
+        ..Default::default()
+    };
+
+    let mut optimizer = PsoOptimizer::new(config);
+
+    let fitness_fn = |params: &[f64]| {
+        let mut param_idx = 0;
+        let mut mse = 0.0_f64;
+
+        for (i, input_row) in target_inputs.iter().enumerate() {
+            let mut temp_vars = variables.to_vec();
+            for var in &mut temp_vars {
+                for term in &mut var.terms {
+                    let n_params = match term.mf_type.as_str() {
+                        "trimf" => 3,
+                        "trapmf" => 4,
+                        "gaussmf" => 2,
+                        _ => 0,
+                    };
+                    if n_params > 0 && param_idx + n_params <= params.len() {
+                        let mut new_params = params[param_idx..param_idx + n_params].to_vec();
+                        match term.mf_type.as_str() {
+                            "trimf" if new_params.len() >= 3 => {
+                                new_params.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
                             }
+                            "trapmf" if new_params.len() >= 4 => {
+                                new_params.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                            }
+                            _ => {}
                         }
-                    }
-                    None => {
-                        if variables.iter().any(|v| v.name.eq_ignore_ascii_case(var_name)) {
-                            alpha = 0.0;
-                        }
+                        term.params = new_params;
+                        param_idx += n_params;
                     }
                 }
             }
-            alpha *= rule.weight;
-            if alpha <= 0.0 || cons_term_label.is_empty() {
-                continue;
-            }
-            has_active_rule = true;
-            if let Some(cons_term) = cons_var.terms.iter().find(|t| t.label == cons_term_label) {
-                for (i, agg) in aggregated.iter_mut().enumerate().take(resolution) {
-                    let y = cons_var.universe_min + i as f64 * step;
-                    let mu_y = membership(y, &cons_term.mf_type, &cons_term.params);
-                    let clipped = mu_y.min(alpha);
-                    if clipped > *agg {
-                        *agg = clipped;
+            param_idx = 0;
+
+            let outputs = evaluate_mamdani(&temp_vars, rules, input_row);
+            if let Some(expected) = target_outputs.get(i) {
+                for (k, v) in &outputs {
+                    if let Some(ev) = expected.get(k) {
+                        let diff = v - ev;
+                        mse += diff * diff;
                     }
                 }
             }
         }
-        let result = if !has_active_rule {
-            (cons_var.universe_min + cons_var.universe_max) / 2.0
-        } else {
-            let mut num = 0.0_f64;
-            let mut den = 0.0_f64;
-            for (i, agg) in aggregated.iter().enumerate().take(resolution) {
-                let y = cons_var.universe_min + i as f64 * step;
-                num += y * agg;
-                den += agg;
-            }
-            if den.abs() < f64::EPSILON {
-                (cons_var.universe_min + cons_var.universe_max) / 2.0
-            } else {
-                num / den
-            }
-        };
-        outputs.insert(cons_var.name.clone(), result);
-    }
-    outputs
+        mse / target_inputs.len() as f64
+    };
+
+    let (best_pos, best_fit, _state) = optimizer.optimize(fitness_fn);
+    Ok((best_pos, best_fit, vec![]))
 }
 
 #[cfg(test)]

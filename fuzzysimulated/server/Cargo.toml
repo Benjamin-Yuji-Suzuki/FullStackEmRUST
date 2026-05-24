@@ -28,6 +28,8 @@ leptos_config = "0.8.2"
 dotenvy = "0.15"
 mime_guess = "2"
 
+logicfuzzy_academic = "0.2.1"
+
 [dev-dependencies]
 http.workspace = true
 serial_test.workspace = true
