@@ -2270,16 +2270,16 @@ fn Variaveis() -> impl IntoView {
                                      <div style="font-size:9px;color:var(--text3);margin-bottom:6px">
                                          {format!("{x_var} x {y_var}  {n}x{n} grid  z in [{min_z:.2}, {max_z:.2}]")}
                                      </div>
-                                     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(8px,1fr));gap:1px;max-height:300px;overflow-y:auto;border:1px solid var(--border);padding:4px;border-radius:4px">
-                                         {grid.iter().map(|p| {
-                                             let z = p["z"].as_f64().unwrap_or(0.0);
-                                             let intensity = ((z - min_z) / range) * 0.85 + 0.15;
-                                             let r = (255.0 * (1.0 - intensity)) as u8;
-                                             let g = (255.0 * (0.3 + 0.7 * intensity)) as u8;
-                                             let b = (255.0 * (0.1 + 0.2 * intensity)) as u8;
-                                             view! { <div style=format!("width:8px;height:8px;background:rgb({r},{g},{b});border-radius:1px") title=format!("{x_var}={:.1}, {y_var}={:.1}, z={:.2}", p["x"].as_f64().unwrap_or(0.0), p["y"].as_f64().unwrap_or(0.0), z)></div> }
-                                         }).collect_view()}
-                                     </div>
+<div style=format!("display:grid;grid-template-columns:repeat({n},8px);grid-template-rows:repeat({n},8px);gap:1px;max-height:400px;overflow-y:auto;border:1px solid var(--border);padding:4px;border-radius:4px;width:fit-content")>
+                                          {grid.iter().map(|p| {
+                                              let z = p["z"].as_f64().unwrap_or(0.0);
+                                              let intensity = ((z - min_z) / range) * 0.85 + 0.15;
+                                              let r = (255.0 * (1.0 - intensity)) as u8;
+                                              let g = (255.0 * (0.3 + 0.7 * intensity)) as u8;
+                                              let b = (255.0 * (0.1 + 0.2 * intensity)) as u8;
+                                              view! { <div style=format!("background:rgb({r},{g},{b});border-radius:1px") title=format!("{x_var}={:.1}, {y_var}={:.1}, z={:.2}", p["x"].as_f64().unwrap_or(0.0), p["y"].as_f64().unwrap_or(0.0), z)></div> }
+                                          }).collect_view()}
+                                      </div>
                                  }.into_any()
                              }
                          }
