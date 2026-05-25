@@ -212,7 +212,7 @@ async fn test_e2e_full_pipeline() {
     let opt_export: Value = hyper_body_to_json(resp).await;
     assert!(opt_export["optimal_point"].is_object());
 
-    // 20. PSO (UC17)
+    // 20. PSO manual (UC17)
     let resp = app.call(json_post(
         &format!("/api/systems/{sys_id}/optimize-pso"),
         &serde_json::json!({
@@ -222,12 +222,27 @@ async fn test_e2e_full_pipeline() {
             "max_iterations": 3,
         }),
     )).await;
-    assert_eq!(resp.status(), StatusCode::OK, "PSO deve funcionar");
+    assert_eq!(resp.status(), StatusCode::OK, "PSO manual deve funcionar");
     let pso: Value = hyper_body_to_json(resp).await;
-    assert!(pso["best_position"].is_array());
-    assert!(pso["best_fitness"].is_f64());
+    assert!(pso["best_position"].is_array(), "PSO deve ter best_position");
+    assert!(pso["best_fitness"].is_f64(), "PSO deve ter best_fitness");
+    assert!(pso["history"].as_array().map(|h| h.len() > 1).unwrap_or(false), "PSO deve ter histórico de convergência");
 
-    // 21. Audit — verificar que eventos foram criados
+    // 21. PSO auto from batch (UC17) — usa batch_results criados no passo 7
+    let resp = app.call(json_post(
+        &format!("/api/systems/{sys_id}/optimize-pso-auto"),
+        &serde_json::json!({
+            "population_size": 5,
+            "max_iterations": 3,
+        }),
+    )).await;
+    assert_eq!(resp.status(), StatusCode::OK, "PSO auto deve usar batch_results e funcionar");
+    let pso_auto: Value = hyper_body_to_json(resp).await;
+    assert!(pso_auto["best_position"].is_array(), "PSO auto deve ter best_position");
+    assert!(pso_auto["best_fitness"].is_f64(), "PSO auto deve ter best_fitness");
+    assert!(pso_auto["history"].as_array().map(|h| h.len() > 1).unwrap_or(false), "PSO auto deve ter histórico");
+
+    // 22. Audit — verificar que eventos foram criados
     let resp = app.call(json_get(&format!("/api/systems/{sys_id}/audit"))).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let audit: Value = hyper_body_to_json(resp).await;
