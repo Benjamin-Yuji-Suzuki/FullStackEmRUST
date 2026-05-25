@@ -1,7 +1,9 @@
-mod unit;
-mod integration_db;
-#[allow(non_snake_case)]
+#![allow(non_snake_case)]
+
 mod backend_API_REST_Axum;
+mod integration_api;
+mod integration_db;
+mod unit;
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
@@ -19,13 +21,15 @@ async fn get_test_pool() -> PgPool {
         .max_connections(10)
         .connect(&database_url)
         .await
-        .expect("Failed to connect to test DB. Set DATABASE_URL or create 'fuzzysimulated_test' DB");
+        .expect(
+            "Failed to connect to test DB. Set DATABASE_URL or create 'fuzzysimulated_test' DB",
+        );
     let _ = TEST_POOL.set(pool.clone());
     pool
 }
 
-pub(crate) async fn begin_test_tx(
-    pool: &PgPool,
-) -> sqlx::Transaction<'static, sqlx::Postgres> {
-    pool.begin().await.expect("Failed to begin test transaction")
+pub(crate) async fn begin_test_tx(pool: &PgPool) -> sqlx::Transaction<'static, sqlx::Postgres> {
+    pool.begin()
+        .await
+        .expect("Failed to begin test transaction")
 }
