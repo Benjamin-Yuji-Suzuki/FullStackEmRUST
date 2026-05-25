@@ -1,4 +1,5 @@
 #![recursion_limit = "256"]
+#![allow(non_snake_case)]
 pub mod server_fns;
 
 use leptos::prelude::*;
@@ -1229,7 +1230,7 @@ fn Variaveis() -> impl IntoView {
                                             <a class="icon-btn" style="font-size:9px;padding:2px" href={format!("/edit-var?id={}&s={}", vid, sid)}>
                                                 <i class="ti ti-edit"></i>
                                             </a>
-                                            <button class="icon-btn" style="font-size:9px;padding:2px;color:var(--coral)" 
+                                            <button class="icon-btn" style="font-size:9px;padding:2px;color:var(--coral)"
                                                 on:click=move |e| { e.stop_propagation(); let id = vid_del.clone(); spawn_async({ let v = vars_del.clone(); let s = sid_del.clone(); async move { delete_variable(&id).await; v.set(list_variables(&s).await); } }); }>
                                                 <i class="ti ti-trash"></i>
                                             </button>
@@ -1266,7 +1267,7 @@ fn Variaveis() -> impl IntoView {
                                                         <a class="icon-btn" style="font-size:7px;padding:1px 3px" href={format!("/edit-term?id={}&s={}", tid, sys_id)}>
                                                             <i class="ti ti-edit"></i>
                                                         </a>
-                                                        <button class="icon-btn" style="font-size:7px;padding:1px 3px;color:var(--coral)" 
+                                                        <button class="icon-btn" style="font-size:7px;padding:1px 3px;color:var(--coral)"
                                                             on:click=move |e| { e.stop_propagation(); let id = tid_del.clone(); spawn_async({ let v = vars_del.clone(); let s = sys_id_del.clone(); async move { delete_term(&id).await; v.set(list_variables(&s).await); } }); }>
                                                             <i class="ti ti-trash"></i>
                                                         </button>
@@ -1352,7 +1353,7 @@ fn Variaveis() -> impl IntoView {
                                           <a class="icon-btn" style="margin-left:8px" href={format!("/edit-rule?id={}&s={}", rid, rsid)}>
                                               <i class="ti ti-edit"></i>
                                           </a>
-                                          <button class="icon-btn" style="color:var(--coral)" 
+                                          <button class="icon-btn" style="color:var(--coral)"
                                               on:click=move |_| { let id = rid_del.clone(); spawn_async({ let r = rules_del.clone(); let s = rsid_del.clone(); async move { delete_rule(&id).await; r.set(serde_json::to_value(list_rules(&s).await).unwrap_or_default().as_array().cloned().unwrap_or_default()); } }); }>
                                               <i class="ti ti-trash"></i>
                                           </button>
@@ -1473,15 +1474,15 @@ fn Variaveis() -> impl IntoView {
                                   lower_aliases.iter().any(|alias| n == *alias || n.contains(alias.as_str()) || alias.contains(&n))
                               }).cloned()
                           };
-                          if let Some(t_name) = match_name(&["temperatura", "temp", "temperature", "t"]) {
-                              current.insert(t_name, w.temp);
-                          }
-                          if let Some(h_name) = match_name(&["umidade", "humidity", "humid", "umid", "h"]) {
-                              current.insert(h_name, w.humidity);
-                          }
-                          inp2.set(current);
-                          let matched_t = match_name(&["temperatura", "temp", "temperature", "t"]);
-                          let matched_h = match_name(&["umidade", "humidity", "humid", "umid", "h"]);
+                           if let Some(t_name) = match_name(&["temperatura", "temp", "temperature", "t"] as &[_]) {
+                               current.insert(t_name, w.temp);
+                           }
+                           if let Some(h_name) = match_name(&["umidade", "humidity", "humid", "umid", "h"] as &[_]) {
+                               current.insert(h_name, w.humidity);
+                           }
+                           inp2.set(current);
+                           let matched_t = match_name(&["temperatura", "temp", "temperature", "t"] as &[_]);
+                           let matched_h = match_name(&["umidade", "humidity", "humid", "umid", "h"] as &[_]);
                           let mut msg = format!("{}: {}°C, {}%", w.city, w.temp, w.humidity);
                           if matched_t.is_none() || matched_h.is_none() {
                               msg.push_str(" — Nenhuma variavel com nome temperatura/umidade encontrada, insira manualmente");
