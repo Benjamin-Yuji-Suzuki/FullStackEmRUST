@@ -595,6 +595,3 @@ test.describe.serial("UC20: Diagnostic report", () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────
-// UC24/25 — Optimization history & export
-// (UC24-UC25 ocultos do frontend — mantidos no backend)

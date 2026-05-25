@@ -30,8 +30,6 @@ async fn test_all_404_endpoints() {
         format!("/api/variables/{uid}"),
         format!("/api/terms/{uid}"),
         format!("/api/rules/{uid}"),
-        format!("/api/optimizations/{uid}"),
-        format!("/api/optimizations/{uid}/export"),
     ] {
         let req = json_get(path);
         let resp = app.call(req).await;

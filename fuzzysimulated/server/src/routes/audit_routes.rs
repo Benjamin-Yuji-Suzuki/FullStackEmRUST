@@ -23,7 +23,6 @@ fn entity_table(entity_type: &str) -> Result<&'static str, AppError> {
         "variable" => Ok("fuzzy_variables"),
         "term" => Ok("fuzzy_terms"),
         "rule" => Ok("fuzzy_rules"),
-        "optimization" => Ok("optimizations"),
         other => Err(AppError::Validation(format!("entity_type desconhecido: {other}"))),
     }
 }
@@ -285,11 +284,6 @@ mod tests {
     #[test]
     fn test_entity_table_rule() {
         assert_eq!(entity_table("rule").unwrap(), "fuzzy_rules");
-    }
-
-    #[test]
-    fn test_entity_table_optimization() {
-        assert_eq!(entity_table("optimization").unwrap(), "optimizations");
     }
 
     #[test]

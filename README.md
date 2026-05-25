@@ -67,20 +67,21 @@ FullStackEmRUST/
     │   │   └── state.rs       # AppState (PgPool + LeptosOptions)
     │   ├── migrations/
     │   │   ├── 001_schema.sql
-│   │   ├── 002_seed.sql
-│   │   ├── 003_optimization.sql
-│   │   ├── 004_audit_orphan.sql
-│   │   ├── 005_system_status.sql
-│   │   └── 006_scenarios.sql
-    │       └── tests/
-    │           ├── axum_api.rs    # 43 testes HTTP (serializados)
-    │           ├── api_test.rs    # 22 unit + 8 integration tests
-    │           ├── common/        # TestApp helper
-    │           ├── unit/          # 22 unit tests sem DB
-    │           └── integration/   # 8 integration tests com DB
+    │   │   ├── 002_seed.sql
+    │   │   ├── 004_audit_orphan.sql
+    │   │   ├── 005_system_status.sql
+    │   │   ├── 006_scenarios.sql
+    │   │   ├── 007_seed_risco.sql
+    │   │   ├── 008_seed_risco_cibernetico.sql
+    │   │   └── 009_reset_and_seed.sql
+    │   └── tests/
+    │       ├── all.rs           # 80 testes (16 unit + 64 HTTP)
+    │       ├── common/          # TestApp helper
+    │       ├── unit/            # 16 unit tests sem DB
+    │       └── integration/     # 6 integration tests com DB
     ├── frontend/              # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── end2end/               # 31 testes Playwright E2E
+    ├── end2end/               # 41 testes Playwright E2E
     ├── style/
     │   └── main.scss          # SCSS global (tema escuro Catppuccin)
     └── public/                # assets estáticos
@@ -101,12 +102,12 @@ FullStackEmRUST/
 | 7 | Análise | UC13, UC14, UC15 | ✅ Funcional | Varredura, matriz de regras ativadas, superfície de controle |
 | 8 | Auditoria | UC16 | ✅ Funcional | Timeline + undo real com snapshots + recuperação de sistemas deletados |
 | 9 | Estados do Sistema | — | ✅ Funcional | Ativo/Favorito/Concluído/Desativado com proteção e filtros |
-| 10 | Otimizador | UC17, UC21–UC25 | ✅ Funcional | Hessiana/gradiente, histórico, export resultado |
+| 10 | Otimizador | UC17 | ✅ Funcional | PSO para ajuste de parâmetros de MF |
 | 11 | Importar Sistema | UC11 | ✅ Funcional | Upload JSON com validação de estrutura |
 
 ---
 
-## Casos de Uso (25)
+## Casos de Uso (20)
 
 Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
 
@@ -132,11 +133,7 @@ Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
 | UC18 | Executar Inferência TSK | Usuário |
 | UC19 | Exportar Visualizações SVG | Usuário |
 | UC20 | Visualizar Relatório de Diagnóstico | Usuário |
-| UC21 | Definir Função Objetivo | Usuário |
-| UC22 | Calcular Ponto Ótimo | Usuário |
-| UC23 | Visualizar Justificativa Matemática | Usuário |
-| UC24 | Consultar Histórico de Otimizações | Usuário |
-| UC25 | Exportar Resultado de Otimização | Usuário |
+
 
 ---
 
@@ -184,13 +181,12 @@ cargo leptos watch
 ## Testes
 
 | Suite | Qtde | DB | Como rodar |
-|---|---|---|---|---|
-| Unit (inline) | 41 | ❌ | `cargo test -p server --lib` |
-| Unit (tests/) | 22 | ❌ | `cargo test -p server --test api_test -- unit::` |
-| HTTP Axum | 43 | ✅ | `cargo test -p server --test axum_api` (serial) |
-| Integration | 8 | ✅ | `cargo test -p server --test api_test -- --ignored` |
-| E2E Playwright | 31 | ✅ | `cd end2end && npx playwright test` |
-| **Total** | **145** | | |
+|---|---|---|---|---|---|
+| Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
+| Unit (tests/) | 16 | ❌ | `cargo test -p server --test all -- unit::` |
+| HTTP Axum | 64 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
+| Integration | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
+| **Total server** | **116** | | `DATABASE_URL=... cargo test -p server` |
 
 Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRUNCATE CASCADE`.
 
@@ -200,8 +196,8 @@ Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRU
 
 | Documento | Conteúdo |
 |---|---|
-| [USE_CASES.md](./USE_CASES.md) | Especificação dos 25 casos de uso |
-| [TEST_CASES.md](./TEST_CASES.md) | 55 casos de teste (145 testes automatizados) |
+| [USE_CASES.md](./USE_CASES.md) | Especificação dos 20 casos de uso |
+| [TEST_CASES.md](./TEST_CASES.md) | 44 casos de teste (116 testes server) |
 | [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Modelos Mamdani, TSK e Otimização PSO |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Banco de dados, integrações e fluxos |
 

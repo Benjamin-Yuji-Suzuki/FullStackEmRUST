@@ -4,7 +4,6 @@ pub mod rules;
 pub mod simulate;
 pub mod weather;
 pub mod audit_routes;
-pub mod optimize;
 pub mod scenarios;
 pub mod batch;
 
@@ -19,7 +18,6 @@ pub fn api_routes() -> Router<AppState> {
         .merge(simulate::routes())
         .merge(weather::routes())
         .merge(audit_routes::routes())
-        .merge(optimize::routes())
         .merge(scenarios::routes())
         .merge(batch::routes())
 }

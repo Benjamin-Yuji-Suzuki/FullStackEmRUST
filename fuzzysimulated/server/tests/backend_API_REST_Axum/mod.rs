@@ -135,7 +135,6 @@ pub mod simulate;
 pub mod batch;
 pub mod scenarios;
 pub mod sweep_surface;
-pub mod optimize;
 pub mod audit;
 pub mod compare_export;
 pub mod misc;

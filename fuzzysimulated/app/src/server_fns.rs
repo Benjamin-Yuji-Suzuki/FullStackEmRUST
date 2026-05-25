@@ -84,6 +84,15 @@ pub struct WeatherData {
     pub humidity: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioInfo {
+    pub id: String,
+    pub system_id: String,
+    pub name: String,
+    pub inputs: Value,
+    pub created_at: String,
+}
+
 // ── Helper ──
 
 cfg_if! {
@@ -339,6 +348,81 @@ pub async fn delete_system(id: &str) -> bool {
     api_delete(&format!("/api/systems/{id}")).await
 }
 
+pub async fn duplicate_system(id: &str, name: &str) -> Option<SystemInfo> {
+    let body = serde_json::json!({ "name": name });
+    api_post(&format!("/api/systems/{id}/duplicate"), &body).await
+}
+
+pub async fn import_system(data: &Value) -> Option<SystemInfo> {
+    api_post("/api/systems/import", data).await
+}
+
+// ── Scenarios (UC12) ──
+
+pub async fn list_scenarios(system_id: &str) -> Vec<ScenarioInfo> {
+    api_get(&format!("/api/systems/{system_id}/scenarios")).await.unwrap_or_default()
+}
+
+pub async fn create_scenario(system_id: &str, name: &str, inputs: &Value) -> Option<ScenarioInfo> {
+    let body = serde_json::json!({ "name": name, "inputs": inputs });
+    api_post(&format!("/api/systems/{system_id}/scenarios"), &body).await
+}
+
+pub async fn delete_scenario(id: &str) -> bool {
+    api_delete(&format!("/api/scenarios/{id}")).await
+}
+
+// ── Sweep (UC13) ──
+
+pub async fn run_sweep(
+    system_id: &str,
+    variable: &str,
+    start: f64,
+    end: f64,
+    step: f64,
+    fixed: &std::collections::HashMap<String, f64>,
+) -> Option<Value> {
+    let body = serde_json::json!({
+        "variable": variable, "start": start, "end": end,
+        "step": step, "fixed": fixed,
+    });
+    api_post(&format!("/api/systems/{system_id}/sweep"), &body).await
+}
+
+// ── Compare & Export (UC08/UC09) ──
+
+pub async fn compare_simulations(ids: &[String]) -> Option<Vec<Value>> {
+    let body = serde_json::json!({ "simulation_ids": ids });
+    api_post("/api/simulations/compare", &body).await
+}
+
+pub async fn export_simulation_report(id: &str) -> Option<Value> {
+    api_get(&format!("/api/simulations/{id}/report")).await
+}
+
+// ── Surface (UC15) ──
+
+pub async fn run_surface(
+    system_id: &str,
+    x_name: &str,
+    y_name: &str,
+    x_res: Option<usize>,
+    y_res: Option<usize>,
+) -> Option<Value> {
+    let body = serde_json::json!({
+        "x": x_name, "y": y_name,
+        "x_resolution": x_res, "y_resolution": y_res,
+    });
+    api_post(&format!("/api/systems/{system_id}/surface"), &body).await
+}
+
+// ── Rule Matrix (UC14) ──
+
+pub async fn get_rule_matrix(system_id: &str, inputs: &Value) -> Option<Value> {
+    let body = serde_json::json!({ "inputs": inputs });
+    api_post(&format!("/api/systems/{system_id}/rule-matrix"), &body).await
+}
+
 pub async fn update_variable(id: &str, name: &str, role: &str, universe_min: f64, universe_max: f64, resolution: i32) -> Option<VariableInfo> {
     let body = serde_json::json!({
         "name": name,
@@ -365,142 +449,6 @@ pub async fn update_rule(id: &str, rule_text: &str, weight: f64) -> Option<RuleI
         "weight": weight,
     });
     api_put(&format!("/api/rules/{id}"), &body).await
-}
-
-// ── Optimization ──
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OptimizationResult {
-    pub id: String,
-    pub optimal_x: f64,
-    pub optimal_y: f64,
-    pub optimal_value: f64,
-    pub critical_point_type: String,
-    pub explanation: String,
-    pub gradient_at_optimum: [f64; 2],
-    pub hessian_matrix: [[f64; 2]; 2],
-    pub coef_a: f64,
-    pub coef_b: f64,
-    pub coef_c: f64,
-    pub coef_d: f64,
-    pub coef_e: f64,
-    pub coef_f: f64,
-}
-
-// ── Scenarios (UC12) ──
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioInfo {
-    pub id: String,
-    pub system_id: String,
-    pub name: String,
-    pub inputs: Value,
-    pub created_at: String,
-}
-
-pub async fn list_scenarios(system_id: &str) -> Vec<ScenarioInfo> {
-    api_get(&format!("/api/systems/{system_id}/scenarios")).await.unwrap_or_default()
-}
-
-pub async fn create_scenario(system_id: &str, name: &str, inputs: &Value) -> Option<ScenarioInfo> {
-    let body = serde_json::json!({ "name": name, "inputs": inputs });
-    api_post(&format!("/api/systems/{system_id}/scenarios"), &body).await
-}
-
-pub async fn delete_scenario(id: &str) -> bool {
-    api_delete(&format!("/api/scenarios/{id}")).await
-}
-
-// ── Sweep (UC13) ──
-
-pub async fn run_sweep(
-    system_id: &str,
-    variable: &str,
-    start: f64, end: f64, step: f64,
-    fixed: &std::collections::HashMap<String, f64>,
-) -> Option<Value> {
-    let body = serde_json::json!({
-        "variable": variable, "start": start, "end": end, "step": step, "fixed": fixed
-    });
-    api_post(&format!("/api/systems/{system_id}/sweep"), &body).await
-}
-
-// ── Surface (UC15) ──
-
-pub async fn run_surface(
-    system_id: &str,
-    x: &str, y: &str,
-    x_res: Option<usize>, y_res: Option<usize>,
-) -> Option<Value> {
-    let body = serde_json::json!({
-        "x": x, "y": y, "x_resolution": x_res, "y_resolution": y_res
-    });
-    api_post(&format!("/api/systems/{system_id}/surface"), &body).await
-}
-
-// ── Rule Matrix (UC14) ──
-
-pub async fn get_rule_matrix(system_id: &str, inputs: &Value) -> Option<Value> {
-    api_post(&format!("/api/systems/{system_id}/rule-matrix"), &serde_json::json!({ "inputs": inputs })).await
-}
-
-// ── Compare (UC08) ──
-
-pub async fn compare_simulations(ids: &[String]) -> Option<Vec<SimulationInfo>> {
-    api_post("/api/simulations/compare", &serde_json::json!({ "simulation_ids": ids })).await
-}
-
-// ── Duplicate (UC10) ──
-
-pub async fn duplicate_system(id: &str, name: &str) -> Option<SystemInfo> {
-    let body = serde_json::json!({ "name": name });
-    api_post(&format!("/api/systems/{id}/duplicate"), &body).await
-}
-
-// ── Export (UC11) ──
-
-pub async fn export_system(id: &str) -> Option<Value> {
-    api_get(&format!("/api/systems/{id}/export")).await
-}
-
-pub async fn import_system(data: &Value) -> Option<SystemInfo> {
-    api_post("/api/systems/import", data).await
-}
-
-pub async fn export_simulation_report(id: &str) -> Option<Value> {
-    api_get(&format!("/api/simulations/{id}/report")).await
-}
-
-// ── Optimize ──
-
-pub async fn optimize_function(
-    system_id: Option<&str>,
-    coef_a: f64, coef_b: f64, coef_c: f64,
-    coef_d: f64, coef_e: f64, coef_f: f64,
-    x_min: f64, x_max: f64, y_min: f64, y_max: f64,
-) -> Option<OptimizationResult> {
-    let body = serde_json::json!({
-        "system_id": system_id,
-        "coef_a": coef_a,
-        "coef_b": coef_b,
-        "coef_c": coef_c,
-        "coef_d": coef_d,
-        "coef_e": coef_e,
-        "coef_f": coef_f,
-        "x_min": x_min,
-        "x_max": x_max,
-        "y_min": y_min,
-        "y_max": y_max,
-    });
-    api_post("/api/optimize", &body).await
-}
-
-pub async fn list_optimizations(system_id: &str) -> Vec<Value> {
-    api_get(&format!("/api/optimizations?system_id={system_id}")).await.unwrap_or_default()
-}
-
-pub async fn export_optimization(id: &str) -> Option<Value> {
-    api_get(&format!("/api/optimizations/{id}/export")).await
 }
 
 // ── TSK Inference (UC18) ──

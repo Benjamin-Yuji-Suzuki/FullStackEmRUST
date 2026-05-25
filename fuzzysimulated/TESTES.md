@@ -1,29 +1,31 @@
 # Testes — FuzzySimulated
 
 | Suite | Qtde | DB | Como rodar |
-|---|---|---|---|
-| Unit (inline) | 41 | ❌ | `cargo test -p server --lib` |
-| HTTP Axum | 66 | ✅ | `cargo test -p server --test axum_api` (serial) |
-| Integration | 8 | ✅ | `cargo test -p server --test api_test -- --ignored` |
-| **Total** | **115** | | |
+|---|---|---|---|---|
+| Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
+| Unit (tests/) | 16 | ❌ | `cargo test -p server --test all -- unit::` |
+| HTTP Axum | 64 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
+| Integration | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
+| **Total server** | **116** | | `DATABASE_URL=... cargo test -p server` |
 
 ## Comandos
 
-### Unitários (41 testes, sem DB)
+### Unitários (46 testes, sem DB: 30 inline + 16 tests/)
 ```bash
 cargo test -p server --lib
+cargo test -p server --test all -- unit::
 ```
 
-### HTTP Axum (66 testes, serializados, requer DB)
+### HTTP Axum (64 testes, serializados, requer DB)
 ```bash
-DATABASE_URL=postgres://ben:1234@localhost/fuzzysimulated_test cargo test -p server --test axum_api
+DATABASE_URL=postgres://ben:1234@localhost/fuzzysimulated_test cargo test -p server --test all -- --skip ignored
 ```
 
-Inclui `test_e2e_full_pipeline` — 22 operações: criar sistema → variáveis → termos → regras → simular Mamdani → diagnóstico → SVG → TSK → batch → rule-matrix → sweep → surface → cenários CRUD → comparar → duplicar → import/export → status → otimização quadrática → export → PSO → auditoria.
+Inclui `test_e2e_full_pipeline` — 20 operações: criar sistema → variáveis → termos → regras → simular Mamdani → diagnóstico → SVG → TSK → batch → rule-matrix → sweep → surface → cenários CRUD → comparar → duplicar → import/export → status → PSO → auditoria.
 
-### Integração (8 testes, requer DB)
+### Integração (6 testes, requer DB)
 ```bash
-DATABASE_URL=postgres://ben:1234@localhost/fuzzysimulated_test cargo test -p server --test api_test -- --ignored
+DATABASE_URL=postgres://ben:1234@localhost/fuzzysimulated_test cargo test -p server --test all -- --ignored
 ```
 
 ### Todos de uma vez

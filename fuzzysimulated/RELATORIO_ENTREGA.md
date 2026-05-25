@@ -37,7 +37,6 @@ server/src/lib.rs           → Re-exports públicos
 server/src/state.rs         → AppState (pool + LeptosOptions)
 server/src/errors.rs        → AppError enum, IntoResponse
 server/src/validation.rs    → Validação de nomes, MF shapes, defuzz
-server/src/math.rs          → Otimização quadrática (Hessiana, gradiente)
 server/src/engine.rs        → Motor de inferência fuzzy (Mamdani + TSK)
 server/src/audit.rs         → Schema de auditoria (JSONB snapshot)
 server/src/routes/
@@ -48,7 +47,6 @@ server/src/routes/
   ├── simulate.rs           → Mamdani, TSK, SVG, Diagnóstico, PSO, Sweep, Surface, RuleMatrix
   ├── scenarios.rs          → CRUD cenários
   ├── batch.rs              → Inferência em lote (JSON, CSV, Parquet)
-  ├── optimize.rs           → Otimização quadrática + histórico + export
   ├── audit_routes.rs       → Listagem + undo de eventos
   └── weather.rs            → Integração OpenWeatherMap
 ```
@@ -59,13 +57,12 @@ server/src/routes/
 migrations/
   001_schema.sql          → Tabelas base (systems, variables, terms, rules)
   002_seed.sql            → Seed Conforto Térmico (9 regras)
-  003_optimization.sql    → Tabela optimizations
   004_audit_orphan.sql    → Índices para orphan events
   005_system_status.sql   → Coluna status (ativo/favorito/concluido/desativado)
   006_scenarios.sql       → Tabela scenarios
   007_seed_risco.sql      → Seed Análise de Risco
   008_seed_risco_cibernetico.sql → Seed Risco Cibernético
-  009_reset_and_seed.sql  → Reset + 4 sistemas seed (42 regras, 43 cenários)
+   009_reset_and_seed.sql  → Reset + 4 sistemas seed — JSONB constante + dollar-quoting (42 regras, 43 cenários)
 ```
 
 ---
@@ -100,20 +97,19 @@ migrations/
 
 ## 4. Suíte de Testes
 
-### 4.1 Nível Unitário (41 + 22 = 63 testes)
+### 4.1 Nível Unitário (30 + 16 = 46 testes)
 
 | Módulo | Arquivo | Testes |
 |--------|---------|--------|
 | Engine | `server/src/engine.rs` (inline) | 14 |
-| Math | `server/src/math.rs` (inline) | 10 |
 | Errors | `server/src/errors.rs` (inline) | 4 |
 | Weather | `server/src/routes/weather.rs` (inline) | 4 |
 | Audit | `server/src/routes/audit_routes.rs` (inline) | 9 |
 | MF Validation | `tests/unit/mf_validation.rs` | 10 |
 | System Validation | `tests/unit/system_validation.rs` | 6 |
-| Optimization | `tests/unit/optimization.rs` | 6 |
 
-### 4.2 Nível Integração HTTP (70 testes)
+
+### 4.2 Nível Integração HTTP (64 testes)
 
 | Domínio | Arquivo `tests/backend_API_REST_Axum/` | Testes |
 |---------|--------------------------------------|--------|
@@ -127,28 +123,20 @@ migrations/
 | Sweep/Surface | `sweep_surface.rs` | 5 |
 | Batch | `batch.rs` | 5 |
 | Audit | `audit.rs` | 3 |
-| Optimize | `optimize.rs` | 4 |
+
 | Misc | `misc.rs` | 3 |
 | Pipeline | `pipeline.rs` | 1 |
-| **Integração DB** | `tests/integration_db/` | 8 (ignored) |
+| **Integração DB** | `tests/integration_db/` | 6 (ignored) |
 
-### 4.3 Nível End-to-End (40 testes)
-
-Arquivo: `end2end/tests/example.spec.ts` — Playwright + Chromium
-
-- 4 testes independentes (homepage, navegação, criação, simulador vazio)
-- 37 testes em 10 `describe.serial` blocks
-
-### 4.4 Totais
+### 4.3 Totais
 
 | Nível | Qtde |
 |-------|------|
-| Unitários (src inline) | 41 |
-| Unitários (tests/unit) | 22 |
-| Integração HTTP | 70 |
-| Integração DB (ignored) | 8 |
-| End-to-End | 40 |
-| **Total** | **181** |
+| Unitários (src inline) | 30 |
+| Unitários (tests/unit) | 16 |
+| Integração HTTP | 64 |
+| Integração DB (ignored) | 6 |
+| **Total server** | **116** |
 
 ---
 
@@ -157,11 +145,9 @@ Arquivo: `end2end/tests/example.spec.ts` — Playwright + Chromium
 | Módulo | Cobertura |
 |--------|-----------|
 | `engine.rs` (motor inferência) | **91.76%** |
-| `math.rs` (otimização quadrática) | **98.98%** |
 | `errors.rs` | **100%** |
 | `validation.rs` | **98.15%** |
 | `routes/rules.rs` | **90.06%** |
-| `routes/optimize.rs` | **86.89%** |
 | `routes/scenarios.rs` | **88.16%** |
 | `routes/simulate.rs` | **74.79%** |
 | `routes/variables.rs` | **79.60%** |
@@ -170,7 +156,7 @@ Arquivo: `end2end/tests/example.spec.ts` — Playwright + Chromium
 | `routes/batch.rs` | **44.11%** |
 | `routes/weather.rs` | **50.39%** |
 
-**Meta 70-80% atingida** para os módulos centrais de lógica de negócio (engine, math, validation, rules, optimize, scenarios). Rotas HTTP têm cobertura variável devido à dependência de parquet files reais (batch) e API key (weather).
+**Meta 70-80% atingida** para os módulos centrais de lógica de negócio (engine, validation, rules, scenarios). Rotas HTTP têm cobertura variável devido à dependência de parquet files reais (batch) e API key (weather).
 
 Relatório HTML: `coverage/html/html/index.html`
 
@@ -190,7 +176,7 @@ Relatório HTML: `coverage/html/html/index.html`
 
 ```
 tests/
-  axum_api.rs    → 1516 linhas, 43 testes
+  all.rs         → 80 testes (16 unit + 64 HTTP)
 ```
 
 ### 7.2 Para: Módulos por domínio
@@ -201,8 +187,8 @@ tests/
   unit/
     mf_validation.rs              → 10 testes
     system_validation.rs          → 6 testes
-    optimization.rs               → 6 testes
-  integration_db/                 → 8 testes (ignored, usam transação)
+
+  integration_db/                 → 6 testes (ignored, usam transação)
   backend_API_REST_Axum/
     common/mod.rs                 → Helpers compartilhados (TestApp, json_post, etc.)
     mod.rs                        → Re-exporta todos os módulos
@@ -216,7 +202,7 @@ tests/
     sweep_surface.rs              → 5 testes
     batch.rs                      → 5 testes
     audit.rs                      → 3 testes
-    optimize.rs                   → 4 testes
+
     misc.rs                       → 3 testes
     pipeline.rs                   → 1 teste
 ```
@@ -261,7 +247,6 @@ cargo leptos watch
 | **Leptos SSR+WASM** | Framework reativo com suporte nativo a SSR, sem JS |
 | **Axum + Tower** | Ecossistema async maduro, `ServiceExt::oneshot` para testes |
 | **JSONB snapshots p/ auditoria** | Undo completo de sistema + variáveis + termos + regras |
-| **PSO separado do Hessiano** | Disciplinas distintas: PSO (IA), Hessiano (Multivariável) |
 | **Testes com `#[serial]`** | Banco compartilhado entre testes paralelos |
 | **4 seeds distintos** | Cobertura de OpenWeather, dataset_ml.parquet, cibersegurança |
 | **Output-50 fallback** | Quando `compute()` retorna Err, avalia midpoint do universo |

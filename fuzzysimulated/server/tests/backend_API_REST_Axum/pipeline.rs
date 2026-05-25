@@ -182,7 +182,7 @@ async fn test_e2e_full_pipeline() {
     )).await;
     assert_eq!(resp.status(), StatusCode::CREATED, "Import deve funcionar");
 
-    // 17. Update system status (UC23)
+    // 17. Update system status
     let resp = app.call(json_put(
         &format!("/api/systems/{sys_id}/status"),
         &serde_json::json!({"status": "favorito"}),
@@ -191,28 +191,7 @@ async fn test_e2e_full_pipeline() {
     let updated: Value = hyper_body_to_json(resp).await;
     assert_eq!(updated["status"], "favorito");
 
-    // 18. Otimização função quadrática (UC21)
-    let resp = app.call(json_post(
-        "/api/optimize",
-        &serde_json::json!({
-            "coef_a": 1.0, "coef_b": 0.0, "coef_c": 1.0,
-            "coef_d": 0.0, "coef_e": 0.0, "coef_f": 0.0,
-            "x_min": -10.0, "x_max": 10.0, "y_min": -10.0, "y_max": 10.0,
-            "system_id": sys_id,
-        }),
-    )).await;
-    assert_eq!(resp.status(), StatusCode::OK, "Otimização quadrática deve funcionar");
-    let opt: Value = hyper_body_to_json(resp).await;
-    assert_eq!(opt["critical_point_type"], "mínimo");
-    let opt_id = opt["id"].as_str().unwrap().to_string();
-
-    // 19. Export otimização (UC25)
-    let resp = app.call(json_get(&format!("/api/optimizations/{opt_id}/export"))).await;
-    assert_eq!(resp.status(), StatusCode::OK);
-    let opt_export: Value = hyper_body_to_json(resp).await;
-    assert!(opt_export["optimal_point"].is_object());
-
-    // 20. PSO manual (UC17)
+    // 18. PSO manual (UC17)
     let resp = app.call(json_post(
         &format!("/api/systems/{sys_id}/optimize-pso"),
         &serde_json::json!({
@@ -228,7 +207,7 @@ async fn test_e2e_full_pipeline() {
     assert!(pso["best_fitness"].is_f64(), "PSO deve ter best_fitness");
     assert!(pso["history"].as_array().map(|h| h.len() > 1).unwrap_or(false), "PSO deve ter histórico de convergência");
 
-    // 21. PSO auto from batch (UC17) — usa batch_results criados no passo 7
+    // 19. PSO auto from batch (UC17) — usa batch_results criados no passo 7
     let resp = app.call(json_post(
         &format!("/api/systems/{sys_id}/optimize-pso-auto"),
         &serde_json::json!({
@@ -242,7 +221,7 @@ async fn test_e2e_full_pipeline() {
     assert!(pso_auto["best_fitness"].is_f64(), "PSO auto deve ter best_fitness");
     assert!(pso_auto["history"].as_array().map(|h| h.len() > 1).unwrap_or(false), "PSO auto deve ter histórico");
 
-    // 22. Audit — verificar que eventos foram criados
+    // 20. Audit — verificar que eventos foram criados
     let resp = app.call(json_get(&format!("/api/systems/{sys_id}/audit"))).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let audit: Value = hyper_body_to_json(resp).await;

@@ -94,20 +94,6 @@ CREATE TABLE scenarios (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Otimizações de função objetivo (UC21-UC25)
-CREATE TABLE optimizations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    system_id UUID REFERENCES fuzzy_systems(id) ON DELETE SET NULL,
-    coef_a FLOAT NOT NULL, coef_b FLOAT NOT NULL,
-    coef_c FLOAT NOT NULL, coef_d FLOAT NOT NULL,
-    coef_e FLOAT NOT NULL, coef_f FLOAT NOT NULL,
-    x_min FLOAT NOT NULL, x_max FLOAT NOT NULL,
-    y_min FLOAT NOT NULL, y_max FLOAT NOT NULL,
-    optimal_x FLOAT, optimal_y FLOAT, optimal_value FLOAT,
-    critical_point_type TEXT, explanation TEXT,
-    gradient_at_optimum JSONB, hessian_matrix JSONB,
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 ```
 
 ### Índices
@@ -122,8 +108,6 @@ CREATE INDEX idx_batch_system ON batch_results(system_id);
 CREATE INDEX idx_audit_system ON audit_events(system_id);
 CREATE INDEX idx_audit_created ON audit_events(created_at DESC);
 CREATE INDEX idx_scenarios_system ON scenarios(system_id);
-CREATE INDEX idx_optimizations_system ON optimizations(system_id);
-CREATE INDEX idx_optimizations_executed ON optimizations(executed_at DESC);
 ```
 
 ---
@@ -155,7 +139,7 @@ Na primeira execução, `server/migrations/002_seed.sql` insere automaticamente 
 ```
 FullStackEmRUST/
 ├── USE_CASES.md         # 25 casos de uso
-├── TEST_CASES.md        # 55 casos de teste (41 unit + 22 unit tests + 43 HTTP + 8 integração + 31 E2E)
+├── TEST_CASES.md # 44 casos de teste (30 inline + 16 unit + 64 HTTP + 6 integração)
 ├── FUZZY_MODEL.md       # Modelos Mamdani + TSK + PSO
 ├── ARCHITECTURE.md      # Este documento
 ├── README.md
@@ -172,35 +156,31 @@ FullStackEmRUST/
     │   ├── src/
     │   │   ├── main.rs        # entry point, router, static files
     │   │   ├── engine.rs      # Motor Mamdani (fuzzificação → agregação → defuzz centroide)
-    │   │   ├── math.rs        # Otimização quadrática (Hessiana, gradiente, Cramer)
     │   │   ├── validation.rs  # Validação de MF (trimf/trapmf/gaussmf) e sistema
     │   │   ├── audit.rs       # Helper de registro de auditoria
     │   │   ├── errors.rs      # AppError (422/404/500/502)
-    │   │   ├── models/        # FuzzySystem, Variable, Term, Rule, Simulation, Optimization
-    │   │   ├── routes/        # systems, variables, rules, simulate, weather, audit, optimize
+    │   │   ├── models/        # FuzzySystem, Variable, Term, Rule, Simulation
+    │   │   ├── routes/        # systems, variables, rules, simulate, weather, audit
     │   │   └── state.rs       # AppState { pool, leptos_options }
-    │   ├── migrations/
-    │   │   ├── 001_schema.sql      # Schema: 8 tabelas + índices
-    │   │   ├── 002_seed.sql        # Seed: sistema Conforto Térmico
-    │   │   ├── 003_optimization.sql # Tabela optimizations (UC21-UC25)
-    │   │   ├── 004_audit_orphan.sql # FK audit_events ON DELETE SET NULL
-    │   │   └── 005_system_status.sql # Coluna status (ativo/favorito/concluido/desativado)
-    │   └── tests/
-    │       ├── axum_api.rs         # 43 testes HTTP (serializados via serial_test)
-    │       ├── api_test.rs         # Entry point com helpers compartilhados
-    │       ├── common/mod.rs       # TestApp helper (pool + router)
-    │       ├── unit/               # 22 unit tests
-    │       │   ├── mf_validation.rs
-    │       │   ├── system_validation.rs
-    │       │   └── optimization.rs
-    │       └── integration/        # 8 integration tests (ignored, transaction rollback)
-    │           ├── systems.rs
-    │           ├── variables.rs
-    │           ├── simulate.rs
-    │           └── optimize.rs
+│   ├── migrations/
+│   │   ├── 001_schema.sql              # Schema: 8 tabelas + índices
+│   │   ├── 002_seed.sql                # Seed: sistema Conforto Térmico
+    │   │   ├── 004_audit_orphan.sql        # FK audit_events ON DELETE SET NULL
+│   │   ├── 005_system_status.sql       # Coluna status
+│   │   ├── 006_scenarios.sql           # Tabela scenarios
+│   │   ├── 007_seed_risco.sql          # Seed Análise de Risco
+│   │   ├── 008_seed_risco_cibernetico.sql # Seed Risco Cibernético
+│   │   └── 009_reset_and_seed.sql      # Reset + 4 sistemas seed (JSONB constante)
+│   └── tests/
+│       ├── all.rs               # 80 testes (16 unit + 64 HTTP)
+│       ├── common/mod.rs        # TestApp helper (pool + router)
+│       ├── unit/                # 16 unit tests
+│       │   ├── mf_validation.rs
+│       │   ├── system_validation.rs
+    │   └── integration/         # 6 integration tests (ignored, transaction rollback)
     ├── frontend/          # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── end2end/           # Playwright E2E (31 testes: CRUD, seed, validação, lifecycle, status, simulação)
+    ├── end2end/           # Playwright E2E (41 testes: CRUD, seed, validação, lifecycle, status, simulação)
     ├── style/main.scss    # Tema escuro Catppuccin
     ├── coverage/          # Relatórios HTML de cobertura
     └── public/            # assets estáticos
@@ -225,7 +205,7 @@ Navegador (WASM)
 │         ├── simulate.rs     → simulação (Mamdani real), sweep, surface, duplicate, import/export
 │         ├── weather.rs      → OpenWeather API
 │         ├── audit_routes.rs → auditoria
-│         └── optimize.rs     → otimização de função objetivo (UC21-UC25)
+
         │
         ├── PostgreSQL via SQLx
         │     └── migrations, queries compile-checked, JSONB

@@ -2,7 +2,6 @@
 pub mod audit;
 pub mod engine;
 pub mod errors;
-pub mod math;
 pub mod models;
 pub mod routes;
 pub mod state;
