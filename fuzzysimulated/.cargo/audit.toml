@@ -1,0 +1,4 @@
+[advisories]
+# RUSTSEC-2023-0071: Marvin Attack em rsa (transitivo via sqlx-mysql)
+# Aceito: usamos apenas PostgreSQL, sqlx-mysql nunca é compilado
+ignore = ["RUSTSEC-2023-0071"]
