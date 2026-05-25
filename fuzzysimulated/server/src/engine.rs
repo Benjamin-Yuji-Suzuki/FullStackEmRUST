@@ -456,6 +456,151 @@ pub fn optimize_with_pso(
     Ok((best_pos, best_fit, vec![]))
 }
 
+/// Explora a superfície de saída de um sistema fuzzy usando PSO.
+/// Encontra mínimo, máximo e classifica a superfície (mínimo/máximo/sela/monotônica).
+pub fn explore_output_surface(
+    variables: &[VarInfo],
+    rules: &[RuleInfo],
+    x_var: &str,
+    y_var: &str,
+    x_bounds: (f64, f64),
+    y_bounds: (f64, f64),
+) -> Result<serde_json::Value, String> {
+    let n_ant = variables.iter().filter(|v| v.role == "antecedent" || v.role == "input").count();
+    if n_ant < 2 {
+        return Err("São necessárias ao menos 2 variáveis antecedentes".into());
+    }
+
+    let pso_bounds = vec![
+        (x_bounds.0.min(x_bounds.1), x_bounds.0.max(x_bounds.1)),
+        (y_bounds.0.min(y_bounds.1), y_bounds.0.max(y_bounds.1)),
+    ];
+    let pop_size = 20;
+    let max_iter = 50;
+
+    // ── 1. PSO — encontrar MÍNIMO ──
+    let config_min = PsoConfig {
+        population_size: pop_size,
+        max_iterations: max_iter,
+        bounds: pso_bounds.clone(),
+        seed: Some(42),
+        ..Default::default()
+    };
+    let mut opt_min = PsoOptimizer::new(config_min);
+    let fitness_min = |params: &[f64]| {
+        let mut inputs = HashMap::new();
+        inputs.insert(x_var.to_string(), params[0]);
+        inputs.insert(y_var.to_string(), params[1]);
+        let outputs = evaluate_mamdani(variables, rules, &inputs);
+        outputs.values().copied().sum::<f64>() / outputs.len().max(1) as f64
+    };
+    let (min_pos, min_val, _) = opt_min.optimize(fitness_min);
+
+    // ── 2. PSO — encontrar MÁXIMO (nega fitness) ──
+    let config_max = PsoConfig {
+        population_size: pop_size,
+        max_iterations: max_iter,
+        bounds: pso_bounds.clone(),
+        seed: Some(43),
+        ..Default::default()
+    };
+    let mut opt_max = PsoOptimizer::new(config_max);
+    let fitness_max = |params: &[f64]| {
+        let mut inputs = HashMap::new();
+        inputs.insert(x_var.to_string(), params[0]);
+        inputs.insert(y_var.to_string(), params[1]);
+        let outputs = evaluate_mamdani(variables, rules, &inputs);
+        -(outputs.values().copied().sum::<f64>() / outputs.len().max(1) as f64)
+    };
+    let (max_pos, max_neg, _) = opt_max.optimize(fitness_max);
+    let max_val = -max_neg;
+
+    // ── 3. PSO exploratório (seed diferente) para detectar sela ──
+    let config_seed2 = PsoConfig {
+        population_size: pop_size,
+        max_iterations: max_iter / 2,
+        bounds: pso_bounds.clone(),
+        seed: Some(99),
+        ..Default::default()
+    };
+    let mut opt_seed2 = PsoOptimizer::new(config_seed2);
+    let fitness_seed2 = |params: &[f64]| {
+        let mut inputs = HashMap::new();
+        inputs.insert(x_var.to_string(), params[0]);
+        inputs.insert(y_var.to_string(), params[1]);
+        let outputs = evaluate_mamdani(variables, rules, &inputs);
+        outputs.values().copied().sum::<f64>() / outputs.len().max(1) as f64
+    };
+    let (alt_pos, alt_val, _) = opt_seed2.optimize(fitness_seed2);
+
+    // ── 4. Amostragem para rugosidade ──
+    let sample_res = 8usize;
+    let mut values = Vec::new();
+    for xi in 0..sample_res {
+        for yi in 0..sample_res {
+            let xv = x_bounds.0 + (xi as f64 / (sample_res - 1) as f64) * (x_bounds.1 - x_bounds.0);
+            let yv = y_bounds.0 + (yi as f64 / (sample_res - 1) as f64) * (y_bounds.1 - y_bounds.0);
+            let mut inputs = HashMap::new();
+            inputs.insert(x_var.to_string(), xv);
+            inputs.insert(y_var.to_string(), yv);
+            let outputs = evaluate_mamdani(variables, rules, &inputs);
+            let z = outputs.values().copied().sum::<f64>() / outputs.len().max(1) as f64;
+            values.push(z);
+        }
+    }
+    let roughness = if values.len() > 1 {
+        let diff_sum: f64 = values.windows(2).map(|w| (w[1] - w[0]).abs()).sum();
+        diff_sum / (values.len() - 1) as f64
+    } else {
+        0.0
+    };
+
+    // ── 5. Classificação ──
+    let range = max_val - min_val;
+    let spread = if range.abs() < 1e-9 { 0.0 } else { range };
+    let alt_diff = ((alt_pos[0] - min_pos[0]).powi(2) + (alt_pos[1] - min_pos[1]).powi(2)).sqrt();
+
+    let classification = if spread.abs() < 1e-3 {
+        "monotonica".to_string()
+    } else if alt_diff > (x_bounds.1 - x_bounds.0).abs() * 0.3
+        || alt_diff > (y_bounds.1 - y_bounds.0).abs() * 0.3
+    {
+        if (alt_val - min_val).abs() < spread * 0.1 || (alt_val - max_val).abs() < spread * 0.1 {
+            if min_val.abs() < max_val.abs() {
+                "minimo".to_string()
+            } else {
+                "maximo".to_string()
+            }
+        } else {
+            "sela".to_string()
+        }
+    } else if spread > 0.0 {
+        if min_val.abs() < max_val.abs() && (max_val - min_val).abs() > spread * 0.5 {
+            "minimo_maximo".to_string()
+        } else if min_val.abs() < max_val.abs() {
+            "minimo".to_string()
+        } else {
+            "maximo".to_string()
+        }
+    } else {
+        "indefinido".to_string()
+    };
+
+    Ok(serde_json::json!({
+        "x_var": x_var,
+        "y_var": y_var,
+        "min_point": { "x": min_pos[0], "y": min_pos[1], "z": min_val },
+        "max_point": { "x": max_pos[0], "y": max_pos[1], "z": max_val },
+        "classification": classification,
+        "roughness": (roughness * 1000.0).round() / 1000.0,
+        "spread": (spread * 1000.0).round() / 1000.0,
+        "min_val": (min_val * 1000.0).round() / 1000.0,
+        "max_val": (max_val * 1000.0).round() / 1000.0,
+        "alt_point": { "x": alt_pos[0], "y": alt_pos[1], "z": alt_val },
+        "converged": true,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

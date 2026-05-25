@@ -33,11 +33,7 @@ async fn test_only_one_consequent() {
     .execute(&mut *tx)
     .await;
 
-    assert!(
-        result.is_ok(),
-        "DB permite múltiplos consequentes — validação é da aplicação, mas erro obtido: {:?}",
-        result
-    );
+    result.expect("DB permite múltiplos consequentes — validação é da aplicação");
 }
 
 #[ignore]

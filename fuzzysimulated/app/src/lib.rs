@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 pub mod server_fns;
 
 use leptos::prelude::*;
@@ -32,9 +33,73 @@ cfg_if! {
         fn spawn_async(f: impl std::future::Future<Output = ()> + 'static) {
             wasm_bindgen_futures::spawn_local(f);
         }
+        fn handle_file_upload(
+            upload_loading: RwSignal<bool>,
+            upload_error: RwSignal<Option<String>>,
+            file_name: RwSignal<String>,
+            json_input: RwSignal<String>,
+            file_input: NodeRef<leptos::html::Input>,
+        ) -> impl Fn(leptos::ev::Event) {
+            move |_e| {
+                if let Some(input) = file_input.get() {
+                    use leptos::wasm_bindgen::prelude::*;
+                    use leptos::web_sys::FileReader;
+                    let input: JsValue = input.into();
+                    let files_val = js_sys::Reflect::get(&input, &"files".into()).ok();
+                    let file_list: Option<leptos::web_sys::FileList> = files_val.and_then(|v| v.dyn_into().ok());
+                    if let Some(file) = file_list.and_then(|fl| fl.item(0)) {
+                        upload_loading.set(true);
+                        upload_error.set(None);
+                        file_name.set(file.name());
+                        let reader = FileReader::new().unwrap_throw();
+                        let reader_c = reader.clone();
+                        let ul = upload_loading.clone();
+                        let ue = upload_error.clone();
+                        let ji = json_input.clone();
+                        let fn_sig = file_name.clone();
+                        let onload = Closure::<dyn Fn()>::new(move || {
+                            let data = reader_c.result().unwrap_throw();
+                            let b64 = match data.as_string() {
+                                Some(s) => s,
+                                None => { ue.set(Some("Erro ao ler".into())); ul.set(false); return; }
+                            };
+                            let clean = if b64.contains(",") {
+                                b64.split_once(',').map(|(_, v)| v.to_string()).unwrap_or(b64)
+                            } else {
+                                b64
+                            };
+                            let fn2 = fn_sig.get_untracked();
+                            spawn_async(async move {
+                                match parse_parquet(&clean, &fn2).await {
+                                    Ok(resp) => {
+                                        let json_str = serde_json::to_string_pretty(&resp.rows).unwrap_or_default();
+                                        ji.set(json_str);
+                                        ue.set(None);
+                                    }
+                                    Err(e) => ue.set(Some(e)),
+                                }
+                                ul.set(false);
+                            });
+                        });
+                    reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+                    onload.forget();
+                        reader.read_as_data_url(&file).unwrap_throw();
+                    }
+                }
+            }
+        }
     } else {
         fn spawn_async(f: impl std::future::Future<Output = ()> + Send + 'static) {
             leptos::task::spawn(f);
+        }
+        fn handle_file_upload(
+            _upload_loading: RwSignal<bool>,
+            _upload_error: RwSignal<Option<String>>,
+            _file_name: RwSignal<String>,
+            _json_input: RwSignal<String>,
+            _file_input: NodeRef<leptos::html::Input>,
+        ) -> impl Fn(leptos::ev::Event) {
+            |_e| {}
         }
     }
 }
@@ -383,7 +448,7 @@ fn Auditoria() -> impl IntoView {
                             <option value={s.id.clone()}>{s.name.clone()}</option>
                         }).collect_view()}
                     </select>
-                    <button class="btn-sm btn-outline"
+                    <button class="btn"
                         on:click=move |_| { show_orphans.update(|v| *v = !*v); orphan_trigger.update(|v| *v += 1); }>
                         <i class="ti ti-trash"></i> " Deletados"
                     </button>
@@ -421,10 +486,10 @@ fn Auditoria() -> impl IntoView {
                                                             if at.starts_with("undo") {
                                                                 view! { <span class="tag" style="margin-top:6px;opacity:0.6">"Restaurado"</span> }.into_any()
                                                             } else {
-                                                                view! { <button class="btn-sm btn-outline" style="margin-top:6px;border-color:var(--red);color:var(--red)"
-                                                                    on:click=move |_| { undo_event(eid.clone(), orphan_trigger); show_orphans.set(false); }>
-                                                                    <i class="ti ti-arrow-back-up"></i> " Restaurar Sistema"
-                                                                </button> }.into_any()
+                                                                view! { <button class="btn" style="margin-top:6px;border-color:var(--red);color:var(--red)"
+                                                                     on:click=move |_| { undo_event(eid.clone(), orphan_trigger); show_orphans.set(false); }>
+                                                                     <i class="ti ti-arrow-back-up"></i> " Restaurar Sistema"
+                                                                 </button> }.into_any()
                                                             }
                                                         }}
                                                     </div>
@@ -474,7 +539,7 @@ fn Auditoria() -> impl IntoView {
                                                         if at.starts_with("undo") {
                                                             view! { <span class="tag" style="margin-top:6px;opacity:0.6">"Desfeito"</span> }.into_any()
                                                         } else {
-                                                            view! { <button class="btn-sm btn-outline" style="margin-top:6px"
+                                                            view! { <button class="btn" style="margin-top:6px"
                                                                 on:click=move |_| undo_event(deid.clone(), trigger)>
                                                                 <i class="ti ti-arrow-back-up"></i> " Desfazer"
                                                             </button> }.into_any()
@@ -1417,8 +1482,13 @@ fn Variaveis() -> impl IntoView {
      let svg_result = RwSignal::new(None::<serde_json::Value>);
      let svg_loading = RwSignal::new(false);
 
-     let diag_result = RwSignal::new(None::<serde_json::Value>);
-     let diag_loading = RwSignal::new(false);
+      let diag_result = RwSignal::new(None::<serde_json::Value>);
+      let diag_loading = RwSignal::new(false);
+
+      let analyze_x_var = RwSignal::new(String::new());
+      let analyze_y_var = RwSignal::new(String::new());
+      let analyze_result = RwSignal::new(None::<serde_json::Value>);
+      let analyze_loading = RwSignal::new(false);
 
       view! {
          <Topbar breadcrumb="Simulador"/>
@@ -1426,14 +1496,16 @@ fn Variaveis() -> impl IntoView {
              <div class="section-header" style="margin-bottom:16px">
                  <div class="section-title">"Simulador"</div>
                  <div style="display:flex;gap:4px;font-size:11px">
-                     <button class:btn-primary=move || active_tab.get() == "mamdani" class="btn-sm"
-                         on:click=move |_| active_tab.set("mamdani".into())>"Mamdani"</button>
-                     <button class:btn-primary=move || active_tab.get() == "tsk" class="btn-sm"
-                         on:click=move |_| active_tab.set("tsk".into())>"TSK"</button>
-                     <button class:btn-primary=move || active_tab.get() == "svg" class="btn-sm"
-                         on:click=move |_| active_tab.set("svg".into())>"SVG"</button>
-                     <button class:btn-primary=move || active_tab.get() == "diagnostic" class="btn-sm"
-                         on:click=move |_| active_tab.set("diagnostic".into())>"Diagnóstico"</button>
+                      <button class="btn" class:btn-primary=move || active_tab.get() == "mamdani"
+                          on:click=move |_| active_tab.set("mamdani".into())>"Mamdani"</button>
+                      <button class="btn" class:btn-primary=move || active_tab.get() == "tsk"
+                          on:click=move |_| active_tab.set("tsk".into())>"TSK"</button>
+                      <button class="btn" class:btn-primary=move || active_tab.get() == "svg"
+                          on:click=move |_| active_tab.set("svg".into())>"SVG"</button>
+                      <button class="btn" class:btn-primary=move || active_tab.get() == "diagnostic"
+                          on:click=move |_| active_tab.set("diagnostic".into())>"Diagnóstico"</button>
+                      <button class="btn" class:btn-primary=move || active_tab.get() == "analyze"
+                          on:click=move |_| active_tab.set("analyze".into())>"Analisar"</button>
                  </div>
              </div>
 
@@ -1895,8 +1967,117 @@ fn Variaveis() -> impl IntoView {
                       }}
                   </div>
               </div>
-              }.into_any() } else { view! {}.into_any() }}
-          </div>
+               }.into_any() } else { view! {}.into_any() }}
+
+               // ─── Analyze Tab (PSO Surface Analyzer) ───
+               {move || if active_tab.get() == "analyze" { view! {
+               <div class="sim-layout">
+                   <div class="panel">
+                       <div class="panel-title">"Analisador de Superfície (PSO)"</div>
+                       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                           <select class="text-input" style="margin-bottom:0;flex:1"
+                               prop:value=move || analyze_x_var.get()
+                               on:change=move |e| analyze_x_var.set(event_target_value(&e))>
+                               <option value="">"-- Eixo X --"</option>
+                               {move || variables.get().iter().filter(|v| v["role"].as_str() == Some("antecedent")).map(|v| {
+                                   let name = v["name"].as_str().unwrap_or("").to_string();
+                                   view! { <option value={name.clone()}>{name.clone()}</option> }
+                               }).collect_view()}
+                           </select>
+                           <select class="text-input" style="margin-bottom:0;flex:1"
+                               prop:value=move || analyze_y_var.get()
+                               on:change=move |e| analyze_y_var.set(event_target_value(&e))>
+                               <option value="">"-- Eixo Y --"</option>
+                               {move || variables.get().iter().filter(|v| v["role"].as_str() == Some("antecedent")).map(|v| {
+                                   let name = v["name"].as_str().unwrap_or("").to_string();
+                                   view! { <option value={name.clone()}>{name.clone()}</option> }
+                               }).collect_view()}
+                           </select>
+                           <button class="btn btn-primary" style="font-size:10px;padding:4px 10px"
+                               on:click=move |_| {
+                                   let sid = selected_sys.get();
+                                   let xv = analyze_x_var.get();
+                                   let yv = analyze_y_var.get();
+                                   if sid.is_empty() || xv.is_empty() || yv.is_empty() { return; }
+                                   analyze_loading.set(true);
+                                   spawn_async({
+                                       let r = analyze_result.clone();
+                                       let l = analyze_loading.clone();
+                                       async move {
+                                           r.set(analyze_surface(&sid, &xv, &yv).await);
+                                           l.set(false);
+                                       }
+                                   });
+                               }>
+                               <i class="ti ti-robot"></i>"Analisar Superfície"
+                           </button>
+                       </div>
+                       {move || {
+                           if analyze_loading.get() {
+                               return view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Executando PSO..."</div> }.into_any();
+                           }
+                           match analyze_result.get() {
+                               None => view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Selecione variaveis e clique em Analisar."</div> }.into_any(),
+                               Some(res) => {
+                                   let classification = res["classification"].as_str().unwrap_or("indefinido").to_string();
+                                   let class_icon = match classification.as_str() {
+                                       "minimo" => "📉",
+                                       "maximo" => "📈",
+                                       "minimo_maximo" => "📊",
+                                       "sela" => "🔀",
+                                       "monotonica" => "➡️",
+                                       _ => "❓",
+                                   };
+                                   let class_label = match classification.as_str() {
+                                       "minimo" => "Mínimo",
+                                       "maximo" => "Máximo",
+                                       "minimo_maximo" => "Mínimo e Máximo",
+                                       "sela" => "Ponto de Sela",
+                                       "monotonica" => "Monotônica",
+                                       _ => "Indefinido",
+                                   };
+                                   let min_x = res["min_point"]["x"].as_f64().unwrap_or(0.0);
+                                   let min_y = res["min_point"]["y"].as_f64().unwrap_or(0.0);
+                                   let min_z = res["min_point"]["z"].as_f64().unwrap_or(0.0);
+                                   let max_x = res["max_point"]["x"].as_f64().unwrap_or(0.0);
+                                   let max_y = res["max_point"]["y"].as_f64().unwrap_or(0.0);
+                                   let max_z = res["max_point"]["z"].as_f64().unwrap_or(0.0);
+                                   view! {
+                                       <div class="panel" style="padding:10px;background:var(--surface1);margin-bottom:8px">
+                                           <div style="font-size:13px;font-weight:700;margin-bottom:4px">
+                                               {class_icon}" "{class_label}
+                                           </div>
+                                           <div style="font-size:10px;color:var(--text2)">
+                                               "Rugosidade: " {format!("{:.3}", res["roughness"].as_f64().unwrap_or(0.0))}
+                                               "  |  Amplitude: " {format!("{:.3}", res["spread"].as_f64().unwrap_or(0.0))}
+                                           </div>
+                                       </div>
+                                       <div style="display:flex;gap:12px;flex-wrap:wrap">
+                                           <div class="panel" style="flex:1;min-width:140px;padding:8px;background:var(--surface1)">
+                                               <div style="font-size:10px;color:var(--teal);font-weight:600">"⬇ Mínimo"</div>
+                                               <div style="font-size:9px;color:var(--text2)">
+                                                   {res["x_var"].as_str().unwrap_or("X")}" = "{format!("{:.2}", min_x)}<br/>
+                                                   {res["y_var"].as_str().unwrap_or("Y")}" = "{format!("{:.2}", min_y)}<br/>
+                                                   "saída = "{format!("{:.3}", min_z)}
+                                               </div>
+                                           </div>
+                                           <div class="panel" style="flex:1;min-width:140px;padding:8px;background:var(--surface1)">
+                                               <div style="font-size:10px;color:var(--coral);font-weight:600">"⬆ Máximo"</div>
+                                               <div style="font-size:9px;color:var(--text2)">
+                                                   {res["x_var"].as_str().unwrap_or("X")}" = "{format!("{:.2}", max_x)}<br/>
+                                                   {res["y_var"].as_str().unwrap_or("Y")}" = "{format!("{:.2}", max_y)}<br/>
+                                                   "saída = "{format!("{:.3}", max_z)}
+                                               </div>
+                                           </div>
+                                       </div>
+                                   }.into_any()
+                               }
+                           }
+                       }}
+                   </div>
+               </div>
+               }.into_any() } else { view! {}.into_any() }}
+           </div>
       }
   }
 
@@ -2044,9 +2225,13 @@ fn Variaveis() -> impl IntoView {
      let batch_result = RwSignal::new(None::<BatchResponse>);
      let batch_loading = RwSignal::new(false);
      let batch_error = RwSignal::new(None::<String>);
-     let history = RwSignal::new(Vec::<serde_json::Value>::new());
+    let history = RwSignal::new(Vec::<serde_json::Value>::new());
+    let upload_loading = RwSignal::new(false);
+    let upload_error = RwSignal::new(None::<String>);
+    let file_name = RwSignal::new(String::new());
+    let file_input: NodeRef<leptos::html::Input> = NodeRef::new();
 
-     spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
+    spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
 
      let load_history = {
          let ss = selected_sys.clone();
@@ -2111,21 +2296,33 @@ fn Variaveis() -> impl IntoView {
              <div style="display:flex;gap:20px;flex-wrap:wrap">
                  <div class="panel" style="flex:1;min-width:300px">
                      <div class="panel-title">"Processar Lote"</div>
-                      <div style="margin-bottom:8px">
-                          <label class="input-label">"Inputs (array JSON)"</label>
-                          <textarea class="text-input" style="min-height:150px;font-family:monospace;font-size:10px;width:100%;resize:vertical"
-                              prop:value=move || json_input.get()
-                              on:input=move |e| json_input.set(event_target_value(&e))
-                              placeholder=r#"[
+              <div style="margin-bottom:8px">
+                  <label class="input-label">"Inputs (array JSON)"</label>
+                  <textarea class="text-input" style="min-height:150px;font-family:monospace;font-size:10px;width:100%;resize:vertical"
+                      prop:value=move || json_input.get()
+                      on:input=move |e| json_input.set(event_target_value(&e))
+                      placeholder=r#"[
   {"temperatura": 10, "umidade": 20},
   {"temperatura": 24, "umidade": 55},
   {"temperatura": 35, "umidade": 85}
 ]"#></textarea>
-                          <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                              <span style="font-size:8px;color:var(--text3)">"Dica: use o script para converter CSV/Parquet em JSON:"</span>
-                              <code style="font-size:8px;background:var(--surface1);padding:2px 6px;border-radius:3px">"scripts/importar_dados.py dados.csv"</code>
-                          </div>
+                  <div style="margin-top:8px;padding:10px;border:1px dashed var(--border);border-radius:6px;text-align:center;font-size:11px;">
+                      <label for="parquet-upload" style="cursor:pointer;color:var(--accent);">
+                          <strong>"📂 Importar .parquet ou .csv"</strong>
+                          <input id="parquet-upload" type="file" accept=".parquet,.csv" style="display:none"
+                              node_ref=file_input
+                              on:change={handle_file_upload(upload_loading, upload_error, file_name, json_input, file_input)}/>
+                      </label>
+                      <div style="font-size:9px;color:var(--text3);margin-top:4px">
+                          {move || {
+                              let fn_v = file_name.get();
+                              if !fn_v.is_empty() { format!("Arquivo: {fn_v}") } else { "Clique para selecionar".into() }
+                          }}
                       </div>
+                      {move || upload_loading.get().then(|| view! { <div style="font-size:9px;color:var(--accent);margin-top:4px">"Processando..."</div> })}
+                      {move || upload_error.get().map(|e| view! { <div style="font-size:9px;color:var(--red);margin-top:4px">{e}</div> })}
+                  </div>
+              </div>
                      <button class="btn btn-primary"
                          on:click=move |_| run_batch()
                          disabled=move || batch_loading.get()>

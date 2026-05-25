@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 use axum::Router;
 use app::*;
 use leptos::prelude::*;

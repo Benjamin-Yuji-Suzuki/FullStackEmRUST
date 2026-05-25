@@ -12,7 +12,7 @@ test("homepage loads with FuzzySimulated title and system list", async ({ page }
 const PAGES = [
   { href: "/vars", title: "Variáveis & Termos (UC02)" },
   { href: "/rules", title: "Editor de Regras (UC03)" },
-  { href: "/sim", title: "Simulador Mamdani (UC04)" },
+  { href: "/sim", title: "Simulador" },
   { href: "/hist", title: "Histórico (UC06)" },
   { href: "/analysis", title: "Superficie & Matriz de Regras" },
   { href: "/audit", title: "Histórico de Alterações (UC16)" },
@@ -40,7 +40,7 @@ test("create system form loads with correct fields", async ({ page }) => {
 
 test("simulator page shows empty state when no system selected", async ({ page }) => {
   await page.goto("/sim");
-  await expect(page.locator(".section-title")).toContainText("Simulador Mamdani (UC04)");
+  await expect(page.locator(".section-title")).toContainText("Simulador");
   await expect(page.locator('option[value=""]')).toContainText("— Selecione —");
   await expect(page.locator("text=Nenhuma variável antecedente")).toBeVisible();
   await expect(page.locator("text=Execute uma simulação para ver o resultado.")).toBeVisible();
@@ -378,11 +378,11 @@ test.describe.serial("Full lifecycle (create → use → edit → audit → dele
     await page.goto("/analysis");
     await page.locator("select").first().selectOption({ label: SYS_NAME });
     await page.waitForTimeout(800);
-    await page.locator('button:has-text("Ativacoes")').click();
+    await page.locator('button:has-text("Calcular Ativacoes")').click();
     await page.waitForTimeout(1500);
-    // one rule in matrix
-    const rows = page.locator("table tbody tr");
-    await expect(rows).toHaveCount(1);
+    // rule activation grid shows colored divs (not table rows)
+    const gridCells = page.locator('.panel >> div[style*="grid-template-columns"]');
+    await expect(gridCells.first()).toBeVisible();
   });
 
   test("16: optimizer page calculates and shows result type", async ({ page }) => {
@@ -431,5 +431,317 @@ test.describe.serial("Full lifecycle (create → use → edit → audit → dele
 
   test("keeps seed system intact for manual inspection", async () => {
     // Conforto Térmico must still exist
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC05 — OpenWeather (buscar clima)
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC05: OpenWeather", () => {
+  test("weather fetch populates temperature and humidity inputs", async ({ page }) => {
+    await page.goto("/sim");
+    await page.locator("select").first().selectOption({ label: "Conforto Térmico" });
+    await page.waitForTimeout(800);
+    const cityInput = page.locator('input[placeholder="Cidade (ex: Belém)"]');
+    await cityInput.fill("Belem");
+    await page.locator('button:has-text("Buscar Clima")').click();
+    await page.waitForTimeout(3000);
+    // check that number inputs (temperatura/umidade) got populated with valid values
+    const numInputs = page.locator('input[type="number"].range-number');
+    const count = await numInputs.count();
+    if (count >= 2) {
+      const tempVal = await numInputs.nth(0).inputValue();
+      const humVal = await numInputs.nth(1).inputValue();
+      const tempNum = parseFloat(tempVal);
+      const humNum = parseFloat(humVal);
+      // temperatura should be in [-50, 60] (Earth range), umidade in [0, 100]
+      if (!isNaN(tempNum)) expect(Math.abs(tempNum)).toBeLessThanOrEqual(60);
+      if (!isNaN(humNum)) { expect(humNum).toBeGreaterThanOrEqual(0); expect(humNum).toBeLessThanOrEqual(100); }
+    }
+    // either a success or error message appears (API may fail in CI)
+    const msg = page.locator("div[style*='color:var(--teal)'], div[style*='color:var(--coral)']").first();
+    await expect(msg).toBeVisible({ timeout: 10000 });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC07 — Batch (inferência em lote)
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC07: Batch inference", () => {
+  test("batch with JSON inputs validates output values", async ({ page }) => {
+    await page.goto("/batch");
+    await page.locator("select").first().selectOption({ label: "Conforto Térmico" });
+    await page.waitForTimeout(600);
+    const ta = page.locator("textarea.text-input").first();
+    await ta.fill(JSON.stringify([
+      { temperatura: 10, umidade: 30 },
+      { temperatura: 24, umidade: 55 },
+      { temperatura: 35, umidade: 85 },
+    ]));
+    await page.locator('button:has-text("Executar Lote")').click();
+    await page.waitForTimeout(2500);
+    const resultadosPanel = page.locator('.panel:has(.panel-title:has-text("Resultados"))');
+    const resTable = resultadosPanel.locator("table");
+    await expect(resTable).toBeVisible({ timeout: 10000 });
+    const rows = resTable.locator("tbody tr");
+    await expect(rows).toHaveCount(3);
+    // validate each row's output value
+    for (let i = 0; i < 3; i++) {
+      const outputCell = rows.nth(i).locator("td").nth(2);
+      const valText = await outputCell.textContent();
+      const num = parseFloat(valText!);
+      expect(num).not.toBeNaN();
+      // conforto universe is [0, 10] — output must be within range
+      expect(num).toBeGreaterThanOrEqual(0);
+      expect(num).toBeLessThanOrEqual(10);
+    }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC11 — Importar Sistema
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC11: Import system", () => {
+  test("import page loads with correct title", async ({ page }) => {
+    await page.goto("/import");
+    await expect(page.locator(".section-title")).toContainText("Importar Sistema");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC13 — Varredura (Sweep)
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC13: Sweep (varredura)", () => {
+  test("sweep with Conforto Térmico validates y-values in [0,10]", async ({ page }) => {
+    await page.goto("/sim");
+    await page.locator("select").first().selectOption({ label: "Conforto Térmico" });
+    await page.waitForTimeout(800);
+    const sweepSelect = page.locator("text=Varredura").locator("..").locator("select.text-input").first();
+    await sweepSelect.selectOption({ index: 1 });
+    const numInputs = page.locator("text=Varredura").locator("..").locator('input[type="number"]');
+    await numInputs.nth(0).fill("0");
+    await numInputs.nth(1).fill("50");
+    await numInputs.nth(2).fill("10");
+    await page.locator('button:has-text("Varrer")').click();
+    await page.waitForTimeout(2000);
+    const table = page.locator("text=Varredura").locator("..").locator("table");
+    await expect(table).toBeVisible({ timeout: 10000 });
+    // validate y-values (conforto output) are in [0, 10]
+    const rows = table.locator("tbody tr");
+    const rowCount = await rows.count();
+    expect(rowCount).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < rowCount; i++) {
+      const yText = await rows.nth(i).locator("td").nth(1).textContent();
+      const yNum = parseFloat(yText!);
+      expect(yNum).not.toBeNaN();
+      expect(yNum).toBeGreaterThanOrEqual(0);
+      expect(yNum).toBeLessThanOrEqual(10);
+    }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC15 — Superfície de Controle
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC15: Surface (heatmap)", () => {
+  test("generate surface heatmap for Risco Cibernético Avançado", async ({ page }) => {
+    await page.goto("/analysis");
+    await page.locator("select").first().selectOption({ label: "Risco Cibernético Avançado" });
+    await page.waitForTimeout(800);
+    const surfacePanel = page.locator('.panel:has(.panel-title:has-text("Superficie de Controle"))');
+    const surfaceSelects = surfacePanel.locator("select.text-input");
+    await surfaceSelects.nth(0).selectOption({ index: 1 });
+    await surfaceSelects.nth(1).selectOption({ index: 2 });
+    const resInput = surfacePanel.locator('input[type="number"]');
+    await resInput.fill("10");
+    await page.locator('button:has-text("Gerar")').click();
+    await page.waitForTimeout(4000);
+    const gridContainer = surfacePanel.locator("div[style*='grid-template-columns']");
+    await expect(gridContainer).toBeVisible({ timeout: 15000 });
+    // info line: "x_var x y_var  NxN grid  z in [min, max]"
+    const infoLine = surfacePanel.locator("text=grid");
+    await expect(infoLine).toBeVisible();
+    const infoText = await infoLine.textContent();
+    // parse z range: "z in [0.00, 50.00]" or similar
+    const zMatch = infoText!.match(/z in \[([\d.]+),\s*([\d.]+)\]/);
+    if (zMatch) {
+      const zMin = parseFloat(zMatch[1]);
+      const zMax = parseFloat(zMatch[2]);
+      // nivel_risco universe is [0, 100]
+      expect(zMin).toBeGreaterThanOrEqual(0);
+      expect(zMax).toBeLessThanOrEqual(100);
+      expect(zMax).toBeGreaterThanOrEqual(zMin);
+    }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC17 — PSO Optimization
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC17: PSO Optimization", () => {
+  test("run PSO optimization for Conforto Térmico", async ({ page }) => {
+    await page.goto("/opt");
+    const sysSelect = page.locator('label:has-text("Sistema (opcional")').locator("..").locator("select.text-input");
+    await sysSelect.selectOption({ label: "Conforto Térmico" });
+    await page.waitForTimeout(400);
+    const psoPanel = page.locator('.panel:has(.panel-title:has-text("Otimização PSO de MF"))');
+    const textareas = psoPanel.locator("textarea.text-input");
+    await textareas.nth(0).fill(JSON.stringify([{ temperatura: 20, umidade: 50 }]));
+    await textareas.nth(1).fill(JSON.stringify([{ conforto: 5 }]));
+    const numberInputs = psoPanel.locator('input[type="number"]');
+    await numberInputs.nth(0).fill("5");
+    await numberInputs.nth(1).fill("3");
+    await psoPanel.locator('button:has-text("Executar PSO")').click();
+    await page.waitForTimeout(10000);
+    // result shows "Melhor Fitness: X.XXXXXX" — parse and validate
+    const fitnessSpan = psoPanel.locator('span[style*="color:var(--teal)"]');
+    await expect(fitnessSpan.first()).toBeVisible({ timeout: 30000 });
+    const fitText = await fitnessSpan.first().textContent();
+    const fitNum = parseFloat(fitText!);
+    expect(fitNum).not.toBeNaN();
+    // MSE fitness must be non-negative
+    expect(fitNum).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC18 — TSK Inference
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC18: TSK inference", () => {
+  test("run TSK simulation on Conforto Térmico", async ({ page }) => {
+    await page.goto("/sim");
+    await page.locator("select").first().selectOption({ label: "Conforto Térmico" });
+    await page.waitForTimeout(800);
+    await page.locator('button.btn:has-text("TSK")').click();
+    await page.waitForTimeout(300);
+    const numInputs = page.locator('input[type="number"].text-input');
+    await numInputs.nth(0).fill("25");
+    await numInputs.nth(1).fill("50");
+    const coeffTa = page.locator("textarea.text-input").first();
+    await coeffTa.fill(JSON.stringify({
+      "conforto_desconfortavel": [5, 0, 0],
+      "conforto_neutro": [5, 0, 0],
+      "conforto_confortavel": [5, 0, 0],
+    }));
+    await page.locator('button:has-text("Executar TSK")').click();
+    await page.waitForTimeout(2000);
+    await expect(page.locator("text=Resultado TSK").first()).toBeVisible();
+    // parse output value and validate range [0, 10]
+    const outputVal = page.locator(".output-val").first();
+    await expect(outputVal).toBeVisible();
+    const valText = await outputVal.textContent();
+    const num = parseFloat(valText!);
+    expect(num).not.toBeNaN();
+    expect(num).toBeGreaterThanOrEqual(0);
+    expect(num).toBeLessThanOrEqual(10);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC19 — SVG Export
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC19: SVG export", () => {
+  test("generate SVG for Conforto Térmico variables", async ({ page }) => {
+    await page.goto("/sim");
+    await page.locator("select").first().selectOption({ label: "Conforto Térmico" });
+    await page.waitForTimeout(800);
+    // click SVG tab
+    await page.locator('button.btn:has-text("SVG")').click();
+    await page.waitForTimeout(300);
+    // click Gerar SVG
+    await page.locator('button:has-text("Gerar SVG")').click();
+    await page.waitForTimeout(3000);
+    // SVG data rendered inside div[inner_html], the svg elements should exist in the DOM
+    // each variable gets a panel with its name as panel-title + an inline SVG
+    const svgPanels = page.locator('.panel:has(.panel-title:has-text("temperatura")), .panel:has(.panel-title:has-text("umidade")), .panel:has(.panel-title:has-text("conforto"))');
+    await expect(svgPanels.nth(0)).toBeVisible({ timeout: 10000 });
+    // check that at least 2 SVG panels are up (or that the tab is not showing the empty hint)
+    const hint = page.locator("text=Clique em \"Gerar SVG\"");
+    await expect(hint).not.toBeVisible();
+    // check svg element count
+    const allSvgs = page.locator("svg");
+    const count = await allSvgs.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC20 — Diagnóstico
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC20: Diagnostic report", () => {
+  test("generate diagnostic for Conforto Térmico simulation", async ({ page }) => {
+    await page.goto("/sim");
+    await page.locator("select").first().selectOption({ label: "Conforto Térmico" });
+    await page.waitForTimeout(800);
+    await page.locator('button.btn:has-text("Diagnóstico")').click();
+    await page.waitForTimeout(300);
+    const numInputs = page.locator('input[type="number"].text-input');
+    await numInputs.nth(0).fill("22");
+    await numInputs.nth(1).fill("60");
+    await page.locator('button:has-text("Gerar Diagnóstico")').click();
+    await page.waitForTimeout(2000);
+    // diagnostic panels must appear
+    await expect(page.locator("summary").filter({ hasText: "Fuzzificação" }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("summary").filter({ hasText: "Regras Disparadas" }).first()).toBeVisible();
+    await expect(page.locator("summary").filter({ hasText: "Saídas" }).first()).toBeVisible();
+    // first <details> is open by default — validate term values are in [0, 1]
+    // each term is rendered as "label: 0.xxxx" inside a div
+    const termLines = page.locator("div[style*='padding-left:12px']");
+    const termCount = await termLines.count();
+    expect(termCount).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < Math.min(termCount, 6); i++) {
+      const text = await termLines.nth(i).textContent();
+      const numMatch = text!.match(/: ([\d.]+)$/);
+      if (numMatch) {
+        const val = parseFloat(numMatch[1]);
+        expect(val).not.toBeNaN();
+        expect(val).toBeGreaterThanOrEqual(0);
+        expect(val).toBeLessThanOrEqual(1);
+      }
+    }
+    // expand Saídas details and validate output value
+    await page.locator("summary").filter({ hasText: "Saídas" }).first().click();
+    await page.waitForTimeout(300);
+    // scope to the diagnostic panel to avoid picking up mamdani .output-val elements
+    const diagPanel = page.locator('.panel:has(.panel-title:has-text("Diagnóstico"))');
+    const outputVal = diagPanel.locator(".output-val").first();
+    await expect(outputVal).toBeVisible({ timeout: 5000 });
+    const valText = await outputVal.textContent();
+    const num = parseFloat(valText!);
+    expect(num).not.toBeNaN();
+    // conforto universe is [0, 10]
+    expect(num).toBeGreaterThanOrEqual(0);
+    expect(num).toBeLessThanOrEqual(10);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// UC24/25 — Optimization history & export
+// ──────────────────────────────────────────────────────────────
+test.describe.serial("UC24-25: Optimization history & export", () => {
+  test("run quadratic optimization and export result as JSON", async ({ page }) => {
+    await page.goto("/opt");
+    // select a system so the optimization links to it (for UC24 history)
+    const sysSelect = page.locator('label:has-text("Sistema (opcional")').locator("..").locator("select.text-input");
+    await sysSelect.selectOption({ label: "Conforto Térmico" });
+    await page.waitForTimeout(400);
+    // use default f(x,y)=x²+y² — click calculate
+    await page.locator('button:has-text("Calcular Ponto Ótimo")').click();
+    await page.waitForTimeout(3000);
+    await expect(page.locator(".opt-result-card").first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("text=mínimo").first()).toBeVisible();
+    // export link in the result card (UC25)
+    const exportLink = page.locator('a.btn-outline:has-text("Exportar Resultado")').first();
+    await expect(exportLink).toBeVisible();
+    const href = await exportLink.getAttribute("href");
+    expect(href).toContain("/api/optimizations/");
+    expect(href).toContain("/export");
+    // fetch the JSON content
+    const response = await page.request.get(href!);
+    expect(response.ok()).toBeTruthy();
+    const json = await response.json();
+    expect(json.optimal_point).toBeDefined();
+    expect(json.optimal_point.x).toBeDefined();
+    expect(json.critical_point_type).toBeDefined();
   });
 });

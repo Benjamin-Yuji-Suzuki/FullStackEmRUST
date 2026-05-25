@@ -97,6 +97,18 @@ cfg_if! {
                 .send().await.ok()?
                 .json().await.ok()
         }
+        async fn api_post_text<B: serde::Serialize>(url: &str, body: &B) -> Result<String, String> {
+            let resp = gloo_net::http::Request::post(url)
+                .json(body).map_err(|e| format!("Erro ao serializar: {e}"))?
+                .send().await.map_err(|e| format!("Erro de conexao: {e}"))?;
+            let status = resp.status();
+            let text = resp.text().await.map_err(|e| format!("Erro ao ler resposta: {e}"))?;
+            if status >= 200 && status < 300 {
+                Ok(text)
+            } else {
+                Err(text)
+            }
+        }
         async fn api_put<T: serde::de::DeserializeOwned, B: serde::Serialize>(url: &str, body: &B) -> Option<T> {
             gloo_net::http::Request::put(url)
                 .json(body).ok()?
@@ -114,6 +126,18 @@ cfg_if! {
             reqwest::Client::new()
                 .post(url).json(body).send().await.ok()?
                 .json().await.ok()
+        }
+        async fn api_post_text<B: serde::Serialize>(url: &str, body: &B) -> Result<String, String> {
+            let resp = reqwest::Client::new()
+                .post(url).json(body).send().await
+                .map_err(|e| format!("Erro de conexao: {e}"))?;
+            let status = resp.status();
+            let text = resp.text().await.map_err(|e| format!("Erro ao ler resposta: {e}"))?;
+            if status.is_success() {
+                Ok(text)
+            } else {
+                Err(text)
+            }
         }
         async fn api_put<T: serde::de::DeserializeOwned, B: serde::Serialize>(url: &str, body: &B) -> Option<T> {
             reqwest::Client::new()
@@ -565,4 +589,28 @@ pub async fn list_batch_results(system_id: &str) -> Vec<Value> {
 
 pub async fn delete_batch_result(id: &str) -> bool {
     api_delete(&format!("/api/batch/{id}")).await
+}
+
+pub async fn analyze_surface(system_id: &str, x_var: &str, y_var: &str) -> Option<Value> {
+    let body = serde_json::json!({
+        "x_var": x_var,
+        "y_var": y_var,
+    });
+    api_post(&format!("/api/systems/{system_id}/analyze-surface"), &body).await
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParseFileResponse {
+    pub columns: Vec<String>,
+    pub rows: Vec<Value>,
+    pub total: usize,
+}
+
+pub async fn parse_parquet(data_b64: &str, filename: &str) -> Result<ParseFileResponse, String> {
+    let body = serde_json::json!({
+        "data": data_b64,
+        "filename": filename,
+    });
+    let text = api_post_text("/api/batch/parse-file", &body).await?;
+    serde_json::from_str(&text).map_err(|e| format!("JSON invalido: {e}"))
 }

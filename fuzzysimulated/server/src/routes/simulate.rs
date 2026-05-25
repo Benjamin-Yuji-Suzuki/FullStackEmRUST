@@ -29,7 +29,9 @@ pub fn routes() -> Router<AppState> {
         .route("/systems/{id}/svg", get(svg_export))
         .route("/systems/{id}/diagnostic", post(diagnostic))
         .route("/systems/{id}/optimize-pso", post(optimize_pso))
+        .route("/systems/{id}/optimize-pso-auto", post(optimize_pso_auto))
         .route("/systems/{id}/apply-pso-params", post(apply_pso_params))
+        .route("/systems/{id}/analyze-surface", post(analyze_surface))
 }
 
 #[derive(Deserialize)]
@@ -52,6 +54,12 @@ pub struct SurfaceRequest {
     pub y: String,
     pub x_resolution: Option<usize>,
     pub y_resolution: Option<usize>,
+}
+
+#[derive(Deserialize)]
+pub struct AnalyzeSurfaceRequest {
+    pub x_var: String,
+    pub y_var: String,
 }
 
 async fn simulate(
@@ -503,7 +511,7 @@ async fn diagnostic(
 
     let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
     let diag = engine::generate_diagnostic(&var_infos, &rule_infos, &req.inputs)
-        .map_err(|e| AppError::Validation(e))?;
+        .map_err(AppError::Validation)?;
 
     Ok(Json(diag))
 }
@@ -529,13 +537,123 @@ async fn optimize_pso(
         &var_infos, &rule_infos,
         &req.target_inputs, &req.target_outputs,
         pop, iters,
-    ).map_err(|e| AppError::Validation(e))?;
+    ).map_err(AppError::Validation)?;
 
     Ok(Json(json!({
         "system_id": system_id,
         "best_position": best_pos,
         "best_fitness": best_fit,
     })))
+}
+
+#[derive(Deserialize)]
+pub struct OptimizePsoAutoRequest {
+    pub population_size: Option<usize>,
+    pub max_iterations: Option<usize>,
+}
+
+/// PSO automático: lê batch_results do DB e otimiza MF params sem o usuário precisar
+/// especificar função objetivo ou domínio.
+async fn optimize_pso_auto(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+    Json(req): Json<OptimizePsoAutoRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let _system = sqlx::query_as::<_, FuzzySystem>(
+        "SELECT * FROM fuzzy_systems WHERE id = $1"
+    )
+    .bind(system_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Sistema não encontrado".into()))?;
+
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+
+    let antecedents: Vec<&str> = var_infos.iter()
+        .filter(|v| v.role == "antecedent")
+        .map(|v| v.name.as_str())
+        .collect();
+    let consequents: Vec<&str> = var_infos.iter()
+        .filter(|v| v.role == "consequent")
+        .map(|v| v.name.as_str())
+        .collect();
+
+    if consequents.is_empty() {
+        return Err(AppError::Validation("Sistema não tem variável consequente".into()));
+    }
+
+    let batch_rows = sqlx::query_as::<_, crate::models::BatchResult>(
+        "SELECT * FROM batch_results WHERE system_id = $1 ORDER BY row_index"
+    )
+    .bind(system_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    if batch_rows.is_empty() {
+        return Err(AppError::Validation(
+            "Nenhum resultado batch encontrado. Execute o batch primeiro.".into()
+        ));
+    }
+
+    let mut target_inputs: Vec<std::collections::HashMap<String, f64>> = Vec::new();
+    let mut target_outputs: Vec<std::collections::HashMap<String, f64>> = Vec::new();
+
+    for row in &batch_rows {
+        let input_map = row_to_f64_filtered(&row.inputs, &antecedents);
+        if input_map.is_empty() { continue; }
+        let mut out_map = std::collections::HashMap::new();
+        for cons in &consequents {
+            out_map.insert(cons.to_string(), row.output);
+        }
+        target_inputs.push(input_map);
+        target_outputs.push(out_map);
+    }
+
+    if target_inputs.is_empty() {
+        return Err(AppError::Validation(
+            "Nenhum batch result com inputs válidos para este sistema.".into()
+        ));
+    }
+
+    let pop = req.population_size.unwrap_or(30);
+    let iters = req.max_iterations.unwrap_or(100);
+
+    let (best_pos, best_fit, _history) = engine::optimize_with_pso(
+        &var_infos, &rule_infos,
+        &target_inputs, &target_outputs,
+        pop, iters,
+    ).map_err(AppError::Validation)?;
+
+    Ok(Json(json!({
+        "system_id": system_id,
+        "best_position": best_pos,
+        "best_fitness": best_fit,
+        "trained_on": target_inputs.len(),
+        "population_size": pop,
+        "max_iterations": iters,
+    })))
+}
+
+fn row_to_f64_filtered(
+    row: &serde_json::Value,
+    allowed_keys: &[&str],
+) -> std::collections::HashMap<String, f64> {
+    let mut result = std::collections::HashMap::new();
+    if let Some(obj) = row.as_object() {
+        for key in allowed_keys {
+            if let Some(val) = obj.get(*key) {
+                let num = match val {
+                    serde_json::Value::Number(n) => n.as_f64(),
+                    serde_json::Value::String(s) => s.parse::<f64>().ok(),
+                    _ => None,
+                };
+                if let Some(n) = num {
+                    result.insert(key.to_string(), n);
+                }
+            }
+        }
+    }
+    result
 }
 
 #[derive(Deserialize)]
@@ -748,4 +866,28 @@ async fn surface(
     }
 
     Ok(Json(json!({ "grid": grid, "x_var": x_name, "y_var": y_name })))
+}
+
+/// PSO Surface Analyzer — explora superfície de saída com PSO e classifica (min/max/sela)
+async fn analyze_surface(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+    Json(req): Json<AnalyzeSurfaceRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+
+    let x_range = var_infos.iter().find(|v| v.name == req.x_var)
+        .map(|v| (v.universe_min, v.universe_max))
+        .ok_or_else(|| AppError::Validation(format!("Variável '{}' não encontrada", req.x_var)))?;
+    let y_range = var_infos.iter().find(|v| v.name == req.y_var)
+        .map(|v| (v.universe_min, v.universe_max))
+        .ok_or_else(|| AppError::Validation(format!("Variável '{}' não encontrada", req.y_var)))?;
+
+    let result = engine::explore_output_surface(
+        &var_infos, &rule_infos,
+        &req.x_var, &req.y_var,
+        x_range, y_range,
+    ).map_err(AppError::Validation)?;
+
+    Ok(Json(result))
 }

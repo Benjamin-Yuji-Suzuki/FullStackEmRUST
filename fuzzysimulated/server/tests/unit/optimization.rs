@@ -13,9 +13,8 @@ fn make_input(
 
 #[test]
 fn test_optimize_paraboloid_minimo() {
-    let result = solve_quadratic_optimization(&make_input(1.0, 0.0, 1.0, 0.0, 0.0, 0.0, -10.0, 10.0, -10.0, 10.0));
-    assert!(result.is_ok());
-    let r = result.unwrap();
+    let r = solve_quadratic_optimization(&make_input(1.0, 0.0, 1.0, 0.0, 0.0, 0.0, -10.0, 10.0, -10.0, 10.0))
+        .expect("parabolóide x²+y² deve ter mínimo em (0,0)");
     assert!((r.optimal_x - 0.0).abs() < 1e-6);
     assert!((r.optimal_y - 0.0).abs() < 1e-6);
     assert!((r.optimal_value - 0.0).abs() < 1e-6);
@@ -24,9 +23,8 @@ fn test_optimize_paraboloid_minimo() {
 
 #[test]
 fn test_optimize_paraboloid_maximo() {
-    let result = solve_quadratic_optimization(&make_input(-1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -10.0, 10.0, -10.0, 10.0));
-    assert!(result.is_ok());
-    let r = result.unwrap();
+    let r = solve_quadratic_optimization(&make_input(-1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -10.0, 10.0, -10.0, 10.0))
+        .expect("parabolóide -x²-y² deve ter máximo em (0,0)");
     assert!((r.optimal_x - 0.0).abs() < 1e-6);
     assert!((r.optimal_y - 0.0).abs() < 1e-6);
     assert_eq!(r.critical_point_type, "máximo");
@@ -34,9 +32,8 @@ fn test_optimize_paraboloid_maximo() {
 
 #[test]
 fn test_optimize_sela() {
-    let result = solve_quadratic_optimization(&make_input(1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -10.0, 10.0, -10.0, 10.0));
-    assert!(result.is_ok());
-    let r = result.unwrap();
+    let r = solve_quadratic_optimization(&make_input(1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -10.0, 10.0, -10.0, 10.0))
+        .expect("sela x²-y² deve ser calculada");
     assert!((r.optimal_x - 0.0).abs() < 1e-6);
     assert!((r.optimal_y - 0.0).abs() < 1e-6);
     assert_eq!(r.critical_point_type, "sela");
@@ -56,9 +53,8 @@ fn test_optimize_singular_system() {
 
 #[test]
 fn test_optimize_gradient_at_optimum() {
-    let result = solve_quadratic_optimization(&make_input(2.0, 3.0, 4.0, 5.0, 6.0, 7.0, -10.0, 10.0, -10.0, 10.0));
-    assert!(result.is_ok());
-    let r = result.unwrap();
+    let r = solve_quadratic_optimization(&make_input(2.0, 3.0, 4.0, 5.0, 6.0, 7.0, -10.0, 10.0, -10.0, 10.0))
+        .expect("2x²+3xy+4y²+5x+6y+7 deve ter mínimo analítico");
     let x_expected = -22.0 / 23.0;
     let y_expected = -9.0 / 23.0;
     assert!((r.optimal_x - x_expected).abs() < 1e-6, "x* = {:.6}, esperado {:.6}", r.optimal_x, x_expected);

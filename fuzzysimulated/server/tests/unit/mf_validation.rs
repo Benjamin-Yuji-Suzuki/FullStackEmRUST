@@ -2,16 +2,13 @@ use server::validation::{validate_trimf, validate_trapmf, validate_gaussmf};
 
 #[test]
 fn test_validate_trimf_ok() {
-    let result = validate_trimf(&[0.0, 10.0, 22.0]);
-    assert!(result.is_ok(), "Esperava Ok mas obteve: {:?}", result);
+    validate_trimf(&[0.0, 10.0, 22.0]).expect("trimf [0,10,22] deve ser Ok");
 }
 
 #[test]
 fn test_validate_trimf_shoulder() {
-    let result = validate_trimf(&[0.0, 0.0, 25.0]);
-    assert!(result.is_ok(), "Esperava Ok para open left mas obteve: {:?}", result);
-    let result = validate_trimf(&[25.0, 50.0, 50.0]);
-    assert!(result.is_ok(), "Esperava Ok para open right mas obteve: {:?}", result);
+    validate_trimf(&[0.0, 0.0, 25.0]).expect("shoulder esquerdo deve ser Ok");
+    validate_trimf(&[25.0, 50.0, 50.0]).expect("shoulder direito deve ser Ok");
 }
 
 #[test]
@@ -30,10 +27,8 @@ fn test_validate_trimf_wrong_params() {
 
 #[test]
 fn test_validate_trapmf_ok() {
-    let result = validate_trapmf(&[0.0, 0.0, 20.0, 40.0]);
-    assert!(result.is_ok(), "Esperava Ok mas obteve: {:?}", result);
-    let result = validate_trapmf(&[60.0, 80.0, 100.0, 100.0]);
-    assert!(result.is_ok(), "Esperava Ok para shoulder mas obteve: {:?}", result);
+    validate_trapmf(&[0.0, 0.0, 20.0, 40.0]).expect("trapmf [0,0,20,40] deve ser Ok");
+    validate_trapmf(&[60.0, 80.0, 100.0, 100.0]).expect("shoulder trapmf deve ser Ok");
 }
 
 #[test]
@@ -44,8 +39,7 @@ fn test_validate_trapmf_incoherent() {
 
 #[test]
 fn test_validate_gaussmf_ok() {
-    let result = validate_gaussmf(&[50.0, 15.0]);
-    assert!(result.is_ok(), "Esperava Ok mas obteve: {:?}", result);
+    validate_gaussmf(&[50.0, 15.0]).expect("gaussmf [50,15] deve ser Ok");
 }
 
 #[test]

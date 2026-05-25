@@ -29,6 +29,10 @@ dotenvy = "0.15"
 mime_guess = "2"
 
 logicfuzzy_academic = "0.2.1"
+bytes = "1"
+base64 = "0.22"
+parquet = { version = "58", default-features = false, features = ["arrow", "snap", "zstd", "lz4"] }
+arrow = { version = "58", default-features = false, features = ["prettyprint"] }
 
 [dev-dependencies]
 http.workspace = true
