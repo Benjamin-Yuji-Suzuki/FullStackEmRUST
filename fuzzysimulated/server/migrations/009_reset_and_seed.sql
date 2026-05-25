@@ -7,7 +7,7 @@ DO $$
 DECLARE
     _res CONSTANT INT := 501;
 
-    _src CONSTANT JSONB := '[
+    _src CONSTANT JSONB := $jsonb$[
   {"n":"Risco Cibernético Avançado",
    "d":"Avaliação de risco cibernético considerando probabilidade de ataque, impacto financeiro e vulnerabilidade do sistema.",
    "v":[{"n":"probabilidade_ataque","r":"antecedent","mn":0,"mx":100,
@@ -133,8 +133,7 @@ DECLARE
         {"n":"Tráfego suspeito madrugada","i":{"pacotes_suspeitos":55,"conexoes_anomalas":60,"trafego_noturno":90}},
         {"n":"Exfiltração de dados lenta","i":{"pacotes_suspeitos":70,"conexoes_anomalas":80,"trafego_noturno":50}},
         {"n":"Rede interna monitorada sem ameaças","i":{"pacotes_suspeitos":8,"conexoes_anomalas":5,"trafego_noturno":12}},
-        {"n":"Horário comercial com anomalias leves","i":{"pacotes_suspeitos":30,"conexoes_anomalas":25,"trafego_noturno":15}}]}
-]'::jsonb;
+         {"n":"Horário comercial com anomalias leves","i":{"pacotes_suspeitos":30,"conexoes_anomalas":25,"trafego_noturno":15}}]}]$jsonb$::jsonb;
 
     _sys JSONB; _var JSONB; _term JSONB; _rule JSONB; _sc JSONB;
     _sys_uuid UUID; _var_uuid UUID;
