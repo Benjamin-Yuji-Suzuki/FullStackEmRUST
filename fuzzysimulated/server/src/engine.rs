@@ -356,7 +356,28 @@ pub fn generate_svg(variables: &[VarInfo]) -> Vec<(String, String)> {
     svgs
 }
 
+/// Miniatura de SplitMix64 PRNG — algoritmo idêntico ao usado no logicfuzzy_academic.
+struct PsoRng(u64);
+
+impl PsoRng {
+    fn new(seed: u64) -> Self { Self(seed) }
+
+    fn next_f64(&mut self) -> f64 {
+        let mut z = self.0.wrapping_add(0x9e3779b97f4a7c15);
+        self.0 = z;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+        let u = z ^ (z >> 31);
+        (u >> 11) as f64 * (1.0 / 9007199254740992.0)
+    }
+
+    fn range(&mut self, lo: f64, hi: f64) -> f64 {
+        lo + (hi - lo) * self.next_f64()
+    }
+}
+
 /// Otimiza parâmetros de MF usando PSO (UC17).
+/// Retorna (best_position, best_fitness, history[(iter, fitness)]).
 pub fn optimize_with_pso(
     variables: &[VarInfo],
     rules: &[RuleInfo],
@@ -396,16 +417,6 @@ pub fn optimize_with_pso(
     if all_params.is_empty() {
         return Err("Nenhum parâmetro para otimizar".into());
     }
-
-    let config = PsoConfig {
-        population_size,
-        max_iterations,
-        bounds: all_params,
-        seed: Some(42),
-        ..Default::default()
-    };
-
-    let mut optimizer = PsoOptimizer::new(config);
 
     let fitness_fn = |params: &[f64]| {
         let mut param_idx = 0;
@@ -452,8 +463,59 @@ pub fn optimize_with_pso(
         mse / target_inputs.len() as f64
     };
 
-    let (best_pos, best_fit, _state) = optimizer.optimize(fitness_fn);
-    Ok((best_pos, best_fit, vec![]))
+    // ── PSO loop manual com captura de histórico ──
+    let dim = all_params.len();
+    let mut rng = PsoRng::new(42);
+    let w = 0.729;
+    let c1 = 1.494;
+    let c2 = 1.494;
+
+    // Inicializa partículas
+    let mut pos: Vec<Vec<f64>> = (0..population_size)
+        .map(|_| all_params.iter().map(|&(lo, hi)| rng.range(lo, hi)).collect())
+        .collect();
+    let mut vel: Vec<Vec<f64>> = (0..population_size)
+        .map(|_| all_params.iter().map(|&(lo, hi)| rng.range(-(hi - lo) * 0.1, (hi - lo) * 0.1)).collect())
+        .collect();
+    let mut pbest_pos = pos.clone();
+    let mut pbest_fit: Vec<f64> = pos.iter().map(|p| fitness_fn(p)).collect();
+
+    // Melhor global inicial
+    let mut gbest_idx = 0;
+    for i in 1..population_size {
+        if pbest_fit[i] < pbest_fit[gbest_idx] { gbest_idx = i; }
+    }
+    let mut gbest_pos = pbest_pos[gbest_idx].clone();
+    let mut gbest_fit = pbest_fit[gbest_idx];
+
+    let mut history = vec![(0.0_f64, gbest_fit)];
+
+    for iter in 0..max_iterations {
+        for i in 0..population_size {
+            for j in 0..dim {
+                let r1 = rng.next_f64();
+                let r2 = rng.next_f64();
+                vel[i][j] = w * vel[i][j]
+                    + c1 * r1 * (pbest_pos[i][j] - pos[i][j])
+                    + c2 * r2 * (gbest_pos[j] - pos[i][j]);
+                pos[i][j] = (pos[i][j] + vel[i][j])
+                    .clamp(all_params[j].0, all_params[j].1);
+            }
+
+            let fit = fitness_fn(&pos[i]);
+            if fit < pbest_fit[i] {
+                pbest_fit[i] = fit;
+                pbest_pos[i] = pos[i].clone();
+            }
+            if fit < gbest_fit {
+                gbest_fit = fit;
+                gbest_pos = pos[i].clone();
+            }
+        }
+        history.push(((iter + 1) as f64, gbest_fit));
+    }
+
+    Ok((gbest_pos, gbest_fit, history))
 }
 
 /// Explora a superfície de saída de um sistema fuzzy usando PSO.
