@@ -9,6 +9,9 @@ DECLARE
     v_risco_id UUID;
     mf_trapmf CONSTANT TEXT := 'trapmf';
     mf_trimf  CONSTANT TEXT := 'trimf';
+    p_0_0_30_50    CONSTANT TEXT := '[0, 0, 30, 50]';
+    p_30_50_70     CONSTANT TEXT := '[30, 50, 70]';
+    p_50_70_100_100 CONSTANT TEXT := '[50, 70, 100, 100]';
 BEGIN
     IF EXISTS (SELECT 1 FROM fuzzy_systems WHERE name = 'Analise de Risco') THEN
         RAISE NOTICE 'Sistema Analise de Risco ja existe — ignorado';
@@ -33,18 +36,18 @@ BEGIN
     RETURNING id INTO v_risco_id;
 
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_prob_id, 'baixa',  mf_trapmf, '[0, 0, 30, 50]'),
-    (v_prob_id, 'media',  mf_trimf,  '[30, 50, 70]'),
-    (v_prob_id, 'alta',   mf_trapmf, '[50, 70, 100, 100]');
+    (v_prob_id, 'baixa',  mf_trapmf, p_0_0_30_50),
+    (v_prob_id, 'media',  mf_trimf,  p_30_50_70),
+    (v_prob_id, 'alta',   mf_trapmf, p_50_70_100_100);
 
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_imp_id, 'baixo',  mf_trapmf, '[0, 0, 30, 50]'),
-    (v_imp_id, 'medio',  mf_trimf,  '[30, 50, 70]'),
-    (v_imp_id, 'alto',   mf_trapmf, '[50, 70, 100, 100]');
+    (v_imp_id, 'baixo',  mf_trapmf, p_0_0_30_50),
+    (v_imp_id, 'medio',  mf_trimf,  p_30_50_70),
+    (v_imp_id, 'alto',   mf_trapmf, p_50_70_100_100);
 
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
     (v_risco_id, 'baixo',    mf_trapmf, '[0, 0, 25, 45]'),
-    (v_risco_id, 'moderado', mf_trimf,  '[30, 50, 70]'),
+    (v_risco_id, 'moderado', mf_trimf,  p_30_50_70),
     (v_risco_id, 'critico',  mf_trapmf, '[55, 75, 100, 100]');
 
     INSERT INTO fuzzy_rules (system_id, rule_text, weight, position) VALUES

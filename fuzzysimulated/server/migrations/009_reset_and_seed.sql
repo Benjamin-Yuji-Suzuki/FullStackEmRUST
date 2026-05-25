@@ -10,16 +10,19 @@ DO $$
 DECLARE
     v_sys UUID; v_pob UUID; v_imp UUID; v_vuln UUID; v_risk UUID;
     t CONSTANT TEXT := 'trapmf'; r CONSTANT TEXT := 'trimf';
+    ant CONSTANT TEXT := 'antecedent';
+    con CONSTANT TEXT := 'consequent';
+    res CONSTANT INT  := 501;
 BEGIN
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
     VALUES (uuid_generate_v4(), 'Risco Cibernético Avançado',
         'Avaliação de risco cibernético considerando probabilidade de ataque, impacto financeiro e vulnerabilidade do sistema.',
         'centroid') RETURNING id INTO v_sys;
 
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'probabilidade_ataque', 'antecedent', 0, 100, 501) RETURNING id INTO v_pob;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'impacto_financeiro',   'antecedent', 0, 100, 501) RETURNING id INTO v_imp;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'vulnerabilidade_sistema','antecedent', 0, 100, 501) RETURNING id INTO v_vuln;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'nivel_risco',          'consequent', 0, 100, 501) RETURNING id INTO v_risk;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'probabilidade_ataque',  ant, 0, 100, res) RETURNING id INTO v_pob;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'impacto_financeiro',    ant, 0, 100, res) RETURNING id INTO v_imp;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'vulnerabilidade_sistema', ant, 0, 100, res) RETURNING id INTO v_vuln;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'nivel_risco',           con, 0, 100, res) RETURNING id INTO v_risk;
 
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
     (v_pob, 'baixa', t, '[0,0,25,45]'), (v_pob, 'media', r, '[30,50,70]'), (v_pob, 'alta', t, '[55,75,100,100]');
@@ -54,15 +57,18 @@ DO $$
 DECLARE
     v_sys UUID; v_temp UUID; v_umid UUID; v_conf UUID;
     t CONSTANT TEXT := 'trapmf'; r CONSTANT TEXT := 'trimf';
+    ant CONSTANT TEXT := 'antecedent';
+    con CONSTANT TEXT := 'consequent';
+    res CONSTANT INT  := 501;
 BEGIN
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
     VALUES (uuid_generate_v4(), 'Conforto Térmico',
         'Avaliação de conforto térmico baseado em temperatura e umidade com dados da API OpenWeather. Utiliza cidade e dados meteorológicos reais.',
         'centroid') RETURNING id INTO v_sys;
 
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'temperatura', 'antecedent', 0, 50, 501) RETURNING id INTO v_temp;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'umidade',     'antecedent', 0, 100, 501) RETURNING id INTO v_umid;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'conforto',    'consequent', 0, 10, 501) RETURNING id INTO v_conf;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'temperatura', ant, 0, 50, res) RETURNING id INTO v_temp;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'umidade',     ant, 0, 100, res) RETURNING id INTO v_umid;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'conforto',    con, 0, 10, res) RETURNING id INTO v_conf;
 
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
     (v_temp, 'frio',       t, '[0,0,15,22]'),
@@ -99,16 +105,19 @@ DO $$
 DECLARE
     v_sys UUID; v_rec UUID; v_func UUID; v_grav UUID; v_imp UUID;
     t CONSTANT TEXT := 'trapmf'; r CONSTANT TEXT := 'trimf';
+    ant CONSTANT TEXT := 'antecedent';
+    con CONSTANT TEXT := 'consequent';
+    res CONSTANT INT  := 501;
 BEGIN
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
     VALUES (uuid_generate_v4(), 'Risco Cibernetico',
         'Classifica incidentes de segurança como ALTO ou BAIXO impacto financeiro usando colunas do dataset_ml.parquet (Prata -> Gold).',
         'centroid') RETURNING id INTO v_sys;
 
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'receita_anual_usd',  'antecedent', 0, 1000000000, 501) RETURNING id INTO v_rec;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'total_funcionarios', 'antecedent', 0, 500000, 501) RETURNING id INTO v_func;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'gravidade_ataque',   'antecedent', 0, 100, 501) RETURNING id INTO v_grav;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'impacto_financeiro', 'consequent', 0, 100, 501) RETURNING id INTO v_imp;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'receita_anual_usd',  ant, 0, 1000000000, res) RETURNING id INTO v_rec;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'total_funcionarios', ant, 0, 500000, res) RETURNING id INTO v_func;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'gravidade_ataque',   ant, 0, 100, res) RETURNING id INTO v_grav;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'impacto_financeiro', con, 0, 100, res) RETURNING id INTO v_imp;
 
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
     (v_rec, 'baixa', t, '[0,0,50000000,100000000]'),
@@ -150,16 +159,19 @@ DO $$
 DECLARE
     v_sys UUID; v_pac UUID; v_con UUID; v_traf UUID; v_ame UUID;
     t CONSTANT TEXT := 'trapmf'; r CONSTANT TEXT := 'trimf';
+    ant CONSTANT TEXT := 'antecedent';
+    con CONSTANT TEXT := 'consequent';
+    res CONSTANT INT  := 501;
 BEGIN
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
     VALUES (uuid_generate_v4(), 'Detecção de Intrusão',
         'Análise de tráfego de rede para detecção de intrusões baseada em pacotes suspeitos, conexões anômalas e tráfego noturno.',
         'centroid') RETURNING id INTO v_sys;
 
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'pacotes_suspeitos',  'antecedent', 0, 100, 501) RETURNING id INTO v_pac;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'conexoes_anomalas',  'antecedent', 0, 100, 501) RETURNING id INTO v_con;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'trafego_noturno',    'antecedent', 0, 100, 501) RETURNING id INTO v_traf;
-    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'nivel_ameaca',       'consequent', 0, 100, 501) RETURNING id INTO v_ame;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'pacotes_suspeitos',  ant, 0, 100, res) RETURNING id INTO v_pac;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'conexoes_anomalas',  ant, 0, 100, res) RETURNING id INTO v_con;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'trafego_noturno',    ant, 0, 100, res) RETURNING id INTO v_traf;
+    INSERT INTO fuzzy_variables VALUES (uuid_generate_v4(), v_sys, 'nivel_ameaca',       con, 0, 100, res) RETURNING id INTO v_ame;
 
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
     (v_pac, 'baixo',  t, '[0,0,25,45]'),

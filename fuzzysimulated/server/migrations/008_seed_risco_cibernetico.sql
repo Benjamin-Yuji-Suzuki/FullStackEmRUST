@@ -11,6 +11,9 @@ DECLARE
     v_impacto_id UUID;
     mf_trapmf CONSTANT TEXT := 'trapmf';
     mf_trimf  CONSTANT TEXT := 'trimf';
+    role_ant   CONSTANT TEXT := 'antecedent';
+    role_con   CONSTANT TEXT := 'consequent';
+    univ_res   CONSTANT INT  := 501;
 BEGIN
     IF EXISTS (SELECT 1 FROM fuzzy_systems WHERE name = 'Risco Cibernetico') THEN
         RAISE NOTICE 'Sistema Risco Cibernetico ja existe';
@@ -25,20 +28,20 @@ BEGIN
 
     -- Variaveis antecedentes (camada Prata)
     INSERT INTO fuzzy_variables (id, system_id, name, role, universe_min, universe_max, resolution)
-    VALUES (uuid_generate_v4(), v_sys_id, 'receita_anual_usd', 'antecedent', 0, 1000000000, 501)
+    VALUES (uuid_generate_v4(), v_sys_id, 'receita_anual_usd', role_ant, 0, 1000000000, univ_res)
     RETURNING id INTO v_receita_id;
 
     INSERT INTO fuzzy_variables (id, system_id, name, role, universe_min, universe_max, resolution)
-    VALUES (uuid_generate_v4(), v_sys_id, 'total_funcionarios', 'antecedent', 0, 500000, 501)
+    VALUES (uuid_generate_v4(), v_sys_id, 'total_funcionarios', role_ant, 0, 500000, univ_res)
     RETURNING id INTO v_func_id;
 
     INSERT INTO fuzzy_variables (id, system_id, name, role, universe_min, universe_max, resolution)
-    VALUES (uuid_generate_v4(), v_sys_id, 'gravidade_ataque', 'antecedent', 0, 100, 501)
+    VALUES (uuid_generate_v4(), v_sys_id, 'gravidade_ataque', role_ant, 0, 100, univ_res)
     RETURNING id INTO v_gravidade_id;
 
     -- Consequente
     INSERT INTO fuzzy_variables (id, system_id, name, role, universe_min, universe_max, resolution)
-    VALUES (uuid_generate_v4(), v_sys_id, 'impacto_financeiro', 'consequent', 0, 100, 501)
+    VALUES (uuid_generate_v4(), v_sys_id, 'impacto_financeiro', role_con, 0, 100, univ_res)
     RETURNING id INTO v_impacto_id;
 
     -- Termos: receita_anual_usd
