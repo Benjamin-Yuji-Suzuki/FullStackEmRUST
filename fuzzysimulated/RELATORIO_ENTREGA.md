@@ -70,13 +70,14 @@ migrations/
 
 ---
 
-## 3. 15 Casos de Uso + 8 Extras
+## 3. Casos de Uso Implementados
 
 | UC# | Nome | Status | Testes |
 |-----|------|--------|--------|
 | UC01 | Dashboard | ✅ | 4 E2E |
 | UC02 | Variáveis & Termos | ✅ | 12 API + E2E |
 | UC03 | Editor de Regras | ✅ | 5 API + E2E |
+| UC04 | Executar Inferência Mamdani | ✅ | 12 API + 1 E2E |
 | UC05 | OpenWeather | ✅ | 2 API + 1 E2E |
 | UC06 | Histórico | ✅ | 1 API + E2E |
 | UC07 | Batch | ✅ | 5 API + 1 E2E |
@@ -93,10 +94,7 @@ migrations/
 | UC18 | TSK | ✅ | 2 API + 1 E2E |
 | UC19 | SVG | ✅ | 2 API + 1 E2E |
 | UC20 | Diagnóstico | ✅ | 2 API + 1 E2E |
-| UC21 | Otimização Quadrática | ✅ | 2 API |
-| UC23 | Status do Sistema | ✅ | 1 API + E2E |
-| UC24 | Histórico Otimizações | ✅ | 1 API + 1 E2E |
-| UC25 | Export Otimização | ✅ | 1 API + 1 E2E |
+| — | Status do Sistema | ✅ | 1 API + E2E |
 
 ---
 
@@ -117,8 +115,8 @@ migrations/
 
 ### 4.2 Nível Integração HTTP (70 testes)
 
-| Domínio | Arquivo `tests/api/` | Testes |
-|---------|---------------------|--------|
+| Domínio | Arquivo `tests/backend_API_REST_Axum/` | Testes |
+|---------|--------------------------------------|--------|
 | Systems | `systems.rs` | 8 |
 | Variables | `variables.rs` | 7 |
 | Terms | `terms.rs` | 5 |
@@ -132,9 +130,9 @@ migrations/
 | Optimize | `optimize.rs` | 4 |
 | Misc | `misc.rs` | 3 |
 | Pipeline | `pipeline.rs` | 1 |
-| **Integração DB** | `tests/integration/` | 8 (ignored) |
+| **Integração DB** | `tests/integration_db/` | 8 (ignored) |
 
-### 4.3 Nível End-to-End (41 testes)
+### 4.3 Nível End-to-End (40 testes)
 
 Arquivo: `end2end/tests/example.spec.ts` — Playwright + Chromium
 
@@ -149,8 +147,8 @@ Arquivo: `end2end/tests/example.spec.ts` — Playwright + Chromium
 | Unitários (tests/unit) | 22 |
 | Integração HTTP | 70 |
 | Integração DB (ignored) | 8 |
-| End-to-End | 41 |
-| **Total** | **182** |
+| End-to-End | 40 |
+| **Total** | **181** |
 
 ---
 
@@ -199,21 +197,28 @@ tests/
 
 ```
 tests/
-  api/
-    mod.rs          → Helpers compartilhados (TestApp, json_post, etc.)
-    systems.rs      → 8 testes
-    variables.rs    → 7 testes
-    terms.rs        → 5 testes
-    rules.rs        → 5 testes
-    simulate.rs     → 12 testes
-    compare_export.rs → 5 testes
-    scenarios.rs    → 5 testes
-    sweep_surface.rs → 5 testes
-    batch.rs        → 5 testes
-    audit.rs        → 3 testes
-    optimize.rs     → 4 testes
-    misc.rs         → 3 testes
-    pipeline.rs     → 1 teste
+  all.rs                          → Root: inclui unit/, integration_db/, backend_API_REST_Axum/
+  unit/
+    mf_validation.rs              → 10 testes
+    system_validation.rs          → 6 testes
+    optimization.rs               → 6 testes
+  integration_db/                 → 8 testes (ignored, usam transação)
+  backend_API_REST_Axum/
+    common/mod.rs                 → Helpers compartilhados (TestApp, json_post, etc.)
+    mod.rs                        → Re-exporta todos os módulos
+    systems.rs                    → 8 testes
+    variables.rs                  → 7 testes
+    terms.rs                      → 5 testes
+    rules.rs                      → 5 testes
+    simulate.rs                   → 12 testes
+    compare_export.rs             → 5 testes
+    scenarios.rs                  → 5 testes
+    sweep_surface.rs              → 5 testes
+    batch.rs                      → 5 testes
+    audit.rs                      → 3 testes
+    optimize.rs                   → 4 testes
+    misc.rs                       → 3 testes
+    pipeline.rs                   → 1 teste
 ```
 
 ### 7.3 is_ok → expect
@@ -268,4 +273,3 @@ cargo leptos watch
 - Aumentar cobertura de `batch.rs` (44%) com testes que usam arquivos Parquet reais
 - Aumentar cobertura de `weather.rs` (50%) com API key de teste
 - Fixar warnings do Clippy no app crate (depende de atualização do Leptos)
-- Adicionar UC04 e UC22 se requisitados
