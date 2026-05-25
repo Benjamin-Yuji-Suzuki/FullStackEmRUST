@@ -5,12 +5,24 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::json;
+use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::engine;
 use crate::errors::AppError;
 use crate::models::*;
 use crate::state::AppState;
+
+#[allow(dead_code)]
+#[derive(Debug, FromRow)]
+struct FuzzyTermWithVar {
+    id: Uuid,
+    variable_id: Uuid,
+    variable_name: String,
+    label: String,
+    mf_type: String,
+    params: serde_json::Value,
+}
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -533,16 +545,44 @@ async fn optimize_pso(
     let pop = req.population_size.unwrap_or(20);
     let iters = req.max_iterations.unwrap_or(50);
 
-    let (best_pos, best_fit, _history) = engine::optimize_with_pso(
+    let (best_pos, best_fit, history) = engine::optimize_with_pso(
         &var_infos, &rule_infos,
         &req.target_inputs, &req.target_outputs,
         pop, iters,
     ).map_err(AppError::Validation)?;
 
+    let term_rows = sqlx::query_as::<_, FuzzyTermWithVar>(
+        "SELECT ft.*, fv.name as variable_name FROM fuzzy_terms ft \
+         JOIN fuzzy_variables fv ON fv.id = ft.variable_id \
+         WHERE fv.system_id = $1 \
+         ORDER BY fv.name, ft.label"
+    )
+    .bind(system_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let terms_info: Vec<serde_json::Value> = term_rows.iter().map(|t| {
+        json!({
+            "variable_name": t.variable_name,
+            "term_label": t.label,
+            "mf_type": t.mf_type,
+            "current_params": t.params,
+        })
+    }).collect();
+
+    let history_json: Vec<[f64; 2]> = history.iter().map(|&(iter, fit)| [iter, fit]).collect();
+
     Ok(Json(json!({
         "system_id": system_id,
         "best_position": best_pos,
         "best_fitness": best_fit,
+        "history": history_json,
+        "terms_info": terms_info,
+        "population_size": pop,
+        "max_iterations": iters,
+        "trained_on": req.target_inputs.len(),
+        "training_inputs": req.target_inputs,
+        "training_outputs": req.target_outputs,
     })))
 }
 
@@ -618,16 +658,19 @@ async fn optimize_pso_auto(
     let pop = req.population_size.unwrap_or(30);
     let iters = req.max_iterations.unwrap_or(100);
 
-    let (best_pos, best_fit, _history) = engine::optimize_with_pso(
+    let (best_pos, best_fit, history) = engine::optimize_with_pso(
         &var_infos, &rule_infos,
         &target_inputs, &target_outputs,
         pop, iters,
     ).map_err(AppError::Validation)?;
 
+    let history_json: Vec<[f64; 2]> = history.iter().map(|&(iter, fit)| [iter, fit]).collect();
+
     Ok(Json(json!({
         "system_id": system_id,
         "best_position": best_pos,
         "best_fitness": best_fit,
+        "history": history_json,
         "trained_on": target_inputs.len(),
         "population_size": pop,
         "max_iterations": iters,
