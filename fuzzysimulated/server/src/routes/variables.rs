@@ -288,7 +288,7 @@ async fn create_term(
                 return Err(AppError::Validation("gaussmf: sigma > 0".into()));
             }
         }
-        _ => unreachable!(),
+        other => return Err(AppError::Validation(format!("Tipo de MF não suportado: {other}"))),
     }
 
     let var = sqlx::query_as::<_, FuzzyVariable>(
