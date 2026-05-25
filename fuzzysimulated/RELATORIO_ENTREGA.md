@@ -258,3 +258,4 @@ cargo leptos watch
 - Aumentar cobertura de `batch.rs` (44%) com testes que usam arquivos Parquet reais
 - Aumentar cobertura de `weather.rs` (50%) com API key de teste
 - Fixar warnings do Clippy no app crate (depende de atualização do Leptos)
+
