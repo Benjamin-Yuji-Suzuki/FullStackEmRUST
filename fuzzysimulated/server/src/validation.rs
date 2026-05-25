@@ -2,6 +2,9 @@ pub fn validate_trimf(params: &[f64]) -> Result<(), String> {
     if params.len() != 3 {
         return Err("trimf requer 3 parâmetros".into());
     }
+    if params.iter().any(|&p| !p.is_finite()) {
+        return Err("trimf: parâmetros devem ser finitos".into());
+    }
     if params[0] > params[1] || params[1] > params[2] {
         return Err("trimf: a ≤ b ≤ c".into());
     }
@@ -12,6 +15,9 @@ pub fn validate_trapmf(params: &[f64]) -> Result<(), String> {
     if params.len() != 4 {
         return Err("trapmf requer 4 parâmetros".into());
     }
+    if params.iter().any(|&p| !p.is_finite()) {
+        return Err("trapmf: parâmetros devem ser finitos".into());
+    }
     if params[0] > params[1] || params[1] > params[2] || params[2] > params[3] {
         return Err("trapmf: a ≤ b ≤ c ≤ d".into());
     }
@@ -21,6 +27,9 @@ pub fn validate_trapmf(params: &[f64]) -> Result<(), String> {
 pub fn validate_gaussmf(params: &[f64]) -> Result<(), String> {
     if params.len() != 2 {
         return Err("gaussmf requer 2 parâmetros".into());
+    }
+    if !params[0].is_finite() || !params[1].is_finite() {
+        return Err("gaussmf: parâmetros devem ser finitos".into());
     }
     if params[1] <= 0.0 {
         return Err("gaussmf: sigma > 0".into());
