@@ -1,4 +1,4 @@
-use server::validation::{validate_system_name, validate_defuzz_method};
+use server::validation::{validate_defuzz_method, validate_system_name};
 
 #[test]
 fn test_validate_system_name_ok() {
