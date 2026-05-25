@@ -174,7 +174,7 @@ fn Sidebar() -> impl IntoView {
     view! {
         <aside class="sidebar">
             <div class="sidebar-logo">
-                <div class="logo-mark">"⬡ FuzzySimulated"</div>
+                <div class="logo-mark"><span class="logo-icon">"⬡"</span><span class="logo-text">"FuzzySimulated"</span></div>
                 <div class="logo-sub">"Inference Platform"</div>
             </div>
 
@@ -561,92 +561,37 @@ fn Auditoria() -> impl IntoView {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Optimize Page (UC21-UC25)
+// Optimize Page (UC17 — PSO)
 // ─────────────────────────────────────────────────────────────
 #[component]
 fn OptimizePage() -> impl IntoView {
     let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
     let selected_sys = RwSignal::new(String::new());
-    let coef_a = RwSignal::new("1.0".to_string());
-    let coef_b = RwSignal::new("0.0".to_string());
-    let coef_c = RwSignal::new("1.0".to_string());
-    let coef_d = RwSignal::new("0.0".to_string());
-    let coef_e = RwSignal::new("0.0".to_string());
-    let coef_f = RwSignal::new("0.0".to_string());
-    let x_min = RwSignal::new("-10".to_string());
-    let x_max = RwSignal::new("10".to_string());
-    let y_min = RwSignal::new("-10".to_string());
-    let y_max = RwSignal::new("10".to_string());
-    let result = RwSignal::new(None::<OptimizationResult>);
-    let loading = RwSignal::new(false);
-    let error_msg = RwSignal::new(String::new());
-    // UC24: optimization history
-    let opt_history = RwSignal::new(Vec::<Value>::new());
-
-    // UC17: PSO state
-    let pso_target_in = RwSignal::new("[{\"Temperatura\": 80}]".to_string());
-    let pso_target_out = RwSignal::new("[{\"Risco\": 0.8}]".to_string());
     let pso_pop = RwSignal::new("20".to_string());
     let pso_iters = RwSignal::new("50".to_string());
     let pso_result = RwSignal::new(None::<Value>);
     let pso_loading = RwSignal::new(false);
     let pso_apply_msg = RwSignal::new(String::new());
+    let pso_err = RwSignal::new(String::new());
+
+    // Modo personalizado com builder de inputs
+    let pso_vars = RwSignal::new(Vec::<Value>::new());   // variáveis do sistema selecionado
+    let pso_custom_rows = RwSignal::new(Vec::<Value>::new()); // { "var": val, ... } por linha
+    let pso_custom_out_rows = RwSignal::new(Vec::<Value>::new()); // { "consequent": val, ... } por linha
 
     spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
 
-    // load history when system changes (UC24)
-    let load_history = {
-        let ss = selected_sys.clone();
-        let oh = opt_history.clone();
-        move || {
-            let sid = ss.get();
-            if !sid.is_empty() {
-                let oh2 = oh.clone();
-                spawn_async(async move {
-                    oh2.set(list_optimizations(&sid).await);
-                });
-            } else {
-                oh.set(Vec::new());
-            }
-        }
-    };
-
-    let calculate = move || {
-        let parse_or = |s: &str, _name: &str| -> Option<f64> {
-            let v: f64 = s.trim().parse().ok()?;
-            Some(v)
-        };
-
-        let a = match parse_or(&coef_a.get(), "a") { Some(v) => v, None => { error_msg.set("Coeficiente 'a' inválido".into()); return; } };
-        let b = match parse_or(&coef_b.get(), "b") { Some(v) => v, None => { error_msg.set("Coeficiente 'b' inválido".into()); return; } };
-        let c = match parse_or(&coef_c.get(), "c") { Some(v) => v, None => { error_msg.set("Coeficiente 'c' inválido".into()); return; } };
-        let d = match parse_or(&coef_d.get(), "d") { Some(v) => v, None => { error_msg.set("Coeficiente 'd' inválido".into()); return; } };
-        let e = match parse_or(&coef_e.get(), "e") { Some(v) => v, None => { error_msg.set("Coeficiente 'e' inválido".into()); return; } };
-        let f = match parse_or(&coef_f.get(), "f") { Some(v) => v, None => { error_msg.set("Coeficiente 'f' inválido".into()); return; } };
-        let xmn = match parse_or(&x_min.get(), "x_min") { Some(v) => v, None => { error_msg.set("x_min inválido".into()); return; } };
-        let xmx = match parse_or(&x_max.get(), "x_max") { Some(v) => v, None => { error_msg.set("x_max inválido".into()); return; } };
-        let ymn = match parse_or(&y_min.get(), "y_min") { Some(v) => v, None => { error_msg.set("y_min inválido".into()); return; } };
-        let ymx = match parse_or(&y_max.get(), "y_max") { Some(v) => v, None => { error_msg.set("y_max inválido".into()); return; } };
-
-        if xmn >= xmx { error_msg.set("x_min deve ser menor que x_max".into()); return; }
-        if ymn >= ymx { error_msg.set("y_min deve ser menor que y_max".into()); return; }
-
-        loading.set(true);
-        error_msg.set(String::new());
-        let sys_id = selected_sys.get();
-        let sys_opt_owned = if sys_id.is_empty() { None } else { Some(sys_id) };
-        let r2 = result.clone();
-        let ld = loading.clone();
-        let em = error_msg.clone();
+    // Carrega variáveis ao selecionar sistema
+    let load_vars = move |sid: &str| {
+        let sid2 = sid.to_string();
+        let v = pso_vars.clone();
+        let cr = pso_custom_rows.clone();
+        let co = pso_custom_out_rows.clone();
         spawn_async(async move {
-            let res = optimize_function(
-                sys_opt_owned.as_deref(), a, b, c, d, e, f, xmn, xmx, ymn, ymx
-            ).await;
-            match res {
-                Some(val) => { r2.set(Some(val)); }
-                None => { em.set("Erro ao calcular. Verifique os coeficientes.".into()); }
-            }
-            ld.set(false);
+            let vars = list_variables(&sid2).await;
+            v.set(vars);
+            cr.set(Vec::new());
+            co.set(Vec::new());
         });
     };
 
@@ -654,326 +599,481 @@ fn OptimizePage() -> impl IntoView {
         <Topbar breadcrumb="Otimizador"/>
         <div class="content">
             <div class="section-header" style="margin-bottom:16px">
-                <div class="section-title">"Otimizador de Função Objetivo (UC21–UC25)"</div>
+                <div class="section-title">"Otimizador de Parâmetros (UC17)"</div>
             </div>
-
-            <div class="opt-layout">
-                <div class="panel">
-                    <div class="panel-title">"Função Objetivo"</div>
-                    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;font-family:monospace">
-                        "f(x, y) = ax² + bxy + cy² + dx + ey + f"
+            <div class="panel">
+                <div class="panel-title">"Selecionar Sistema"</div>
+                <select class="text-input" prop:value=move || selected_sys.get()
+                    on:change=move |e| {
+                        let sid = event_target_value(&e);
+                        selected_sys.set(sid.clone());
+                        load_vars(&sid);
+                    }>
+                    <option value="">"— Selecione —"</option>
+                    {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
+                </select>
+            </div>
+            <div class="panel">
+                <div class="panel-title">"Otimização PSO (UC17)"</div>
+                <div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+                    "Otimiza os parâmetros das funções de pertinência com base em dados de referência."
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                    <div>
+                        <label class="input-label">"População"</label>
+                        <input type="number" class="text-input" style="width:80px;font-size:10px"
+                            prop:value=move || pso_pop.get()
+                            on:input=move |e| pso_pop.set(event_target_value(&e))/>
                     </div>
-                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
-                        <span style="font-size:9px;color:var(--text3);align-self:center">"Exemplos:"</span>
-                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
-                            let ca = coef_a.clone(); let cb = coef_b.clone(); let cc = coef_c.clone();
-                            let cd = coef_d.clone(); let ce = coef_e.clone(); let cf = coef_f.clone();
-                            let xmn = x_min.clone(); let xmx = x_max.clone();
-                            let ymn = y_min.clone(); let ymx = y_max.clone();
-                            move |_| { ca.set("1".into()); cb.set("0".into()); cc.set("1".into()); cd.set("0".into()); ce.set("0".into()); cf.set("0".into()); xmn.set("-10".into()); xmx.set("10".into()); ymn.set("-10".into()); ymx.set("10".into()); }
-                        }>"f=x²+y²"</button>
-                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
-                            let ca = coef_a.clone(); let cb = coef_b.clone(); let cc = coef_c.clone();
-                            let cd = coef_d.clone(); let ce = coef_e.clone(); let cf = coef_f.clone();
-                            let xmn = x_min.clone(); let xmx = x_max.clone();
-                            let ymn = y_min.clone(); let ymx = y_max.clone();
-                            move |_| { ca.set("2".into()); cb.set("3".into()); cc.set("-4".into()); cd.set("1".into()); ce.set("-2".into()); cf.set("5".into()); xmn.set("-10".into()); xmx.set("10".into()); ymn.set("-10".into()); ymx.set("10".into()); }
-                        }>"f=2x²+3xy-4y²+x-2y+5"</button>
-                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
-                            let ca = coef_a.clone(); let cb = coef_b.clone(); let cc = coef_c.clone();
-                            let cd = coef_d.clone(); let ce = coef_e.clone(); let cf = coef_f.clone();
-                            let xmn = x_min.clone(); let xmx = x_max.clone();
-                            let ymn = y_min.clone(); let ymx = y_max.clone();
-                            move |_| { ca.set("0.5".into()); cb.set("0".into()); cc.set("0.5".into()); cd.set("10".into()); ce.set("-20".into()); cf.set("100".into()); xmn.set("0".into()); xmx.set("50".into()); ymn.set("0".into()); ymx.set("100".into()); }
-                        }>"conforto ~ temp²+umid² (exemplo)"</button>
+                    <div>
+                        <label class="input-label">"Iterações"</label>
+                        <input type="number" class="text-input" style="width:80px;font-size:10px"
+                            prop:value=move || pso_iters.get()
+                            on:input=move |e| pso_iters.set(event_target_value(&e))/>
                     </div>
-
-                    <div class="opt-grid">
-                        <div>
-                            <label class="input-label">"a"</label>
-                            <input type="text" class="text-input" prop:value=move || coef_a.get() on:input=move |e| coef_a.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"b"</label>
-                            <input type="text" class="text-input" prop:value=move || coef_b.get() on:input=move |e| coef_b.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"c"</label>
-                            <input type="text" class="text-input" prop:value=move || coef_c.get() on:input=move |e| coef_c.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"d"</label>
-                            <input type="text" class="text-input" prop:value=move || coef_d.get() on:input=move |e| coef_d.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"e"</label>
-                            <input type="text" class="text-input" prop:value=move || coef_e.get() on:input=move |e| coef_e.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"f"</label>
-                            <input type="text" class="text-input" prop:value=move || coef_f.get() on:input=move |e| coef_f.set(event_target_value(&e))/>
-                        </div>
-                    </div>
-
-                    <div class="panel-title" style="margin-top:16px">"Domínio"</div>
-                    <div class="opt-grid">
-                        <div>
-                            <label class="input-label">"x_min"</label>
-                            <input type="text" class="text-input" prop:value=move || x_min.get() on:input=move |e| x_min.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"x_max"</label>
-                            <input type="text" class="text-input" prop:value=move || x_max.get() on:input=move |e| x_max.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"y_min"</label>
-                            <input type="text" class="text-input" prop:value=move || y_min.get() on:input=move |e| y_min.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"y_max"</label>
-                            <input type="text" class="text-input" prop:value=move || y_max.get() on:input=move |e| y_max.set(event_target_value(&e))/>
-                        </div>
-                    </div>
-
-                    <div class="panel" style="margin-top:12px;padding:8px 12px">
-                        <label class="input-label">"Sistema (opcional, para auditoria)"</label>
-                        <select class="text-input" prop:value=move || selected_sys.get()
-                            on:change=move |e| { selected_sys.set(event_target_value(&e)); load_history(); }>
-                            <option value="">"— Nenhum —"</option>
-                            {move || systems_list.get().iter().map(|s| view! { <option value={s.id.clone()}>{s.name.clone()}</option> }).collect_view()}
-                        </select>
-                    </div>
-
-                    {move || { let m = error_msg.get(); if !m.is_empty() { view! { <div style="color:var(--coral);font-size:11px;margin-top:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
-
-                    <button class="btn btn-primary" style="margin-top:12px" on:click=move |_| calculate()>
-                        <i class="ti ti-math-function"></i>"Calcular Ponto Ótimo"
-                    </button>
                 </div>
 
-                <div class="panel">
-                    <div class="panel-title">"Resultado da Otimização"</div>
-                    {move || {
-                        if loading.get() {
-                            return view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Calculando..."</div> }.into_any();
-                        }
-                        match result.get() {
-                            None => view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Preencha os coeficientes e clique em \"Calcular Ponto Ótimo\"."</div> }.into_any(),
-                            Some(r) => {
-                                let ptype = r.critical_point_type.clone();
-                                let type_color = match ptype.as_str() {
-                                    "mínimo" => "var(--green)",
-                                    "máximo" => "var(--coral)",
-                                    "sela" => "var(--amber)",
-                                    _ => "var(--text1)",
-                                };
-                                view! {
-                                    <div class="opt-result-grid">
-                                        <div class="opt-result-card">
-                                            <div class="opt-result-label">"x*"</div>
-                                            <div class="opt-result-value">{format!("{:.6}", r.optimal_x)}</div>
-                                        </div>
-                                        <div class="opt-result-card">
-                                            <div class="opt-result-label">"y*"</div>
-                                            <div class="opt-result-value">{format!("{:.6}", r.optimal_y)}</div>
-                                        </div>
-                                        <div class="opt-result-card">
-                                            <div class="opt-result-label">"f(x*, y*)"</div>
-                                            <div class="opt-result-value">{format!("{:.6}", r.optimal_value)}</div>
-                                        </div>
-                                        <div class="opt-result-card">
-                                            <div class="opt-result-label">"Tipo"</div>
-                                            <div class="opt-result-value" style=format!("color:{}", type_color)>{ptype}</div>
-                                        </div>
-                                    </div>
-
-                                    <div style="margin-top:16px;font-size:11px;color:var(--text3);font-family:monospace;white-space:pre-wrap;background:var(--surface1);padding:12px;border-radius:6px;line-height:1.6">
-                                        {r.explanation.clone()}
-                                    </div>
-
-                                    <details style="margin-top:12px">
-                                        <summary style="cursor:pointer;font-size:11px;color:var(--teal)">"Detalhes Matemáticos"</summary>
-                                        <div style="margin-top:8px;font-size:10px;font-family:monospace;background:var(--surface1);padding:12px;border-radius:6px;line-height:1.8">
-                                            <div>"Gradiente ∇f no ponto ótimo:"</div>
-                                            <div style="padding-left:16px">
-                                                "∂f/∂x = " {format!("{:.10}", r.gradient_at_optimum[0])}
-                                            </div>
-                                            <div style="padding-left:16px">
-                                                "∂f/∂y = " {format!("{:.10}", r.gradient_at_optimum[1])}
-                                            </div>
-                                            <div style="margin-top:8px">"Matriz Hessiana H:"</div>
-                                            <div style="padding-left:16px">
-                                                "| " {format!("{:.4}", r.hessian_matrix[0][0])} "  " {format!("{:.4}", r.hessian_matrix[0][1])} " |"
-                                            </div>
-                                            <div style="padding-left:16px">
-                                                "| " {format!("{:.4}", r.hessian_matrix[1][0])} "  " {format!("{:.4}", r.hessian_matrix[1][1])} " |"
-                                            </div>
-                                            <div style="margin-top:8px">
-                                                "det(H) = " {format!("{:.4}", r.hessian_matrix[0][0] * r.hessian_matrix[1][1] - r.hessian_matrix[0][1] * r.hessian_matrix[1][0])}
-                                            </div>
-                                        </div>
-                                    </details>
-
-                                    <div style="margin-top:12px;display:flex;gap:8px">
-                                        <a class="btn btn-outline" href={format!("/api/optimizations/{}/export", r.id)} target="_self" style="font-size:10px;padding:5px 12px;text-decoration:none">
-                                            <i class="ti ti-download"></i>"Exportar Resultado (JSON)"
-                                        </a>
-                                    </div>
-                                }.into_any()
-                            }
-                        }
-                    }}
-                </div>
-
-                // UC24: Histórico de Otimizações
-                <div class="panel">
-                    <div class="panel-title">"Histórico de Otimizações (UC24)"</div>
-                    {move || {
-                        let history = opt_history.get();
-                        if history.is_empty() {
-                            return view! { <div style="color:var(--text3);font-size:11px;padding:16px 0">"Selecione um sistema para ver o histórico."</div> }.into_any();
-                        }
-                        history.iter().map(|opt| {
-                            let id = opt["id"].as_str().unwrap_or("");
-                            let date = opt["executed_at"].as_str().unwrap_or("");
-                            let ptype = opt["critical_point_type"].as_str().unwrap_or("");
-                            let x = opt["optimal_x"].as_f64().unwrap_or(0.0);
-                            let y = opt["optimal_y"].as_f64().unwrap_or(0.0);
-                            let val = opt["optimal_value"].as_f64().unwrap_or(0.0);
-                            let type_color = match ptype {
-                                "mínimo" => "var(--green)",
-                                "máximo" => "var(--coral)",
-                                "sela" => "var(--amber)",
-                                _ => "var(--text1)",
-                            };
-                            view! {
-                                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface1);font-size:10px">
-                                    <div>
-                                        <span style="color:var(--text3)">{&date[..19.min(date.len())]}</span>
-                                        " | x*=" {format!("{:.4}", x)} " y*=" {format!("{:.4}", y)}
-                                        " f=" {format!("{:.4}", val)}
-                                        <span style=format!("color:{};margin-left:6px", type_color)>{ptype}</span>
-                                    </div>
-                                    <a class="icon-btn" href={format!("/api/optimizations/{}/export", id)} target="_self" title="Exportar">
-                                        <i class="ti ti-download"></i>
-                                    </a>
-                                </div>
-                            }
-                        }).collect_view().into_any()
-                    }}
-                </div>
-                // UC17: PSO - Otimização de Parâmetros MF
-                <div class="panel">
-                    <div class="panel-title">"Otimização PSO de MF (UC17)"</div>
-                    <div style="font-size:11px;color:var(--text3);margin-bottom:6px">
-                        "Otimiza parâmetros das funções de pertinência via PSO com dados de referência."
-                    </div>
-                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
-                        <span style="font-size:9px;color:var(--text3);align-self:center">"Presets:"</span>
-                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
-                            let ti = pso_target_in.clone(); let to = pso_target_out.clone();
-                            move |_| { ti.set(r#"[{"temperatura":10,"umidade":20},{"temperatura":24,"umidade":55},{"temperatura":35,"umidade":85}]"#.into()); to.set(r#"[{"conforto":2},{"conforto":8},{"conforto":1}]"#.into()); }
-                        }>"Conforto Térmico"</button>
-                        <button class="btn btn-outline" style="font-size:9px;padding:3px 8px" on:click={
-                            let ti = pso_target_in.clone(); let to = pso_target_out.clone();
-                            move |_| { ti.set(r#"[{"probabilidade":10,"impacto":10},{"probabilidade":50,"impacto":50},{"probabilidade":90,"impacto":90}]"#.into()); to.set(r#"[{"risco":10},{"risco":50},{"risco":90}]"#.into()); }
-                        }>"Análise de Risco"</button>
-                    </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap">
-                        <div>
-                            <label class="input-label">"População"</label>
-                            <input type="number" class="text-input" style="width:80px;font-size:10px"
-                                prop:value=move || pso_pop.get()
-                                on:input=move |e| pso_pop.set(event_target_value(&e))/>
-                        </div>
-                        <div>
-                            <label class="input-label">"Iterações"</label>
-                            <input type="number" class="text-input" style="width:80px;font-size:10px"
-                                prop:value=move || pso_iters.get()
-                                on:input=move |e| pso_iters.set(event_target_value(&e))/>
-                        </div>
-                        <div style="flex:1;min-width:200px">
-                            <label class="input-label">"Target Inputs (JSON)"</label>
-                            <textarea class="text-input" style="min-height:50px;font-size:10px;font-family:monospace"
-                                prop:value=move || pso_target_in.get()
-                                on:input=move |e| pso_target_in.set(event_target_value(&e))/>
-                        </div>
-                        <div style="flex:1;min-width:200px">
-                            <label class="input-label">"Target Outputs (JSON)"</label>
-                            <textarea class="text-input" style="min-height:50px;font-size:10px;font-family:monospace"
-                                prop:value=move || pso_target_out.get()
-                                on:input=move |e| pso_target_out.set(event_target_value(&e))/>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" style="margin-top:8px" on:click={
+                /* ── Presets ── */
+                <div style="font-size:9px;color:var(--text3);margin-bottom:4px">"Presets de dados de referência:"</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                    <button class="btn btn-primary" style="font-size:10px;padding:4px 12px" on:click={
                         let ss = selected_sys.clone();
-                        let ti = pso_target_in.clone();
-                        let to = pso_target_out.clone();
-                        let pop = pso_pop.clone();
-                        let iters = pso_iters.clone();
-                        let pr = pso_result.clone();
-                        let pl = pso_loading.clone();
+                        let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                        let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
+                        move |_| run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe,
+                            r#"[{"temperatura":10,"umidade":20},{"temperatura":24,"umidade":55},{"temperatura":35,"umidade":85}]"#,
+                            r#"[{"conforto":2},{"conforto":8},{"conforto":1}]"#)
+                    }>"Conforto Térmico"</button>
+                    <button class="btn btn-primary" style="font-size:10px;padding:4px 12px" on:click={
+                        let ss = selected_sys.clone();
+                        let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                        let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
+                        move |_| run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe,
+                            r#"[{"probabilidade":10,"impacto":10},{"probabilidade":50,"impacto":50},{"probabilidade":90,"impacto":90}]"#,
+                            r#"[{"risco":10},{"risco":50},{"risco":90}]"#)
+                    }>"Análise de Risco"</button>
+                    <button class="btn btn-primary" style="font-size:10px;padding:4px 12px" on:click={
+                        let ss = selected_sys.clone();
+                        let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                        let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
+                        move |_| run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe,
+                            r#"[{"receita_anual_usd":500000,"total_funcionarios":20,"gravidade_ataque":15},{"receita_anual_usd":50000000,"total_funcionarios":5000,"gravidade_ataque":50},{"receita_anual_usd":500000000,"total_funcionarios":100000,"gravidade_ataque":85}]"#,
+                            r#"[{"impacto_financeiro":5},{"impacto_financeiro":50},{"impacto_financeiro":90}]"#)
+                    }>"Risco Cibernético"</button>
+                </div>
+
+                /* ── Auto from Batch ── */
+                <div style="margin-bottom:8px">
+                    <button class="btn" style="font-size:10px;padding:4px 12px" on:click={
+                        let ss = selected_sys.clone();
+                        let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                        let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
                         move |_| {
                             let sid = ss.get();
-                            if sid.is_empty() { return; }
-                            let pop_val: usize = pop.get().parse().unwrap_or(20);
-                            let iter_val: usize = iters.get().parse().unwrap_or(50);
-                            let inputs_val: serde_json::Value = serde_json::from_str(&ti.get()).unwrap_or(serde_json::json!([]));
-                            let outputs_val: serde_json::Value = serde_json::from_str(&to.get()).unwrap_or(serde_json::json!([]));
+                            if sid.is_empty() { pe.set("Selecione um sistema primeiro.".into()); return; }
+                            pe.set(String::new());
+                            let pop_val: usize = pop.get().parse().unwrap_or(30);
+                            let iter_val: usize = iters.get().parse().unwrap_or(100);
                             pl.set(true);
-                            let pr2 = pr.clone();
-                            let pl2 = pl.clone();
+                            let r2 = pr.clone(); let l2 = pl.clone(); let e2 = pe.clone();
                             spawn_async(async move {
-                                let res = run_pso_optimization(&sid, &inputs_val, &outputs_val, pop_val, iter_val).await;
-                                pr2.set(res);
-                                pl2.set(false);
+                                match run_pso_auto_optimization(&sid, pop_val, iter_val).await {
+                                    Some(res) => { r2.set(Some(res)); e2.set(String::new()); }
+                                    None => { e2.set("Erro. Execute o batch primeiro.".into()); }
+                                }
+                                l2.set(false);
                             });
                         }
                     }>
-                        <i class="ti ti-math-function"></i>"Executar PSO"
+                        <i class="ti ti-database"></i>"Auto — usar resultados do Batch"
                     </button>
-                    {move || {
-                        if pso_loading.get() { return view! { <div style="font-size:11px;color:var(--text3);margin-top:8px">"Otimizando..."</div> }.into_any(); }
-                        match pso_result.get() {
-                            None => view! {}.into_any(),
-                            Some(r) => {
-                                let best_fit = r["best_fitness"].as_f64().unwrap_or(0.0);
-                                let best_pos = r["best_position"].as_array().cloned().unwrap_or_default();
-                                let ss = selected_sys.clone();
-                                let am = pso_apply_msg.clone();
-                                view! {
-                                    <div style="margin-top:8px;padding:8px;background:var(--surface1);border-radius:4px;font-size:10px">
-                                        <div>"Melhor Fitness: " <span style="color:var(--teal);font-weight:600">{format!("{:.6}", best_fit)}</span></div>
-                                        <div style="margin-top:4px">{let joined: String = best_pos.iter().map(|p| format!("{:.4} ", p.as_f64().unwrap_or(0.0))).collect(); format!("Parâmetros: [{}]", joined)}</div>
-                                        <button class="btn btn-outline" style="margin-top:6px;font-size:9px;padding:3px 8px" on:click={
-                                            let sid = ss.clone();
-                                            let bp = best_pos.clone();
-                                            let am2 = am.clone();
-                                            move |_| {
-                                                let sid2 = sid.get();
-                                                if sid2.is_empty() { return; }
-                                                let params_val = serde_json::json!(bp);
-                                                let am3 = am2.clone();
-                                                spawn_async(async move {
-                                                    match apply_pso_params(&sid2, &params_val).await {
-                                                        Some(res) => {
-                                                            let n = res["updated_terms"].as_u64().unwrap_or(0);
-                                                            am3.set(format!("{} termos atualizados!", n));
-                                                        }
-                                                        None => am3.set("Erro ao aplicar".into()),
-                                                    }
-                                                });
-                                            }
-                                        }>
-                                            <i class="ti ti-check"></i>"Aplicar Parametros no BD"
-                                        </button>
-                                        {move || { let m = am.get(); if !m.is_empty() { view! { <div style="color:var(--teal);margin-top:4px;font-size:9px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
-                                    </div>
-                                }.into_any()
-                            }
-                        }
-                    }}
                 </div>
+
+                /* ── Modo Personalizado com builder ── */
+                <details style="margin-top:4px">
+                    <summary style="cursor:pointer;font-size:10px;color:var(--text2);padding:2px 0">"Modo Personalizado — adicionar linhas de dados manualmente"</summary>
+                    <div style="margin-top:4px">
+                        {move || {
+                            let vars = pso_vars.get();
+                            let ant_names: Vec<String> = vars.iter().filter(|v| {
+                                v["role"].as_str() == Some("antecedent") || v["role"].as_str() == Some("input")
+                            }).filter_map(|v| v["name"].as_str().map(String::from)).collect();
+                            let cons_names: Vec<String> = vars.iter().filter(|v| {
+                                v["role"].as_str() == Some("consequent") || v["role"].as_str() == Some("output")
+                            }).filter_map(|v| v["name"].as_str().map(String::from)).collect();
+
+                            if ant_names.is_empty() && cons_names.is_empty() {
+                                return view! { <div style="font-size:9px;color:var(--text3);padding:4px 0">"Selecione um sistema primeiro."</div> }.into_any();
+                            }
+
+                            let ant2 = ant_names.clone();
+                            let cons2 = cons_names.clone();
+
+                            view! {
+                                <div style="font-size:9px;color:var(--text3);margin-bottom:4px">
+                                    {format!("{} antecedentes, {} consequentes", ant_names.len(), cons_names.len())}
+                                </div>
+
+                                <table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:4px">
+                                    <thead><tr style="border-bottom:1px solid var(--border)">
+                                        {ant_names.iter().map(|n| view! { <th style="padding:2px 4px;text-align:left;color:var(--text3)">{n.clone()}</th> }).collect_view()}
+                                        {cons_names.iter().map(|n| view! { <th style="padding:2px 4px;text-align:left;color:var(--text3)">{n.clone()}</th> }).collect_view()}
+                                        <th style="padding:2px 4px;width:24px"></th>
+                                    </tr></thead>
+                                    <tbody>
+                                        {move || {
+                                            let rows = pso_custom_rows.get();
+                                            let out_rows = pso_custom_out_rows.get();
+                                            let ant_n = ant2.clone();
+                                            let cons_n = cons2.clone();
+                                            (0..rows.len()).map(|i| {
+                                                let row = rows.get(i).cloned().unwrap_or_default();
+                                                let out_row = out_rows.get(i).cloned().unwrap_or_default();
+                                                let idx = i;
+                                                let ant_n2 = ant_n.clone();
+                                                let cons_n2 = cons_n.clone();
+                                                view! {
+                                                    <tr style="border-bottom:1px solid var(--surface0)">
+                                                        {ant_n2.iter().map(|vname| {
+                                                            let vn = vname.clone();
+                                                            let cur = row.get(&vn).and_then(|x| x.as_f64()).unwrap_or(0.0);
+                                                            let cr = pso_custom_rows.clone();
+                                                            view! {
+                                                                <td style="padding:1px 4px">
+                                                                    <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface0);border:1px solid var(--border);border-radius:2px;color:var(--text)"
+                                                                        prop:value=move || cur
+                                                                        on:input=move |e| {
+                                                                            let val: f64 = event_target_value(&e).parse().unwrap_or(0.0);
+                                                                            let mut r2 = cr.get();
+                                                                            if idx < r2.len() {
+                                                                                if let Some(obj) = r2[idx].as_object_mut() {
+                                                                                    obj.insert(vn.clone(), serde_json::json!(val));
+                                                                                }
+                                                                                cr.set(r2);
+                                                                            }
+                                                                        }/>
+                                                                </td>
+                                                            }
+                                                        }).collect_view()}
+                                                        {cons_n2.iter().map(|vname| {
+                                                            let vn = vname.clone();
+                                                            let cur = out_row.get(&vn).and_then(|x| x.as_f64()).unwrap_or(0.0);
+                                                            let cor = pso_custom_out_rows.clone();
+                                                            view! {
+                                                                <td style="padding:1px 4px">
+                                                                    <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface0);border:1px solid var(--border);border-radius:2px;color:var(--text)"
+                                                                        prop:value=move || cur
+                                                                        on:input=move |e| {
+                                                                            let val: f64 = event_target_value(&e).parse().unwrap_or(0.0);
+                                                                            let mut r2 = cor.get();
+                                                                            if idx < r2.len() {
+                                                                                if let Some(obj) = r2[idx].as_object_mut() {
+                                                                                    obj.insert(vn.clone(), serde_json::json!(val));
+                                                                                }
+                                                                                cor.set(r2);
+                                                                            }
+                                                                        }/>
+                                                                </td>
+                                                            }
+                                                        }).collect_view()}
+                                                        <td style="padding:1px 2px">
+                                                            <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0" on:click={
+                                                                let cr = pso_custom_rows.clone();
+                                                                let cor = pso_custom_out_rows.clone();
+                                                                move |_| {
+                                                                    let mut r = cr.get();
+                                                                    if idx < r.len() { r.remove(idx); cr.set(r); }
+                                                                    let mut r2 = cor.get();
+                                                                    if idx < r2.len() { r2.remove(idx); cor.set(r2); }
+                                                                }
+                                                            }>"×"</button>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            }).collect_view()
+                                        }}
+                                        <tr>
+                                            {ant_names.iter().map(|vname| {
+                                                let vn = vname.clone();
+                                                let cr = pso_custom_rows.clone();
+                                                let cor = pso_custom_out_rows.clone();
+                                                let ant_n3 = ant_names.clone();
+                                                let cons_n3 = cons_names.clone();
+                                                view! {
+                                                    <td style="padding:1px 4px">
+                                                        <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface0);border:1px solid var(--border);border-radius:2px;color:var(--text3)"
+                                                            placeholder="0"
+                                                            on:input=move |e| {
+                                                                let val: f64 = event_target_value(&e).parse().unwrap_or(0.0);
+                                                                let mut rows = cr.get();
+                                                                let mut orows = cor.get();
+                                                                if rows.is_empty() {
+                                                                    let empty_in: serde_json::Value = ant_n3.iter().map(|a| (a.clone(), serde_json::json!(0.0))).collect();
+                                                                    let empty_out: serde_json::Value = cons_n3.iter().map(|a| (a.clone(), serde_json::json!(0.0))).collect();
+                                                                    rows.push(empty_in);
+                                                                    orows.push(empty_out);
+                                                                }
+                                                                let last_idx = rows.len() - 1;
+                                                                if let Some(obj) = rows[last_idx].as_object_mut() {
+                                                                    obj.insert(vn.clone(), serde_json::json!(val));
+                                                                }
+                                                                cr.set(rows);
+                                                                cor.set(orows);
+                                                            }/>
+                                                    </td>
+                                                }
+                                            }).collect_view()}
+                                            {cons_names.iter().map(|vname| {
+                                                let vn = vname.clone();
+                                                let cr = pso_custom_rows.clone();
+                                                let cor = pso_custom_out_rows.clone();
+                                                let ant_n4 = ant_names.clone();
+                                                let cons_n4 = cons_names.clone();
+                                                view! {
+                                                    <td style="padding:1px 4px">
+                                                        <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface0);border:1px solid var(--border);border-radius:2px;color:var(--text3)"
+                                                            placeholder="0"
+                                                            on:input=move |e| {
+                                                                let val: f64 = event_target_value(&e).parse().unwrap_or(0.0);
+                                                                let mut rows = cr.get();
+                                                                let mut orows = cor.get();
+                                                                if rows.is_empty() {
+                                                                    let empty_in: serde_json::Value = ant_n4.iter().map(|a| (a.clone(), serde_json::json!(0.0))).collect();
+                                                                    let empty_out: serde_json::Value = cons_n4.iter().map(|a| (a.clone(), serde_json::json!(0.0))).collect();
+                                                                    rows.push(empty_in);
+                                                                    orows.push(empty_out);
+                                                                }
+                                                                let last_idx = rows.len() - 1;
+                                                                if let Some(obj) = orows[last_idx].as_object_mut() {
+                                                                    obj.insert(vn.clone(), serde_json::json!(val));
+                                                                }
+                                                                cr.set(rows);
+                                                                cor.set(orows);
+                                                            }/>
+                                                    </td>
+                                                }
+                                            }).collect_view()}
+                                            <td style="padding:1px 2px"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <button class="btn btn-primary" style="font-size:10px;padding:4px 12px;margin-top:4px" on:click={
+                                    let ss = selected_sys.clone();
+                                    let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                                    let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
+                                    let cr = pso_custom_rows.clone(); let cor = pso_custom_out_rows.clone();
+                                    move |_| {
+                                        let rows = cr.get();
+                                        let orows = cor.get();
+                                        if rows.is_empty() || orows.is_empty() {
+                                            pe.set("Adicione pelo menos uma linha de dados.".into()); return;
+                                        }
+                                        let inputs_json: serde_json::Value = serde_json::json!(rows);
+                                        let outputs_json: serde_json::Value = serde_json::json!(orows);
+                                        let inputs_str = serde_json::to_string(&inputs_json).unwrap_or_default();
+                                        let outputs_str = serde_json::to_string(&outputs_json).unwrap_or_default();
+                                        run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe, &inputs_str, &outputs_str);
+                                    }
+                                }>"Executar PSO com dados acima"</button>
+                            }.into_any()
+                        }}
+                    </div>
+                </details>
+
+                {move || {
+                    let e = pso_err.get();
+                    if !e.is_empty() {
+                        view! { <div style="color:var(--red);font-size:10px;margin-bottom:4px">{e}</div> }.into_any()
+                    } else { view! {}.into_any() }
+                }}
+                {move || {
+                    if pso_loading.get() {
+                        return view! {
+                            <div style="padding:12px;text-align:center">
+                                <div style="font-size:12px;color:var(--text3)">"Otimizando parâmetros..."</div>
+                                <div style="font-size:10px;color:var(--text3);margin-top:4px">
+                                    "População=" {pso_pop.get()} ", Iterações=" {pso_iters.get()} ", aguarde..."
+                                </div>
+                            </div>
+                        }.into_any();
+                    }
+                    match pso_result.get() {
+                        None => view! {}.into_any(),
+                        Some(r) => {
+                            let best_fit = r["best_fitness"].as_f64().unwrap_or(0.0);
+                            let best_pos = r["best_position"].as_array().cloned().unwrap_or_default();
+                            let history = r["history"].as_array().cloned().unwrap_or_default();
+                            let terms_info = r["terms_info"].as_array().cloned().unwrap_or_default();
+                            let n_pts = r["trained_on"].as_u64().unwrap_or(0);
+                            let pop_used = r["population_size"].as_u64().unwrap_or(0);
+                            let iters_used = r["max_iterations"].as_u64().unwrap_or(0);
+                            // Tenta ler dados de treino da resposta (opcional)
+                            let train_inputs = r["training_inputs"].as_array().cloned().unwrap_or_default();
+                            let train_outputs = r["training_outputs"].as_array().cloned().unwrap_or_default();
+                            let ss = selected_sys.clone();
+                            let am = pso_apply_msg.clone();
+
+                            // Build SVG chart for fitness convergence (600x220)
+                            let chart_svg = if history.len() > 1 {
+                                let w = 600.0; let h = 220.0; let pad_l = 55.0; let pad_r = 15.0; let pad_t = 20.0; let pad_b = 25.0;
+                                let plot_w = w - pad_l - pad_r;
+                                let plot_h = h - pad_t - pad_b;
+                                let pts: Vec<[f64;2]> = history.iter().filter_map(|v| {
+                                    Some([v[0].as_f64()?, v[1].as_f64()?])
+                                }).collect();
+                                let min_fit = pts.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
+                                let max_fit = pts.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max);
+                                let range = (max_fit - min_fit).max(1e-10);
+                                let iter_max = pts.last().map(|p| p[0]).unwrap_or(1.0);
+
+                                // Grid lines (horizontal)
+                                let n_grid = 4;
+                                let grid_lines: String = (0..=n_grid).map(|i| {
+                                    let y = pad_t + (i as f64 / n_grid as f64) * plot_h;
+                                    let val = max_fit - (i as f64 / n_grid as f64) * range;
+                                    format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface0)" stroke-width="0.5"/>
+                                        <text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="end">{:.3e}</text>"#,
+                                        pad_l, y, w - pad_r, y, pad_l - 4.0, y + 3.0, val)
+                                }).collect();
+
+                                // Vertical grid
+                                let vgrid: String = (0..=n_grid).map(|i| {
+                                    let x = pad_l + (i as f64 / n_grid as f64) * plot_w;
+                                    format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface0)" stroke-width="0.5"/>"#, x, pad_t, x, h - pad_b)
+                                }).collect();
+
+                                // Axis labels
+                                let x_label = format!(r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="middle">Iteração</text>"#, pad_l + plot_w / 2.0, h - 4.0);
+                                let y_label = format!(r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="middle" transform="rotate(-90,12,120)">Fitness (MSE)</text>"#, 12.0, pad_t + plot_h / 2.0);
+
+                                // Path
+                                let path_d: String = pts.iter().enumerate().map(|(i, p)| {
+                                    let x = pad_l + (p[0] / iter_max) * plot_w;
+                                    let y = pad_t + ((max_fit - p[1]) / range) * plot_h;
+                                    if i == 0 { format!("M{x:.1},{y:.1}") } else { format!("L{x:.1},{y:.1}") }
+                                }).collect();
+                                let last = pts.last().unwrap();
+                                let lx = pad_l + (last[0] / iter_max) * plot_w;
+                                let ly = pad_t + ((max_fit - last[1]) / range) * plot_h;
+
+                                format!(r#"<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="background:var(--surface1);border-radius:4px;width:100%;max-width:600px">
+                                    {grid_lines}{vgrid}
+                                    {x_label}{y_label}
+                                    <path d="{path_d}" fill="none" stroke="var(--teal)" stroke-width="1.5"/>
+                                    <circle cx="{lx:.1}" cy="{ly:.1}" r="3" fill="var(--teal)"/>
+                                    <text x="{lx:.1}" y="{ly:.1}" fill="var(--teal)" font-size="8" dx="5" dy="-3">{:.4e}</text>
+                                </svg>"#, last[1])
+                            } else { String::new() };
+
+                            // Build terms table rows
+                            let table_rows: Vec<String> = terms_info.iter().enumerate().map(|(i, t)| {
+                                let vname = t["variable_name"].as_str().unwrap_or("");
+                                let tlabel = t["term_label"].as_str().unwrap_or("");
+                                let mftype = t["mf_type"].as_str().unwrap_or("");
+                                let cur = t["current_params"].as_array().map(|a| a.iter().map(|v| format!("{:.3}", v.as_f64().unwrap_or(0.0))).collect::<Vec<_>>().join(", ")).unwrap_or_default();
+                                let opt = best_pos.get(i).and_then(|v| v.as_f64()).map_or("—".into(), |v| format!("{:.3}", v));
+                                format!(r#"<tr><td style="padding:2px 6px;font-size:9px">{vname}</td><td style="padding:2px 6px;font-size:9px">{tlabel}</td><td style="padding:2px 6px;font-size:9px">{mftype}</td><td style="padding:2px 6px;font-size:9px;color:var(--text3)">[{cur}]</td><td style="padding:2px 6px;font-size:9px;color:var(--teal)">{opt}</td></tr>"#)
+                            }).collect();
+                            let table_html = if !table_rows.is_empty() {
+                                format!(r#"<table style="width:100%;border-collapse:collapse;margin-top:6px">
+                                    <thead><tr style="border-bottom:1px solid var(--surface1)">
+                                        <th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">Variável</th>
+                                        <th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">Termo</th>
+                                        <th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">MF</th>
+                                        <th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">Atual</th>
+                                        <th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">Otimizado</th>
+                                    </tr></thead>
+                                    <tbody>{}</tbody></table>"#, table_rows.join(""))
+                            } else { String::new() };
+
+                            // Tabela de dados de treino
+                            let train_table = if !train_inputs.is_empty() {
+                                let mut headers: Vec<&str> = Vec::new();
+                                if let Some(first) = train_inputs.first().and_then(|v| v.as_object()) {
+                                    for k in first.keys() { headers.push(k.as_str()); }
+                                }
+                                if let Some(first) = train_outputs.first().and_then(|v| v.as_object()) {
+                                    for k in first.keys() { headers.push(k.as_str()); }
+                                }
+
+                                let header_html: String = headers.iter().map(|h| {
+                                    format!(r#"<th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">{}</th>"#, h)
+                                }).collect();
+
+                                let default_obj = serde_json::json!({});
+                                let body_rows: String = (0..train_inputs.len()).map(|i| {
+                                    let in_row = train_inputs.get(i).unwrap_or(&default_obj);
+                                    let out_row = train_outputs.get(i).unwrap_or(&default_obj);
+                                    let cells: String = headers.iter().map(|h| {
+                                        let val = in_row.get(h).or_else(|| out_row.get(h)).and_then(|v| v.as_f64()).unwrap_or(0.0);
+                                        format!(r#"<td style="padding:2px 6px;font-size:9px;text-align:right">{:.2}</td>"#, val)
+                                    }).collect();
+                                    format!("<tr style=\"border-bottom:1px solid var(--surface0)\">{}</tr>", cells)
+                                }).collect();
+
+                                format!(r#"<details style="margin-top:6px">
+                                    <summary style="cursor:pointer;font-size:9px;color:var(--text2)">"Dados de Treino ({n_pts} linhas)"</summary>
+                                    <div style="max-height:160px;overflow-y:auto;margin-top:4px">
+                                        <table style="width:100%;border-collapse:collapse;font-size:9px">
+                                            <thead><tr style="border-bottom:1px solid var(--surface1)">{}</tr></thead>
+                                            <tbody>{}</tbody>
+                                        </table>
+                                    </div>
+                                </details>"#, header_html, body_rows)
+                            } else { String::new() };
+
+                            view! {
+                                <div style="margin-top:8px;padding:8px;background:var(--surface1);border-radius:4px;font-size:10px">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                                        <div>"Fitness: " <span style="color:var(--teal);font-weight:600">{format!("{:.6}", best_fit)}</span>
+                                            <span style="color:var(--text3);margin-left:4px">(0 = perfeito)</span></div>
+                                        <div style="color:var(--text3);font-size:9px">{n_pts} pontos, {pop_used} partículas, {iters_used} iterações</div>
+                                    </div>
+
+                                    {if !chart_svg.is_empty() {
+                                        view! { <div style="margin-bottom:8px" inner_html=chart_svg></div> }.into_any()
+                                    } else { view! {}.into_any() }}
+
+                                    {if !train_table.is_empty() {
+                                        view! { <div inner_html=train_table></div> }.into_any()
+                                    } else { view! {}.into_any() }}
+
+                                    <details>
+                                        <summary style="cursor:pointer;font-size:10px;color:var(--teal)">"Parâmetros por Termo"</summary>
+                                        {if !table_html.is_empty() {
+                                            view! { <div inner_html=table_html></div> }.into_any()
+                                        } else { view! {}.into_any() }}
+                                    </details>
+
+                                    <button class="btn btn-outline" style="margin-top:6px;font-size:9px;padding:3px 8px" on:click={
+                                        let sid = ss.clone();
+                                        let bp = best_pos.clone();
+                                        let am2 = am.clone();
+                                        move |_| {
+                                            let sid2 = sid.get();
+                                            if sid2.is_empty() { return; }
+                                            let params_val = serde_json::json!(bp);
+                                            let am3 = am2.clone();
+                                            spawn_async(async move {
+                                                match apply_pso_params(&sid2, &params_val).await {
+                                                    Some(res) => {
+                                                        let n = res["updated_terms"].as_u64().unwrap_or(0);
+                                                        am3.set(format!("{} termos atualizados!", n));
+                                                    }
+                                                    None => am3.set("Erro ao aplicar".into()),
+                                                }
+                                            });
+                                        }
+                                    }>
+                                        <i class="ti ti-check"></i>"Aplicar Parâmetros no BD"
+                                    </button>
+                                    {move || { let m = am.get(); if !m.is_empty() { view! { <div style="color:var(--teal);margin-top:4px;font-size:9px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+                                </div>
+                            }.into_any()
+                        }
+                    }
+                }}
             </div>
         </div>
     }
@@ -3216,6 +3316,39 @@ fn ImportPage() -> impl IntoView {
             </div>
         </div>
     }
+}
+
+/// Helper: executa PSO com preset de dados de referência.
+/// Não requer JSON manual — os dados vão hardcoded nos botões.
+fn run_pso_preset(
+    sid: &RwSignal<String>,
+    pop: &RwSignal<String>,
+    iters: &RwSignal<String>,
+    result: &RwSignal<Option<Value>>,
+    loading: &RwSignal<bool>,
+    err: &RwSignal<String>,
+    target_inputs: &str,
+    target_outputs: &str,
+) {
+    let system_id = sid.get();
+    if system_id.is_empty() { err.set("Selecione um sistema primeiro.".into()); return; }
+    err.set(String::new());
+    let pop_val: usize = pop.get().parse().unwrap_or(20);
+    let iter_val: usize = iters.get().parse().unwrap_or(50);
+    let inputs_val: Value = serde_json::from_str(target_inputs).unwrap_or(serde_json::json!([]));
+    let outputs_val: Value = serde_json::from_str(target_outputs).unwrap_or(serde_json::json!([]));
+    loading.set(true);
+    let r2 = result.clone();
+    let l2 = loading.clone();
+    let e2 = err.clone();
+    let sid2 = system_id;
+    spawn_async(async move {
+        match run_pso_optimization(&sid2, &inputs_val, &outputs_val, pop_val, iter_val).await {
+            Some(res) => { r2.set(Some(res)); e2.set(String::new()); }
+            None => { e2.set("Erro na otimização. Verifique se o sistema tem variáveis e regras.".into()); }
+        }
+        l2.set(false);
+    });
 }
 
 // ── 404 ──
