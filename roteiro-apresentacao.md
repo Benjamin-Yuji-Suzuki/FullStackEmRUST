@@ -245,6 +245,8 @@ Isso foi implementado com trigger ON DELETE SET NULL + re-inserção dos registr
 
 "Mais 16 testes unitários em `tests/unit/` — validação de MF, criação de sistema. Total: **46 testes unitários**."
 
+**Por que em Rust?** O Rust tem suporte nativo a testes com os atributos `#[cfg(test)]` e `#[test]` — não preciso instalar framework externo, biblioteca de assertions ou runner. Basta escrever a função com `#[test]` e rodar `cargo test`. Os testes podem ficar inline (dentro do próprio módulo) ou em arquivos separados em `tests/`. Isso é uma vantagem enorme sobre C/Java/Python, onde você precisa configurar um framework separado."
+
 ### 8.2 Testes HTTP (Integração)
 
 [Rode `DATABASE_URL=postgres://ben:1234@localhost/fuzzysimulated_test cargo test -p server --test axum_api` no terminal]
@@ -252,6 +254,8 @@ Isso foi implementado com trigger ON DELETE SET NULL + re-inserção dos registr
 "64 testes HTTP que batem na API real com banco PostgreSQL. Cada teste cria seu próprio pool, faz `TRUNCATE CASCADE` no setup, roda serializado com `#[serial_test::serial]` pra evitar deadlock.
 
 Cobrem todos os endpoints: CRUD de sistemas, variáveis, termos, regras, simulação Mamdani/TSK/SVG/Diagnóstico, sweep, superfície, batch, PSO, auditoria, weather."
+
+**Por que em Rust?** Uso o mesmo `Router` do Axum com um `TestApp` customizado que cria um pool de conexão isolado. O cliente HTTP é o `reqwest` (crate Rust). A vantagem é que não preciso mockar nada — o mesmo código que roda em produção é usado nos testes. Se um endpoint funciona no teste, funciona no servidor real. Outra vantagem: o SQLx compila as queries; se a migration mudar e o SELECT ficar inconsistente, o teste nem compila."
 
 ### 8.3 Testes de Integração DB
 
@@ -262,6 +266,8 @@ Cobrem todos os endpoints: CRUD de sistemas, variáveis, termos, regras, simula�
 ### 8.4 Testes E2E
 
 "41 testes com Playwright + Chromium contra o servidor rodando. Simulam jornadas completas: navegação, CRUD, simulação, delete protection, full lifecycle de 20 operações."
+
+**Por que Playwright e não Rust?** O ecossistema de automação de navegador em Rust ainda é imaturo — existem opções como `headless_chrome` e `fantoccini`, mas sofrem com instabilidade, falta de suporte a navegadores múltiplos e APIs limitadas. Playwright é o padrão-ouro da indústria para testes E2E, desenvolvido pela Microsoft, roda qualquer navegador (Chromium, Firefox, Safari), tem espera automática, gera screenshots e vídeos, e a sintaxe é concisa. Não valia a pena reinventar a roda em Rust para algo que Playwright já faz perfeitamente. O teste em si é simples — 'faça login, clique aqui, veja se aparece isso' — não precisa ser na mesma linguagem do backend."
 
 ### 8.5 Total
 
