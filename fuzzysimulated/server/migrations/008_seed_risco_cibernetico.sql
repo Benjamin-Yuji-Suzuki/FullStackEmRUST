@@ -9,19 +9,20 @@ DECLARE
     v_func_id UUID;
     v_gravidade_id UUID;
     v_impacto_id UUID;
+    sys_name   CONSTANT TEXT := 'Risco Cibernetico';
     mf_trapmf CONSTANT TEXT := 'trapmf';
     mf_trimf  CONSTANT TEXT := 'trimf';
     role_ant   CONSTANT TEXT := 'antecedent';
     role_con   CONSTANT TEXT := 'consequent';
     univ_res   CONSTANT INT  := 501;
 BEGIN
-    IF EXISTS (SELECT 1 FROM fuzzy_systems WHERE name = 'Risco Cibernetico') THEN
-        RAISE NOTICE 'Sistema Risco Cibernetico ja existe';
+    IF EXISTS (SELECT 1 FROM fuzzy_systems WHERE name = sys_name) THEN
+        RAISE NOTICE 'Sistema % ja existe', sys_name;
         RETURN;
     END IF;
 
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
-    VALUES (uuid_generate_v4(), 'Risco Cibernetico',
+    VALUES (uuid_generate_v4(), sys_name,
         'Classifica incidentes de seguranca como ALTO ou BAIXO impacto financeiro (Prata -> Gold)',
         'centroid')
     RETURNING id INTO v_sys_id;
@@ -93,8 +94,9 @@ END $$;
 DO $$
 DECLARE
     v_sys_id UUID;
+    sys_name CONSTANT TEXT := 'Risco Cibernetico';
 BEGIN
-    SELECT id INTO v_sys_id FROM fuzzy_systems WHERE name = 'Risco Cibernetico';
+    SELECT id INTO v_sys_id FROM fuzzy_systems WHERE name = sys_name;
     IF NOT FOUND THEN RETURN; END IF;
 
     DELETE FROM scenarios WHERE system_id = v_sys_id;
