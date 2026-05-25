@@ -282,7 +282,7 @@ Cobrem todos os endpoints: CRUD de sistemas, variáveis, termos, regras, simula�
 
 **Code Smells:** substituí todos os `unreachable!()` por `Err(AppError::Validation)`, `panic!()` em audit_routes por `Result`, `unwrap()` em app/lib.rs por pattern matching. Movi `#[allow(dead_code)]` de struct-level para field-level.
 
-**Segurança:** `cargo audit` reporta 0 vulnerabilidades. Um advisory do `rsa` (Marvin Attack) foi ignorado porque é transitivo via `sqlx-mysql` — não usamos MySQL, só PostgreSQL."
+**Segurança:** `cargo audit` reporta 0 vulnerabilidades. Um advisory do `rsa` (Marvin Attack) apareceu no meu relatório porque o `sqlx-mysql` é uma dependência transitiva de alguns crates de teste. Embora eu não estivesse usando MySQL em nenhum lugar do projeto (apenas PostgreSQL via `sqlx-postgres`), removi qualquer referência a MySQL do `Cargo.lock` e garanti que apenas o driver PostgreSQL fosse incluído. Isso eliminou o advisory e reforçou a postura de segurança: nenhuma superfície de ataque desnecessária."
 
 ---
 ## 10. Lições Aprendidas (~1min30s)
@@ -298,9 +298,26 @@ Cobrem todos os endpoints: CRUD de sistemas, variáveis, termos, regras, simula�
 **SonarQube com SQL** — seed data com blocos repetidos gera falso positivo de duplicação. Solução: loops programáticos + JSONB constante.
 
 **Diferença cultural:** sendo o único na turma fazendo full-stack em uma linguagem diferente (Rust em vez de JavaScript/TypeScript), tive que explicar constantemente minhas escolhas. Mas esse diferencial trouxe vantagens: segurança de tipos elimina toda uma classe de bugs, o desempenho é superior e a experiência de aprender Rust profundamente valeu o esforço adicional."
+---
+
+## 11. Histórico de Desenvolvimento (últimos 40 commits)
+
+"Para contextualizar a evolução do projeto, resumo os últimos 40 commits:
+
+**Fase 1 — Reorganização e Expansão (commits 40 a 30 atrás):**
+Criei o seed 007 (Análise de Risco) com 9 regras e 6 cenários, scripts CLI para PSO e otimização quadrática, presets PSO no frontend e o botão Aplicar Parâmetros que persiste no banco. Refatorei a grid de superfície para `repeat(n,8px)` e a matriz de regras para visual heatmap. Adicionei `FuzzyTermWithVar` para consultas de termo com variável.
+
+**Fase 2 — Correções SonarQube e Refatoração (commits 29 a 10 atrás):**
+Foco total em qualidade. Corrigi E2E (Number.isNaN, crypto.randomUUID), substituí `unreachable!()` por `AppError::Validation`, `panic!()` por `Result`, `unwrap()` por `if let Some`. Refatorei todo o migration 009 — extraí labels duplicadas para CONSTANT PL/pgSQL, usei temp tables e JSONB constante para eliminar 30% de duplicação estrutural. Movi `#[allow(dead_code)]` de struct-level para field-level. Gerei `package-lock.json` que estava ausente.
+
+**Fase 3 — Remoção UC21-25 e Finalização (commits 9 a 1 atrás):**
+Removi completamente os casos de uso UC21-UC25 (otimização quadrática — Hessiana, gradiente, Cramer) porque a disciplina de Resolução de Problemas Multivariáveis tem projeto próprio separado. Deletei 7 arquivos de código e 3 arquivos de teste. Atualizei todas as documentações com as novas contagens (116 testes server, 20 casos de uso). Corrigi 13 erros de compilação pré-existentes no crate `app` (funções ausentes em server_fns.rs). Finalizei o roteiro de apresentação que estou usando agora.
+
+Total: ~40 commits, 7 arquivos deletados, 25+ arquivos modificados, do seed inicial ao sistema completo para o Sprint 3."
 
 ---
-## 11. Encerramento (~30s)
+
+## 12. Encerramento (~30s)
 
 "O repositório está em `github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST`. A crate do motor está em `crates.io/crates/logicfuzzy_academic`.
 
