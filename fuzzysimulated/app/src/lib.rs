@@ -953,17 +953,18 @@ fn OptimizePage() -> impl IntoView {
                                     let y = pad_t + ((max_fit - p[1]) / range) * plot_h;
                                     if i == 0 { format!("M{x:.1},{y:.1}") } else { format!("L{x:.1},{y:.1}") }
                                 }).collect();
-                                let last = pts.last().unwrap();
-                                let lx = pad_l + (last[0] / iter_max) * plot_w;
-                                let ly = pad_t + ((max_fit - last[1]) / range) * plot_h;
-
-                                format!(r#"<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="background:var(--surface1);border-radius:4px;width:100%;max-width:600px">
-                                    {grid_lines}{vgrid}
-                                    {x_label}{y_label}
-                                    <path d="{path_d}" fill="none" stroke="var(--teal)" stroke-width="1.5"/>
-                                    <circle cx="{lx:.1}" cy="{ly:.1}" r="3" fill="var(--teal)"/>
-                                    <text x="{lx:.1}" y="{ly:.1}" fill="var(--teal)" font-size="8" dx="5" dy="-3">{:.4e}</text>
-                                </svg>"#, last[1])
+                                let svg_content = if let Some(last) = pts.last() {
+                                    let lx = pad_l + (last[0] / iter_max) * plot_w;
+                                    let ly = pad_t + ((max_fit - last[1]) / range) * plot_h;
+                                    format!(r#"<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="background:var(--surface1);border-radius:4px;width:100%;max-width:600px">
+                                        {grid_lines}{vgrid}
+                                        {x_label}{y_label}
+                                        <path d="{path_d}" fill="none" stroke="var(--teal)" stroke-width="1.5"/>
+                                        <circle cx="{lx:.1}" cy="{ly:.1}" r="3" fill="var(--teal)"/>
+                                        <text x="{lx:.1}" y="{ly:.1}" fill="var(--teal)" font-size="8" dx="5" dy="-3">{:.4e}</text>
+                                    </svg>"#, last[1])
+                                } else { String::new() };
+                            svg_content
                             } else { String::new() };
 
                             // Build terms table rows
