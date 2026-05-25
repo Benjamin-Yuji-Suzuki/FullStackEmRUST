@@ -1,8 +1,16 @@
-use server::validation::{validate_trimf, validate_trapmf, validate_gaussmf};
+use server::validation::{validate_gaussmf, validate_trapmf, validate_trimf};
 
 #[test]
 fn test_validate_trimf_ok() {
-    validate_trimf(&[0.0, 10.0, 22.0]).expect("trimf [0,10,22] deve ser Ok");
+    validate_trimf(&[0.0, 10.0, 12.0]).expect("trimf [0,10,12] deve ser Ok");
+}
+
+#[test]
+fn test_validate_trimf_non_finite() {
+    let result = validate_trimf(&[0.0, f64::NAN, 10.0]);
+    assert!(result.is_err(), "NaN deve ser rejeitado");
+    let result = validate_trimf(&[0.0, f64::INFINITY, 10.0]);
+    assert!(result.is_err(), "Inf deve ser rejeitado");
 }
 
 #[test]
@@ -20,9 +28,17 @@ fn test_validate_trimf_incoherent() {
 #[test]
 fn test_validate_trimf_wrong_params() {
     let result = validate_trimf(&[1.0, 2.0]);
-    assert!(result.is_err(), "Esperava Err para 2 params mas obteve: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Esperava Err para 2 params mas obteve: {:?}",
+        result
+    );
     let result = validate_trimf(&[1.0, 2.0, 3.0, 4.0]);
-    assert!(result.is_err(), "Esperava Err para 4 params mas obteve: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Esperava Err para 4 params mas obteve: {:?}",
+        result
+    );
 }
 
 #[test]
@@ -45,19 +61,35 @@ fn test_validate_gaussmf_ok() {
 #[test]
 fn test_validate_gaussmf_zero_sigma() {
     let result = validate_gaussmf(&[50.0, 0.0]);
-    assert!(result.is_err(), "Esperava Err para sigma=0 mas obteve: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Esperava Err para sigma=0 mas obteve: {:?}",
+        result
+    );
 }
 
 #[test]
 fn test_validate_gaussmf_negative_sigma() {
     let result = validate_gaussmf(&[50.0, -1.0]);
-    assert!(result.is_err(), "Esperava Err para sigma negativo mas obteve: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Esperava Err para sigma negativo mas obteve: {:?}",
+        result
+    );
 }
 
 #[test]
 fn test_validate_gaussmf_wrong_params() {
     let result = validate_gaussmf(&[50.0]);
-    assert!(result.is_err(), "Esperava Err para 1 param mas obteve: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Esperava Err para 1 param mas obteve: {:?}",
+        result
+    );
     let result = validate_gaussmf(&[50.0, 15.0, 10.0]);
-    assert!(result.is_err(), "Esperava Err para 3 params mas obteve: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Esperava Err para 3 params mas obteve: {:?}",
+        result
+    );
 }
