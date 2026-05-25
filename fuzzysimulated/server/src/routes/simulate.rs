@@ -13,10 +13,11 @@ use crate::errors::AppError;
 use crate::models::*;
 use crate::state::AppState;
 
-#[allow(dead_code)]
 #[derive(Debug, FromRow)]
 struct FuzzyTermWithVar {
+    #[allow(dead_code)]
     id: Uuid,
+    #[allow(dead_code)]
     variable_id: Uuid,
     variable_name: String,
     label: String,
