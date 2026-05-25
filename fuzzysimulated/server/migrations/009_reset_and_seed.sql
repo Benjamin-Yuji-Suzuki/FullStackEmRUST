@@ -3,17 +3,21 @@
 
 TRUNCATE fuzzy_systems CASCADE;
 
+-- Shared constants (evita declarar 4× nos blocos abaixo)
+CREATE TEMP TABLE IF NOT EXISTS _mfc AS
+SELECT 'trapmf'::text AS trapmf, 'trimf'::text AS trimf,
+       'antecedent'::text AS ant, 'consequent'::text AS con,
+       501::int AS res;
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- SISTEMA 1: Risco Cibernético Avançado (risco cibernético geral)
 -- ═══════════════════════════════════════════════════════════════════════════
 DO $$
 DECLARE
     v_sys UUID; v_pob UUID; v_imp UUID; v_vuln UUID; v_risk UUID;
-    t CONSTANT TEXT := 'trapmf'; r CONSTANT TEXT := 'trimf';
-    ant CONSTANT TEXT := 'antecedent';
-    con CONSTANT TEXT := 'consequent';
-    res CONSTANT INT  := 501;
+    t TEXT; r TEXT; ant TEXT; con TEXT; res INT;
 BEGIN
+    SELECT trapmf, trimf, ant, con, res INTO t, r, ant, con, res FROM _mfc;
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
     VALUES (uuid_generate_v4(), 'Risco Cibernético Avançado',
         'Avaliação de risco cibernético considerando probabilidade de ataque, impacto financeiro e vulnerabilidade do sistema.',
@@ -56,11 +60,9 @@ END $$;
 DO $$
 DECLARE
     v_sys UUID; v_temp UUID; v_umid UUID; v_conf UUID;
-    t CONSTANT TEXT := 'trapmf'; r CONSTANT TEXT := 'trimf';
-    ant CONSTANT TEXT := 'antecedent';
-    con CONSTANT TEXT := 'consequent';
-    res CONSTANT INT  := 501;
+    t TEXT; r TEXT; ant TEXT; con TEXT; res INT;
 BEGIN
+    SELECT trapmf, trimf, ant, con, res INTO t, r, ant, con, res FROM _mfc;
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
     VALUES (uuid_generate_v4(), 'Conforto Térmico',
         'Avaliação de conforto térmico baseado em temperatura e umidade com dados da API OpenWeather. Utiliza cidade e dados meteorológicos reais.',
@@ -104,11 +106,9 @@ END $$;
 DO $$
 DECLARE
     v_sys UUID; v_rec UUID; v_func UUID; v_grav UUID; v_imp UUID;
-    t CONSTANT TEXT := 'trapmf'; r CONSTANT TEXT := 'trimf';
-    ant CONSTANT TEXT := 'antecedent';
-    con CONSTANT TEXT := 'consequent';
-    res CONSTANT INT  := 501;
+    t TEXT; r TEXT; ant TEXT; con TEXT; res INT;
 BEGIN
+    SELECT trapmf, trimf, ant, con, res INTO t, r, ant, con, res FROM _mfc;
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
     VALUES (uuid_generate_v4(), 'Risco Cibernetico',
         'Classifica incidentes de segurança como ALTO ou BAIXO impacto financeiro usando colunas do dataset_ml.parquet (Prata -> Gold).',
@@ -158,11 +158,9 @@ END $$;
 DO $$
 DECLARE
     v_sys UUID; v_pac UUID; v_con UUID; v_traf UUID; v_ame UUID;
-    t CONSTANT TEXT := 'trapmf'; r CONSTANT TEXT := 'trimf';
-    ant CONSTANT TEXT := 'antecedent';
-    con CONSTANT TEXT := 'consequent';
-    res CONSTANT INT  := 501;
+    t TEXT; r TEXT; ant TEXT; con TEXT; res INT;
 BEGIN
+    SELECT trapmf, trimf, ant, con, res INTO t, r, ant, con, res FROM _mfc;
     INSERT INTO fuzzy_systems (id, name, description, defuzz_method)
     VALUES (uuid_generate_v4(), 'Detecção de Intrusão',
         'Análise de tráfego de rede para detecção de intrusões baseada em pacotes suspeitos, conexões anômalas e tráfego noturno.',
