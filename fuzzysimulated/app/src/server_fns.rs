@@ -548,6 +548,18 @@ pub async fn run_pso_optimization(
     api_post(&format!("/api/systems/{system_id}/optimize-pso"), &body).await
 }
 
+pub async fn run_pso_auto_optimization(
+    system_id: &str,
+    population_size: usize,
+    max_iterations: usize,
+) -> Option<Value> {
+    let body = serde_json::json!({
+        "population_size": population_size,
+        "max_iterations": max_iterations,
+    });
+    api_post(&format!("/api/systems/{system_id}/optimize-pso-auto"), &body).await
+}
+
 pub async fn apply_pso_params(system_id: &str, params: &Value) -> Option<Value> {
     let body = serde_json::json!({ "params": params });
     api_post(&format!("/api/systems/{system_id}/apply-pso-params"), &body).await
