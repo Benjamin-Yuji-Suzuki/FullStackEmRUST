@@ -181,7 +181,7 @@ cargo leptos watch
 ## Testes
 
 | Suite | Qtde | DB | Como rodar |
-|---|---|---|---|---|
+|---|---|---|---|
 | Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
 | Unit (tests/) | 19 | ❌ | `cargo test -p server --test all -- unit::` |
 | HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
