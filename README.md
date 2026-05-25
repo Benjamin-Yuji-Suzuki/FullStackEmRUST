@@ -181,12 +181,12 @@ cargo leptos watch
 ## Testes
 
 | Suite | Qtde | DB | Como rodar |
-|---|---|---|---|---|---|
+|---|---|---|---|---|
 | Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
-| Unit (tests/) | 16 | ❌ | `cargo test -p server --test all -- unit::` |
-| HTTP Axum | 64 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
+| Unit (tests/) | 19 | ❌ | `cargo test -p server --test all -- unit::` |
+| HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
 | Integration | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
-| **Total server** | **116** | | `DATABASE_URL=... cargo test -p server` |
+| **Total server** | **120** | | `DATABASE_URL=... cargo test -p server` |
 
 Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRUNCATE CASCADE`.
 
