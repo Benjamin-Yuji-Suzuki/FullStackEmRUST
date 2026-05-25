@@ -9,9 +9,9 @@ DECLARE
     v_risco_id UUID;
     mf_trapmf CONSTANT TEXT := 'trapmf';
     mf_trimf  CONSTANT TEXT := 'trimf';
-    p_0_0_30_50    CONSTANT TEXT := '[0, 0, 30, 50]';
-    p_30_50_70     CONSTANT TEXT := '[30, 50, 70]';
-    p_50_70_100_100 CONSTANT TEXT := '[50, 70, 100, 100]';
+    p_0_0_30_50    CONSTANT JSONB := '[0, 0, 30, 50]'::JSONB;
+    p_30_50_70     CONSTANT JSONB := '[30, 50, 70]'::JSONB;
+    p_50_70_100_100 CONSTANT JSONB := '[50, 70, 100, 100]'::JSONB;
 BEGIN
     IF EXISTS (SELECT 1 FROM fuzzy_systems WHERE name = 'Analise de Risco') THEN
         RAISE NOTICE 'Sistema Analise de Risco ja existe — ignorado';
@@ -46,9 +46,9 @@ BEGIN
     (v_imp_id, 'alto',   mf_trapmf, p_50_70_100_100);
 
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_risco_id, 'baixo',    mf_trapmf, '[0, 0, 25, 45]'),
+    (v_risco_id, 'baixo',    mf_trapmf, '[0, 0, 25, 45]'::JSONB),
     (v_risco_id, 'moderado', mf_trimf,  p_30_50_70),
-    (v_risco_id, 'critico',  mf_trapmf, '[55, 75, 100, 100]');
+    (v_risco_id, 'critico',  mf_trapmf, '[55, 75, 100, 100]'::JSONB);
 
     INSERT INTO fuzzy_rules (system_id, rule_text, weight, position) VALUES
     (v_sys_id, 'SE probabilidade e baixa E impacto e baixo ENTAO risco e baixo', 1.0, 0),
