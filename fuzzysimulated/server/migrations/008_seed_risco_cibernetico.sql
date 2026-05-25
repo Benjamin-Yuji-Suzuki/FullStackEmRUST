@@ -55,28 +55,28 @@ BEGIN
 
     -- Termos: receita_anual_usd
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_receita_id, label_baixa, mf_trapmf, '[0, 0, 50000000, 100000000]'),
-    (v_receita_id, label_media, mf_trimf,  '[50000000, 200000000, 500000000]'),
-    (v_receita_id, label_alta,  mf_trapmf, '[200000000, 500000000, 1000000000, 1000000000]');
+    (v_receita_id, label_baixa, mf_trapmf, '[0, 0, 50000000, 100000000]'::jsonb),
+    (v_receita_id, label_media, mf_trimf,  '[50000000, 200000000, 500000000]'::jsonb),
+    (v_receita_id, label_alta,  mf_trapmf, '[200000000, 500000000, 1000000000, 1000000000]'::jsonb);
 
     -- Termos: total_funcionarios
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_func_id, label_pequena, mf_trapmf, '[0, 0, 5000, 20000]'),
-    (v_func_id, label_media,   mf_trimf,  '[5000, 50000, 150000]'),
-    (v_func_id, label_grande,  mf_trapmf, '[50000, 150000, 500000, 500000]');
+    (v_func_id, label_pequena, mf_trapmf, '[0, 0, 5000, 20000]'::jsonb),
+    (v_func_id, label_media,   mf_trimf,  '[5000, 50000, 150000]'::jsonb),
+    (v_func_id, label_grande,  mf_trapmf, '[50000, 150000, 500000, 500000]'::jsonb);
 
     -- Termos: gravidade_ataque (mapeamento de attack_vector_primary)
     -- phishing=20, malware=40, dos=50, insider=60, data_breach=70, ransomware=85
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_gravidade_id, label_baixa, mf_trapmf, '[0, 0, 20, 40]'),
-    (v_gravidade_id, label_media, mf_trimf,  '[20, 50, 70]'),
-    (v_gravidade_id, label_alta,  mf_trapmf, '[50, 70, 100, 100]');
+    (v_gravidade_id, label_baixa, mf_trapmf, '[0, 0, 20, 40]'::jsonb),
+    (v_gravidade_id, label_media, mf_trimf,  '[20, 50, 70]'::jsonb),
+    (v_gravidade_id, label_alta,  mf_trapmf, '[50, 70, 100, 100]'::jsonb);
 
     -- Termos: impacto_financeiro (consequente)
     INSERT INTO fuzzy_terms (variable_id, label, mf_type, params) VALUES
-    (v_impacto_id, label_baixo, mf_trapmf, '[0, 0, 30, 50]'),
-    (v_impacto_id, label_medio, mf_trimf,  '[30, 50, 70]'),
-    (v_impacto_id, label_alto,  mf_trapmf, '[50, 70, 100, 100]');
+    (v_impacto_id, label_baixo, mf_trapmf, '[0, 0, 30, 50]'::jsonb),
+    (v_impacto_id, label_medio, mf_trimf,  '[30, 50, 70]'::jsonb),
+    (v_impacto_id, label_alto,  mf_trapmf, '[50, 70, 100, 100]'::jsonb);
 
     -- Regras (3x3x3 = 27 combinacoes, usando as mais relevantes)
     -- Regra de negocio: receita alta + ataque severo = impacto alto
