@@ -46,7 +46,6 @@ pub struct OptimizationRequest {
 }
 
 /// Resultado da otimização retornado pela API.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizationResult {
     pub optimal_x: f64,
