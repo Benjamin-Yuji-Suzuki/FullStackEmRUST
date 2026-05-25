@@ -3,20 +3,20 @@
 | Suite | Qtde | DB | Como rodar |
 |---|---|---|---|---|
 | Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
-| Unit (tests/) | 16 | ❌ | `cargo test -p server --test all -- unit::` |
-| HTTP Axum | 64 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
+| Unit (tests/) | 19 | ❌ | `cargo test -p server --test all -- unit::` |
+| HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
 | Integration | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
-| **Total server** | **116** | | `DATABASE_URL=... cargo test -p server` |
+| **Total server** | **120** | | `DATABASE_URL=... cargo test -p server` |
 
 ## Comandos
 
-### Unitários (46 testes, sem DB: 30 inline + 16 tests/)
+### Unitários (49 testes, sem DB: 30 inline + 19 tests/)
 ```bash
 cargo test -p server --lib
 cargo test -p server --test all -- unit::
 ```
 
-### HTTP Axum (64 testes, serializados, requer DB)
+### HTTP Axum (65 testes, serializados, requer DB)
 ```bash
 DATABASE_URL=postgres://ben:1234@localhost/fuzzysimulated_test cargo test -p server --test all -- --skip ignored
 ```
