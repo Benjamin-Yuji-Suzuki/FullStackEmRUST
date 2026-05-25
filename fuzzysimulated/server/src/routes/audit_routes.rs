@@ -17,14 +17,14 @@ pub fn routes() -> Router<AppState> {
         .route("/audit/{id}/undo", post(undo_event))
 }
 
-fn entity_table(entity_type: &str) -> &str {
+fn entity_table(entity_type: &str) -> Result<&'static str, AppError> {
     match entity_type {
-        "system" => "fuzzy_systems",
-        "variable" => "fuzzy_variables",
-        "term" => "fuzzy_terms",
-        "rule" => "fuzzy_rules",
-        "optimization" => "optimizations",
-        _ => panic!("entity_type desconhecido: {entity_type}"),
+        "system" => Ok("fuzzy_systems"),
+        "variable" => Ok("fuzzy_variables"),
+        "term" => Ok("fuzzy_terms"),
+        "rule" => Ok("fuzzy_rules"),
+        "optimization" => Ok("optimizations"),
+        other => Err(AppError::Validation(format!("entity_type desconhecido: {other}"))),
     }
 }
 
@@ -108,7 +108,7 @@ async fn undo_event(
         None
     };
 
-    let table = entity_table(&entity_type);
+    let table = entity_table(&entity_type)?;
 
     match action_type.as_str() {
         "delete" => {
@@ -269,33 +269,32 @@ mod tests {
 
     #[test]
     fn test_entity_table_system() {
-        assert_eq!(entity_table("system"), "fuzzy_systems");
+        assert_eq!(entity_table("system").unwrap(), "fuzzy_systems");
     }
 
     #[test]
     fn test_entity_table_variable() {
-        assert_eq!(entity_table("variable"), "fuzzy_variables");
+        assert_eq!(entity_table("variable").unwrap(), "fuzzy_variables");
     }
 
     #[test]
     fn test_entity_table_term() {
-        assert_eq!(entity_table("term"), "fuzzy_terms");
+        assert_eq!(entity_table("term").unwrap(), "fuzzy_terms");
     }
 
     #[test]
     fn test_entity_table_rule() {
-        assert_eq!(entity_table("rule"), "fuzzy_rules");
+        assert_eq!(entity_table("rule").unwrap(), "fuzzy_rules");
     }
 
     #[test]
     fn test_entity_table_optimization() {
-        assert_eq!(entity_table("optimization"), "optimizations");
+        assert_eq!(entity_table("optimization").unwrap(), "optimizations");
     }
 
     #[test]
-    #[should_panic(expected = "entity_type desconhecido")]
     fn test_entity_table_unknown() {
-        entity_table("invalid");
+        assert!(entity_table("invalid").is_err());
     }
 
     #[test]
