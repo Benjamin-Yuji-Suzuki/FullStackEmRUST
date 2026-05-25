@@ -22,7 +22,7 @@ async function parseOutput(page: Page): Promise<number> {
   const el = page.locator(".output-val").first();
   await expect(el).toBeVisible();
   const text = await el.textContent();
-  const n = Number.parseFloat(text!);
+  const n = Number.parseFloat(text ?? "");
   return n;
 }
 
@@ -298,7 +298,7 @@ test.describe.serial("Full lifecycle (create → use → edit → audit → dele
     const card = page.locator(".system-card").filter({ hasText: SYS_NAME }).filter({ hasNotText: "(cópia)" }).first();
     const editLink = card.locator('a[title="Editar"]');
     const href = await editLink.getAttribute("href");
-    await page.goto(href!);
+    await page.goto(href ?? "/");
     await page.waitForTimeout(1500);
     await page.locator("input[type='text']").nth(1).fill("Sistema editado via E2E");
     await page.click('button:has-text("Salvar Alterações")');
@@ -327,7 +327,7 @@ test.describe.serial("Full lifecycle (create → use → edit → audit → dele
     const href = await exportLink.getAttribute("href");
     expect(href).toContain("/api/systems/");
     expect(href).toContain("/export");
-    const response = await page.request.get(href!);
+    const response = await page.request.get(href ?? "/");
     expect(response.ok()).toBeTruthy();
     const json = await response.json();
     expect(json.name).toBe(SYS_NAME);
@@ -403,8 +403,8 @@ test.describe.serial("UC05: OpenWeather", () => {
     if (count >= 2) {
       const tempNum = Number.parseFloat(await numInputs.nth(0).inputValue());
       const humNum = Number.parseFloat(await numInputs.nth(1).inputValue());
-      if (!isNaN(tempNum)) expect(Math.abs(tempNum)).toBeLessThanOrEqual(60);
-      if (!isNaN(humNum)) { expect(humNum).toBeGreaterThanOrEqual(0); expect(humNum).toBeLessThanOrEqual(100); }
+      if (!Number.isNaN(tempNum)) expect(Math.abs(tempNum)).toBeLessThanOrEqual(60);
+      if (!Number.isNaN(humNum)) { expect(humNum).toBeGreaterThanOrEqual(0); expect(humNum).toBeLessThanOrEqual(100); }
     }
     const msg = page.locator("div[style*='color:var(--teal)'], div[style*='color:var(--coral)']").first();
     await expect(msg).toBeVisible({ timeout: 10000 });
