@@ -1,13 +1,13 @@
 # FuzzySimulated — Roteiro de Apresentação (Ao Vivo, sem Slides)
 
-> **Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados · Resolução de Problemas Multivariáveis — CESUPA 02/2026  
+> **Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 02/2026  
 > **Equipe:** Benjamin Yuji Suzuki  
 > **Duração estimada:** 25–30 minutos  
 
 ---
 ## 1. Abertura (~1min)
 
-"Bom dia. Meu nome é Benjamin Yuji Suzuki e vou apresentar o **FuzzySimulated**, uma plataforma full-stack 100% Rust para construção e simulação de sistemas de inferência fuzzy. O projeto integra quatro disciplinas: Qualidade de Software, Inteligência Artificial, Ciência de Dados e Resolução de Problemas Multivariáveis.
+"Bom dia. Meu nome é Benjamin Yuji Suzuki e vou apresentar o **FuzzySimulated**, uma plataforma full-stack 100% Rust para construção e simulação de sistemas de inferência fuzzy. O projeto integra três disciplinas: Qualidade de Software, Inteligência Artificial e Ciência de Dados.
 
 Não preparei slides — vou mostrar o sistema rodando ao vivo e explicar cada parte enquanto navego."
 
@@ -17,8 +17,8 @@ Não preparei slides — vou mostrar o sistema rodando ao vivo e explicar cada p
 "Este trabalho representa a entrega final do **Sprint 3** do projeto. Entreguei o sistema completo e funcional, com todas as 5 telas e os 20 casos de uso implementados (após remoção dos UC21-UC25 da disciplina de Matemática, que tem projeto separado). 
 
 A suíte de testes está completa nos três níveis:
-- Unitários: 46 testes (30 inline + 16 tests/)
-- Integração HTTP: 64 testes  
+- Unitários: 49 testes (30 inline + 19 tests/)
+- Integração HTTP: 65 testes  
 - End-to-end: 41 testes Playwright
 - Integração DB: 6 testes ignorados (transaction rollback)
 
@@ -243,7 +243,7 @@ Isso foi implementado com trigger ON DELETE SET NULL + re-inserção dos registr
 
 [Rode também `cargo test -p server --test unit` no terminal]
 
-"Mais 16 testes unitários em `tests/unit/` — validação de MF, criação de sistema. Total: **46 testes unitários**."
+"Mais 19 testes unitários em `tests/unit/` — validação de MF, criação de sistema. Total: **49 testes unitários**."
 
 **Por que em Rust?** O Rust tem suporte nativo a testes com os atributos `#[cfg(test)]` e `#[test]` — não preciso instalar framework externo, biblioteca de assertions ou runner. Basta escrever a função com `#[test]` e rodar `cargo test`. Os testes podem ficar inline (dentro do próprio módulo) ou em arquivos separados em `tests/`. Isso é uma vantagem enorme sobre C/Java/Python, onde você precisa configurar um framework separado."
 
@@ -251,7 +251,7 @@ Isso foi implementado com trigger ON DELETE SET NULL + re-inserção dos registr
 
 [Rode `DATABASE_URL=postgres://ben:1234@localhost/fuzzysimulated_test cargo test -p server --test axum_api` no terminal]
 
-"64 testes HTTP que batem na API real com banco PostgreSQL. Cada teste cria seu próprio pool, faz `TRUNCATE CASCADE` no setup, roda serializado com `#[serial_test::serial]` pra evitar deadlock.
+"65 testes HTTP que batem na API real com banco PostgreSQL. Cada teste cria seu próprio pool, faz `TRUNCATE CASCADE` no setup, roda serializado com `#[serial_test::serial]` pra evitar deadlock.
 
 Cobrem todos os endpoints: CRUD de sistemas, variáveis, termos, regras, simulação Mamdani/TSK/SVG/Diagnóstico, sweep, superfície, batch, PSO, auditoria, weather."
 
@@ -271,7 +271,7 @@ Cobrem todos os endpoints: CRUD de sistemas, variáveis, termos, regras, simula�
 
 ### 8.5 Total
 
-"**157 testes no total**: 46 unit + 64 HTTP + 6 integration + 41 E2E."
+"**161 testes no total**: 49 unit + 65 HTTP + 6 integration + 41 E2E."
 
 ### 8.6 Cobertura
 
@@ -303,23 +303,41 @@ Cobrem todos os endpoints: CRUD de sistemas, variáveis, termos, regras, simula�
 
 **SonarQube com SQL** — seed data com blocos repetidos gera falso positivo de duplicação. Solução: loops programáticos + JSONB constante.
 
-**Diferença cultural:** sendo o único na turma fazendo full-stack em uma linguagem diferente (Rust em vez de JavaScript/TypeScript), tive que explicar constantemente minhas escolhas. Mas esse diferencial trouxe vantagens: segurança de tipos elimina toda uma classe de bugs, o desempenho é superior e a experiência de aprender Rust profundamente valeu o esforço adicional."
+**Diferença cultural:** fui o único na turma a usar Rust em vez de JS/TS. Segurança de tipos elimina bugs, desempenho superior, e aprender Rust profundamente valeu o esforço."
 ---
 
-## 11. Histórico de Desenvolvimento (últimos 40 commits)
+## 11. Histórico de Desenvolvimento (commits 40–148)
 
-"Para contextualizar a evolução do projeto, resumo os últimos 40 commits:
+"Para contextualizar a evolução do projeto, do commit 40 ao 148 (~109 commits):
 
-**Fase 1 — Reorganização e Expansão (commits 40 a 30 atrás):**
-Criei o seed 007 (Análise de Risco) com 9 regras e 6 cenários, scripts CLI para PSO e otimização quadrática, presets PSO no frontend e o botão Aplicar Parâmetros que persiste no banco. Refatorei a grid de superfície para `repeat(n,8px)` e a matriz de regras para visual heatmap. Adicionei `FuzzyTermWithVar` para consultas de termo com variável.
+**Fase 1 — Testes e Qualidade (commits 40–47):**
+Organizei testes unitários em módulo `tests/unit/` (22 testes) e testes de integração em `tests/integration/` (8 testes). Transformei `api_test.rs` em entry point com helpers compartilhados (`get_test_pool`, `begin_test_tx`). Criei `TESTES.md` com comandos para execução.
 
-**Fase 2 — Correções SonarQube e Refatoração (commits 29 a 10 atrás):**
-Foco total em qualidade. Corrigi E2E (Number.isNaN, crypto.randomUUID), substituí `unreachable!()` por `AppError::Validation`, `panic!()` por `Result`, `unwrap()` por `if let Some`. Refatorei todo o migration 009 — extraí labels duplicadas para CONSTANT PL/pgSQL, usei temp tables e JSONB constante para eliminar 30% de duplicação estrutural. Movi `#[allow(dead_code)]` de struct-level para field-level. Gerei `package-lock.json` que estava ausente.
+**Fase 2 — Otimização Quadrática UC21–UC25 (commits 48–61):**
+Implementei os casos de uso de otimização multivariável: modelo, rota, migration, página e CSS. Adicionei 12 casos de teste de otimização. *Removido posteriormente (commit 144) por tratar-se de projeto separado.*
 
-**Fase 3 — Remoção UC21-25 e Finalização (commits 9 a 1 atrás):**
-Removi completamente os casos de uso UC21-UC25 (otimização quadrática — Hessiana, gradiente, Cramer) porque a disciplina de Resolução de Problemas Multivariáveis tem projeto próprio separado. Deletei 7 arquivos de código e 3 arquivos de teste. Atualizei todas as documentações com as novas contagens (116 testes server, 20 casos de uso). Corrigi 13 erros de compilação pré-existentes no crate `app` (funções ausentes em server_fns.rs). Finalizei o roteiro de apresentação que estou usando agora.
+**Fase 3 — Auditoria e Estados do Sistema (commits 62–72):**
+Migration 004: FK `audit_events.system_id` com `ON DELETE SET NULL`. Migration 005: coluna `status` em `fuzzy_systems` (ativo/favorito/concluido/desativado). Undo completo com snapshots JSONB — `build_system_snapshot()` restaura sistema + variáveis + termos + regras. Badge de status, seletor inline, cadeado para favoritos e filtros.
 
-Total: ~40 commits, 7 arquivos deletados, 25+ arquivos modificados, do seed inicial ao sistema completo para o Sprint 3."
+**Fase 4 — CI/CD e Cobertura (commits 73–83):**
+GitHub Actions com `cargo-llvm-cov`, PostgreSQL nos workflows, fixação de SHAs para supply-chain security. Refatoração: extração de `math.rs`, `validation.rs` e `lib.rs`.
+
+**Fase 5 — Motor de Inferência (commits 84–89):**
+Motor Mamdani real com membership functions, parser de regras e centroide. Integração nas rotas `simulate`, `surface` e `sweep`. Correção de bind() e exposição de mensagens reais de erro.
+
+**Fase 6 — Testes e Documentação Sprint 3 (commits 90–105):**
+Playwright E2E com baseURL e webServer. Testes reescritos com rotas relativas e fluxo completo. Serial_test para testes HTTP. Atualização de README e ARCHITECTURE.md.
+
+**Fase 7 — Funcionalidades Avançadas (commits 106–117):**
+Cenários (UC12), batch (UC11), TSK, diagnóstico, PSO, SVG, import/export. Sistema "Análise de Risco" (seed 007). Scripts CLI para PSO. Presets no frontend. Script `importar_dados.py`.
+
+**Fase 8 — Refatoração e Qualidade (commits 118–143):**
+Correções clippy e SonarQube. Migration 009 reescrita com JSONB constante e loop PL/pgSQL, eliminando 30% de duplicação. `unreachable!()` → `AppError::Validation`, `panic!()` → `Result`, `unwrap()` → `if let Some`. `#[allow(dead_code)]` struct-level → field-level.
+
+**Fase 9 — Finalização (commits 144–148):**
+Remoção UC21–UC25 (7 arquivos de código, 3 de teste). Atualização de documentação. Roteiro de apresentação detalhado. Documentação da escolha de ferramentas de teste.
+
+Total: ~109 commits, 7 arquivos deletados, 25+ modificados, do seed inicial ao sistema completo para o Sprint 3."
 
 ---
 
