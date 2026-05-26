@@ -803,4 +803,12 @@ mod tests {
         assert!(risco > 0.0, "Risco should be positive, got {risco}");
         assert!(risco < 1.0, "Risco should be < 1.0, got {risco}");
     }
+
+    #[test]
+    fn test_membership_nan_input_doesnt_panic() {
+        let r = membership(f64::NAN, "trimf", &[0.0, 25.0, 50.0]);
+        assert!(r.is_nan(), "membership com x=NaN deve retornar NaN, não panic");
+        let r = membership(f64::NAN, "gaussmf", &[50.0, 10.0]);
+        assert!(r.is_nan(), "gaussmf com x=NaN deve retornar NaN, não panic");
+    }
 }

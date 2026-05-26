@@ -54,7 +54,7 @@ jobs:
         working-directory: fuzzysimulated
 
       - name: Rodar testes com cobertura
-        run: cargo llvm-cov --lcov --output-path lcov.info -p server --ignore-run-fail -- --test-threads=4
+        run: cargo llvm-cov --lcov --output-path lcov.info -p server --ignore-run-fail -- --test-threads=1
         working-directory: fuzzysimulated
 
       - name: Enviar ao Codecov

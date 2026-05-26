@@ -1,12 +1,12 @@
 # 📋 Casos de Uso — FuzzySimulated
 
-> Especificação dos 25 casos de uso da plataforma, seguindo o padrão UML.
-> ✅ Todos os 25 casos de uso estão implementados na versão atual.
+> Especificação dos 20 casos de uso da plataforma, seguindo o padrão UML.
+> ✅ Todos os 20 casos de uso estão implementados na versão atual.
 > ator(es), pré-condições, fluxo principal, fluxos alternativos (com retorno ao fluxo principal) e pós-condições.
 > Atores são SEMPRE entidades externas à fronteira do sistema.
 
 **Projeto:** FuzzySimulated  
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados · Resolução de Problemas Multivariáveis — CESUPA 02/2026  
+**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 02/2026  
 **Repositório:** https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST
 
 ---
@@ -174,14 +174,14 @@
 
 **Fluxos Alternativos**
 
-- **FA1 — Nome duplicado:** Sistema exibe "Já existe uma variável com este nome". Retorna ao preenchimento.
+- **FA1 — Nome duplicado:** Sistema exibe "Já existe uma variável com este nome". Retorna ao preenchimento. 📝 Pendente
 - **FA2 — Universo mínimo ≥ máximo:** Sistema exibe "Mínimo deve ser menor que máximo". Retorna ao preenchimento.
 - **FA3 — Já existe consequente:** Sistema bloqueia "Este sistema já possui variável de saída".
-- **FA4 — Rótulo de termo duplicado:** Sistema exibe "Já existe um termo com este rótulo". Retorna ao preenchimento.
-- **FA5 — Parâmetros fora do universo:** Sistema exibe aviso "Parâmetros extrapolam o universo. Confirma?" Usuário decide.
-- **FA6 — Variável referenciada em regras:** Sistema exibe "Referenciada em [N] regras. Removê-la as invalidará. Confirma?"
+- **FA4 — Rótulo de termo duplicado:** Sistema exibe "Já existe um termo com este rótulo". Retorna ao preenchimento. 📝 Pendente
+- **FA5 — Parâmetros fora do universo:** Sistema exibe aviso "Parâmetros extrapolam o universo. Confirma?" Usuário decide. 📝 Pendente
+- **FA6 — Variável referenciada em regras:** Sistema exibe "Referenciada em [N] regras. Removê-la as invalidará. Confirma?" 📝 Pendente
 - **FA7 — Usuário cancela:** Nenhuma alteração persistida.
-- **FA8 — Edição com nome duplicado:** Sistema exibe "Já existe uma variável com este nome". Retorna ao formulário de edição.
+- **FA8 — Edição com nome duplicado:** Sistema exibe "Já existe uma variável com este nome". Retorna ao formulário de edição. 📝 Pendente
 - **FA9 — Edição de termo com parâmetros inválidos:** Sistema exibe o erro de validação específico. Retorna ao formulário de edição.
 
 **Pós-condições**
@@ -232,9 +232,9 @@
 
 **Fluxos Alternativos**
 
-- **FA1 — Sem antecedente:** "A regra precisa de ao menos uma condição". Retorna.
-- **FA2 — Sem consequente:** "A regra precisa de exatamente uma conclusão". Retorna.
-- **FA3 — Regra duplicada:** "Esta regra já existe". Retorna.
+- **FA1 — Sem antecedente:** "A regra precisa de ao menos uma condição". Retorna. 📝 Pendente
+- **FA2 — Sem consequente:** "A regra precisa de exatamente uma conclusão". Retorna. 📝 Pendente
+- **FA3 — Regra duplicada:** "Esta regra já existe". Retorna. 📝 Pendente
 - **FA4 — Usuário cancela:** Construtor fechado.
 - **FA5 — Falha de comunicação:** Nenhuma alteração persistida.
 
@@ -269,7 +269,7 @@
 
 - **FA1 — Pré-requisitos não atendidos:** Simulação bloqueada com mensagem específica.
 - **FA2 — Input fora do universo:** Aviso em tempo real. Sistema rejeitará valor inválido.
-- **FA3 — Nenhuma regra ativada:** "Nenhuma regra foi ativada para estes valores". Retorna.
+- **FA3 — Nenhuma regra ativada:** "Nenhuma regra foi ativada para estes valores". Retorna. 📝 Pendente
 - **FA4 — Falha de comunicação:** Mensagem de erro. Retorna.
 
 **Pós-condições**
@@ -342,7 +342,7 @@
 **Fluxos Alternativos**
 
 - **FA1 — Nenhuma simulação:** "Nenhuma simulação encontrada".
-- **FA2 — Usuário cancela exclusão:** Simulação permanece.
+- **FA2 — Usuário cancela exclusão:** Simulação permanece. 📝 Pendente
 - **FA3 — Falha ao carregar:** Mensagem de erro e botão "Tentar novamente".
 
 **Pós-condições**
@@ -374,11 +374,11 @@
 **Fluxos Alternativos**
 
 - **FA1 — Arquivo inválido:** "Arquivo inválido ou corrompido". Retorna.
-- **FA2 — Coluna ausente ou não numérica:** Erro com detalhes. Retorna ao mapeamento.
+- **FA2 — Coluna ausente ou não numérica:** Erro com detalhes. Retorna ao mapeamento. 📝 Pendente
 - **FA3 — Linhas com valores inválidos:** Registra como erro e prossegue.
 - **FA4 — Nenhuma linha válida:** "Nenhuma linha gerou saída válida". Retorna.
-- **FA5 — Arquivo excede limite:** "Arquivo excede o tamanho máximo". Retorna.
-- **FA6 — Nome de coluna inválido:** "Use apenas letras, números e underscores". Retorna.
+- **FA5 — Arquivo excede limite:** "Arquivo excede o tamanho máximo". Retorna. 📝 Pendente
+- **FA6 — Nome de coluna inválido:** "Use apenas letras, números e underscores". Retorna. 📝 Pendente
 - **FA7 — Sistema incompleto:** Bloqueia com mensagem.
 
 **Pós-condições**
@@ -410,7 +410,7 @@
 **Fluxos Alternativos**
 
 - **FA1 — Menos de duas simulações selecionadas:** Sistema exibe "Selecione ao menos duas simulações para comparar". Retorna.
-- **FA2 — Simulações de sistemas diferentes:** Sistema exibe "Apenas simulações do mesmo sistema podem ser comparadas". Retorna.
+- **FA2 — Simulações de sistemas diferentes:** Sistema exibe "Apenas simulações do mesmo sistema podem ser comparadas". Retorna. 📝 Pendente
 
 **Pós-condições**
 
@@ -467,7 +467,7 @@
 
 **Fluxos Alternativos**
 
-- **FA1 — Nome duplicado:** Sistema exibe "Já existe um sistema com este nome". Retorna.
+- **FA1 — Nome duplicado:** Sistema exibe "Já existe um sistema com este nome". Retorna. 📝 Pendente
 - **FA2 — Falha de comunicação:** Mensagem de erro. Nada é criado.
 
 **Pós-condições**
@@ -505,7 +505,7 @@
 
 - **FA1 — JSON inválido (importação):** Sistema exibe "Arquivo JSON inválido ou mal formatado". Retorna.
 - **FA2 — Estrutura incompleta:** Sistema exibe "O JSON não contém todos os campos obrigatórios". Retorna.
-- **FA3 — Nome duplicado (importação):** Sistema exibe "Já existe um sistema com este nome". Retorna.
+- **FA3 — Nome duplicado (importação):** Sistema exibe "Já existe um sistema com este nome". Retorna. 📝 Pendente
 
 **Pós-condições**
 
@@ -547,8 +547,8 @@
 
 **Fluxos Alternativos**
 
-- **FA1 — Nome duplicado:** "Já existe um cenário com este nome neste sistema". Retorna.
-- **FA2 — Nenhum input preenchido:** "Preencha ao menos um input antes de salvar". Retorna.
+- **FA1 — Nome duplicado:** "Já existe um cenário com este nome neste sistema". Retorna. 📝 Pendente
+- **FA2 — Nenhum input preenchido:** "Preencha ao menos um input antes de salvar". Retorna. 📝 Pendente
 
 **Pós-condições**
 
@@ -580,7 +580,7 @@
 
 - **FA1 — Intervalo inválido (início ≥ fim):** Sistema exibe "Início deve ser menor que fim". Retorna.
 - **FA2 — Passo inválido (≤ 0):** "Passo deve ser maior que zero". Retorna.
-- **FA3 — Sistema incompleto:** Bloqueia com mensagem.
+- **FA3 — Sistema incompleto:** Bloqueia com mensagem. 📝 Pendente
 
 **Pós-condições**
 
@@ -609,7 +609,7 @@
 
 **Fluxos Alternativos**
 
-- **FA1 — Nenhuma regra ativada:** Matriz exibe todas as células em cinza com mensagem "Nenhuma regra foi ativada".
+- **FA1 — Nenhuma regra ativada:** Matriz exibe todas as células em cinza com mensagem "Nenhuma regra foi ativada". 📝 Pendente
 
 **Pós-condições**
 
@@ -683,8 +683,8 @@
 **Fluxos Alternativos**
 
 - **FA1 — Timeline vazia:** "Nenhuma alteração registrada para este sistema".
-- **FA2 — Ação não pode ser desfeita (ex.: exclusão em cascata complexa):** Sistema exibe "Esta ação não pode ser desfeita automaticamente".
-- **FA3 — Conflito ao desfazer (estado atual difere do esperado):** Sistema exibe "Não é possível desfazer: o estado atual do sistema difere do esperado. Verifique as alterações manuais."
+- **FA2 — Ação não pode ser desfeita (ex.: exclusão em cascata complexa):** Sistema exibe "Esta ação não pode ser desfeita automaticamente". 📝 Pendente
+- **FA3 — Conflito ao desfazer (estado atual difere do esperado):** Sistema exibe "Não é possível desfazer: o estado atual do sistema difere do esperado. Verifique as alterações manuais." 📝 Pendente
 
 **Pós-condições**
 
@@ -719,8 +719,8 @@
 - **FA1 — Nenhum dado de referência:** Usuário pode definir função objetivo manual (ex: minimizar/maximizar saída para determinados inputs).
 - **FA2 — Limites inválidos:** "Limite mínimo deve ser menor que o máximo para cada parâmetro". Retorna.
 - **FA3 — Sem parâmetros selecionados:** "Selecione ao menos um parâmetro para otimizar". Retorna.
-- **FA4 — Otimização divergente:** "A otimização não convergiu dentro da tolerância. Ajuste os parâmetros do PSO e tente novamente."
-- **FA5 — Usuário cancela:** Otimização interrompida. Resultados parciais descartados.
+- **FA4 — Otimização divergente:** "A otimização não convergiu dentro da tolerância. Ajuste os parâmetros do PSO e tente novamente." 📝 Pendente
+- **FA5 — Usuário cancela:** Otimização interrompida. Resultados parciais descartados. 📝 Pendente
 
 **Pós-condições**
 
@@ -751,9 +751,9 @@
 
 **Fluxos Alternativos**
 
-- **FA1 — Sistema configurado para Mamdani sem consequente fuzzy:** "O sistema precisa de uma variável consequente com termos para TSK ou remova os termos para usar apenas coeficientes."
-- **FA2 — Coeficientes inconsistentes:** "Número de coeficientes deve ser 1 + N (bias + uma para cada entrada)". Retorna.
-- **FA3 — Nenhuma regra ativada:** Mensagem similar ao UC04-FA3.
+- **FA1 — Sistema configurado para Mamdani sem consequente fuzzy:** "O sistema precisa de uma variável consequente com termos para TSK ou remova os termos para usar apenas coeficientes." 📝 Pendente
+- **FA2 — Coeficientes inconsistentes:** "Número de coeficientes deve ser 1 + N (bias + uma para cada entrada)". Retorna. 📝 Pendente
+- **FA3 — Nenhuma regra ativada:** Mensagem similar ao UC04-FA3. 📝 Pendente
 
 **Pós-condições**
 
@@ -784,7 +784,7 @@
 **Fluxos Alternativos**
 
 - **FA1 — Nenhuma variável configurada:** "Não há dados para exportar."
-- **FA2 — Falha na geração:** "Não foi possível gerar o SVG". Retorna.
+- **FA2 — Falha na geração:** "Não foi possível gerar o SVG". Retorna. 📝 Pendente
 
 **Pós-condições**
 

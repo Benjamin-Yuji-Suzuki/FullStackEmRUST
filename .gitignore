@@ -45,3 +45,8 @@ lcov_unit.info
 
 # Cobertura de testes (gerado localmente)
 coverage.sh
+
+# Documentação redundante (conteúdo consolidado em RELATORIO_ENTREGA.md)
+TEST_CASES.md
+fuzzysimulated/TESTES.md
+fuzzysimulated/TESTES_MAP.md

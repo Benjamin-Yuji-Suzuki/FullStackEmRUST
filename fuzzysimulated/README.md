@@ -3,7 +3,7 @@
 Plataforma full-stack **100% Rust** para construção e simulação de sistemas de inferência fuzzy (Mamdani + TSK), com otimização PSO de parâmetros de MF, diagnóstico explicativo e exportação SVG.
 
 **Projeto acadêmico** — CESUPA 02/2026  
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados · Resolução de Problemas Multivariáveis
+**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados
 
 ---
 
@@ -102,7 +102,7 @@ cargo check -p server && cargo check -p app && cargo check -p frontend
 |---|---|---|---|
 | Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
 | Unit (tests/) | 19 | ❌ | `cargo test -p server --test all -- unit::` |
-| HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
+| HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored --test-threads=1` |
 | Integration | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
 | **Total server** | **120** | | `DATABASE_URL=... cargo test -p server` |
 

@@ -1392,39 +1392,56 @@ fn Variaveis() -> impl IntoView {
      let sweep_result = RwSignal::new(None::<serde_json::Value>);
      let sweep_loading = RwSignal::new(false);
 
-     spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await.into_iter().filter(|s| s.status != "desativado").collect()); } });
+      spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await.into_iter().filter(|s| s.status != "desativado").collect()); } });
 
-     let load_vars = {
-         let ss = selected_sys.clone();
-         let v = variables.clone();
-         let i = inputs.clone();
-         let r = result.clone();
-         let sc = scenarios.clone();
-         move || {
-             let sid = ss.get();
-             if !sid.is_empty() {
-                 let v2 = v.clone();
-                 let i2 = i.clone();
-                 let r2 = r.clone();
-                 let sc2 = sc.clone();
-                 spawn_async(async move {
-                     let vars = list_variables(&sid).await;
-                     let mut map = std::collections::HashMap::new();
-                     for var in &vars {
-                         if var["role"].as_str() == Some("antecedent") {
-                             if let Some(min) = var["universe_min"].as_f64() {
-                                 map.insert(var["name"].as_str().unwrap_or("").to_string(), (min + var["universe_max"].as_f64().unwrap_or(100.0)) / 2.0);
-                             }
-                         }
-                     }
-                     i2.set(map);
-                     v2.set(vars);
-                     r2.set(None);
-                     sc2.set(list_scenarios(&sid).await);
-                 });
-             }
-         }
-     };
+      let tsk_inputs = RwSignal::new(std::collections::HashMap::<String, f64>::new());
+      let tsk_coeffs_str = RwSignal::new(String::new());
+      let tsk_result = RwSignal::new(None::<serde_json::Value>);
+      let tsk_loading = RwSignal::new(false);
+
+      let load_vars = {
+          let ss = selected_sys.clone();
+          let v = variables.clone();
+          let i = inputs.clone();
+          let ti = tsk_inputs.clone();
+          let tc = tsk_coeffs_str.clone();
+          let tr = tsk_result.clone();
+          let r = result.clone();
+          let sc = scenarios.clone();
+          move || {
+              let sid = ss.get();
+              if !sid.is_empty() {
+                  let v2 = v.clone();
+                  let i2 = i.clone();
+                  let ti2 = ti.clone();
+                  let tc2 = tc.clone();
+                  let tr2 = tr.clone();
+                  let r2 = r.clone();
+                  let sc2 = sc.clone();
+                  spawn_async(async move {
+                      let vars = list_variables(&sid).await;
+                      let mut map = std::collections::HashMap::new();
+                      let mut tsk_map = std::collections::HashMap::new();
+                      for var in &vars {
+                          if var["role"].as_str() == Some("antecedent") {
+                              if let Some(min) = var["universe_min"].as_f64() {
+                                  let midpoint = (min + var["universe_max"].as_f64().unwrap_or(100.0)) / 2.0;
+                                  map.insert(var["name"].as_str().unwrap_or("").to_string(), midpoint);
+                                  tsk_map.insert(var["name"].as_str().unwrap_or("").to_string(), midpoint);
+                              }
+                          }
+                      }
+                      i2.set(map);
+                      ti2.set(tsk_map);
+                      tc2.set(String::new());
+                      tr2.set(None);
+                      v2.set(vars);
+                      r2.set(None);
+                      sc2.set(list_scenarios(&sid).await);
+                  });
+              }
+          }
+      };
 
      let run_sim = {
          let ss = selected_sys.clone();
@@ -1447,69 +1464,81 @@ fn Variaveis() -> impl IntoView {
          }
      };
 
-      let fetch_weather = {
-          let ci = city_input.clone();
-          let wm = weather_msg.clone();
-          let inp = inputs.clone();
-          let v = variables.clone();
-          move || {
-              let city = ci.get();
-              if city.trim().is_empty() { wm.set("Informe uma cidade".into()); return; }
-              let wm2 = wm.clone();
-              let inp2 = inp.clone();
-              let v2 = v.clone();
-              spawn_async(async move {
-                  match get_weather(&city).await {
-                      Ok(w) => {
-                          let mut current = inp2.get();
-                          let vars = v2.get();
-                          let var_names: Vec<String> = vars.iter()
-                              .filter(|x| x["role"].as_str() == Some("antecedent"))
-                              .filter_map(|x| x["name"].as_str().map(String::from))
-                              .collect();
-                          let match_name = |aliases: &[&str]| -> Option<String> {
-                              let lower_aliases: Vec<String> = aliases.iter().map(|a| a.to_lowercase()).collect();
-                              var_names.iter().find(|name| {
-                                  let n = name.to_lowercase();
-                                  lower_aliases.iter().any(|alias| n == *alias || n.contains(alias.as_str()) || alias.contains(&n))
-                              }).cloned()
-                          };
-                           if let Some(t_name) = match_name(&["temperatura", "temp", "temperature", "t"] as &[_]) {
-                               current.insert(t_name, w.temp);
+       let fetch_weather = {
+           let ci = city_input.clone();
+           let wm = weather_msg.clone();
+           let inp = inputs.clone();
+           let tsk_i = tsk_inputs.clone();
+           let v = variables.clone();
+           move || {
+               let city = ci.get();
+               if city.trim().is_empty() { wm.set("Informe uma cidade".into()); return; }
+               let wm2 = wm.clone();
+               let inp2 = inp.clone();
+               let tsk_i2 = tsk_i.clone();
+               let v2 = v.clone();
+               spawn_async(async move {
+                   match get_weather(&city).await {
+                       Ok(w) => {
+                           let mut current = inp2.get();
+                           let mut tsk_current = tsk_i2.get();
+                           let vars = v2.get();
+                           let var_names: Vec<String> = vars.iter()
+                               .filter(|x| x["role"].as_str() == Some("antecedent"))
+                               .filter_map(|x| x["name"].as_str().map(String::from))
+                               .collect();
+                           let match_name = |aliases: &[&str]| -> Option<String> {
+                               let lower_aliases: Vec<String> = aliases.iter().map(|a| a.to_lowercase()).collect();
+                               var_names.iter().find(|name| {
+                                   let n = name.to_lowercase();
+                                   lower_aliases.iter().any(|alias| n == *alias || n.contains(alias.as_str()) || alias.contains(&n))
+                               }).cloned()
+                           };
+                            if let Some(t_name) = match_name(&["temperatura", "temp", "temperature", "t"] as &[_]) {
+                                current.insert(t_name.clone(), w.temp);
+                                tsk_current.insert(t_name, w.temp);
+                            }
+                            if let Some(h_name) = match_name(&["umidade", "humidity", "humid", "umid", "h"] as &[_]) {
+                                current.insert(h_name.clone(), w.humidity);
+                                tsk_current.insert(h_name, w.humidity);
+                            }
+                            inp2.set(current);
+                            tsk_i2.set(tsk_current);
+                            let matched_t = match_name(&["temperatura", "temp", "temperature", "t"] as &[_]);
+                            let matched_h = match_name(&["umidade", "humidity", "humid", "umid", "h"] as &[_]);
+                           let mut msg = format!("{}: {}°C, {}%", w.city, w.temp, w.humidity);
+                           if matched_t.is_none() || matched_h.is_none() {
+                               msg.push_str(" — Nenhuma variavel com nome temperatura/umidade encontrada, insira manualmente");
                            }
-                           if let Some(h_name) = match_name(&["umidade", "humidity", "humid", "umid", "h"] as &[_]) {
-                               current.insert(h_name, w.humidity);
-                           }
-                           inp2.set(current);
-                           let matched_t = match_name(&["temperatura", "temp", "temperature", "t"] as &[_]);
-                           let matched_h = match_name(&["umidade", "humidity", "humid", "umid", "h"] as &[_]);
-                          let mut msg = format!("{}: {}°C, {}%", w.city, w.temp, w.humidity);
-                          if matched_t.is_none() || matched_h.is_none() {
-                              msg.push_str(" — Nenhuma variavel com nome temperatura/umidade encontrada, insira manualmente");
-                          }
-                          wm2.set(msg);
-                      }
-                      Err(e) => wm2.set(format!("Erro: {e}")),
-                  }
-              });
-          }
-      };
+                           wm2.set(msg);
+                       }
+                       Err(e) => wm2.set(format!("Erro: {e}")),
+                   }
+               });
+           }
+       };
 
-     let save_scenario = {
-         let ss = selected_sys.clone();
-         let inp = inputs.clone();
-         let sn = scenario_name.clone();
-         let sm = scenario_msg.clone();
-         let sc = scenarios.clone();
-         move || {
-             let sid = ss.get();
-             let name = sn.get();
-             if sid.is_empty() || name.trim().is_empty() { sm.set("Informe um nome".into()); return; }
-             let inputs_val = serde_json::json!(inp.get());
-             let sc2 = sc.clone();
-             let sm2 = sm.clone();
-             spawn_async(async move {
-                 if let Some(_) = create_scenario(&sid, &name, &inputs_val).await {
+      let save_scenario = {
+          let ss = selected_sys.clone();
+          let inp = inputs.clone();
+          let tsk_i = tsk_inputs.clone();
+          let tsk_c = tsk_coeffs_str.clone();
+          let sn = scenario_name.clone();
+          let sm = scenario_msg.clone();
+          let sc = scenarios.clone();
+          move || {
+              let sid = ss.get();
+              let name = sn.get();
+              if sid.is_empty() || name.trim().is_empty() { sm.set("Informe um nome".into()); return; }
+              let inputs_val = serde_json::json!({
+                  "inputs": serde_json::json!(inp.get()),
+                  "tsk_inputs": serde_json::json!(tsk_i.get()),
+                  "tsk_coeffs": serde_json::json!(tsk_c.get()),
+              });
+              let sc2 = sc.clone();
+              let sm2 = sm.clone();
+              spawn_async(async move {
+                  if let Some(_) = create_scenario(&sid, &name, &inputs_val).await {
                      sc2.set(list_scenarios(&sid).await);
                      sm2.set("Cenario salvo!".into());
                  } else {
@@ -1519,20 +1548,54 @@ fn Variaveis() -> impl IntoView {
          }
      };
 
-     let load_scenario = {
-         let inp = inputs.clone();
-         move |s: ScenarioInfo| {
-             if let Some(obj) = s.inputs.as_object() {
-                 let mut map = std::collections::HashMap::new();
-                 for (k, v) in obj {
-                     if let Some(n) = v.as_f64() {
-                         map.insert(k.clone(), n);
-                     }
-                 }
-                 inp.set(map);
-             }
-         }
-     };
+      let load_scenario = {
+          let inp = inputs.clone();
+          let tsk_i = tsk_inputs.clone();
+          let tsk_c = tsk_coeffs_str.clone();
+          let tr = tsk_result.clone();
+          move |s: ScenarioInfo| {
+              if let Some(obj) = s.inputs.as_object() {
+                  if obj.contains_key("inputs") {
+                      let flat = obj["inputs"].as_object();
+                      if let Some(flat) = flat {
+                          let mut map = std::collections::HashMap::new();
+                          for (k, v) in flat {
+                              if let Some(n) = v.as_f64() {
+                                  map.insert(k.clone(), n);
+                              }
+                          }
+                          inp.set(map);
+                      }
+                       if let Some(tsk_inputs_obj) = obj.get("tsk_inputs").and_then(|v| v.as_object()) {
+                           let mut tm = std::collections::HashMap::new();
+                           for (k, v) in tsk_inputs_obj {
+                               if let Some(n) = v.as_f64() {
+                                   tm.insert(k.clone(), n);
+                               }
+                           }
+                           tsk_i.set(tm);
+                       } else {
+                           tsk_i.set(inp.get());
+                       }
+                      let coeffs_val = obj.get("tsk_coeffs");
+                      tsk_c.set(match coeffs_val {
+                          Some(v) if v.is_string() => v.as_str().unwrap_or("").to_string(),
+                          Some(v) => serde_json::to_string(v).unwrap_or_default(),
+                          None => String::new(),
+                      });
+                      tr.set(None);
+                  } else {
+                      let mut map = std::collections::HashMap::new();
+                      for (k, v) in obj {
+                          if let Some(n) = v.as_f64() {
+                              map.insert(k.clone(), n);
+                          }
+                      }
+                      inp.set(map);
+                  }
+              }
+          }
+      };
 
      let delete_scenario_fn = {
          let ss = selected_sys.clone();
@@ -1574,14 +1637,9 @@ fn Variaveis() -> impl IntoView {
          }
      };
 
-     let active_tab = RwSignal::new("mamdani".to_string());
+      let active_tab = RwSignal::new("mamdani".to_string());
 
-     let tsk_inputs = RwSignal::new(std::collections::HashMap::<String, f64>::new());
-     let tsk_coeffs_str = RwSignal::new(String::new());
-     let tsk_result = RwSignal::new(None::<serde_json::Value>);
-     let tsk_loading = RwSignal::new(false);
-
-     let svg_result = RwSignal::new(None::<serde_json::Value>);
+      let svg_result = RwSignal::new(None::<serde_json::Value>);
      let svg_loading = RwSignal::new(false);
 
       let diag_result = RwSignal::new(None::<serde_json::Value>);
@@ -1834,10 +1892,19 @@ fn Variaveis() -> impl IntoView {
                                               }/>
                                       </div>
                                   }
-                              }).collect_view()}
-                              <div style="margin-top:12px">
-                                  <label class="input-label">"Coeficientes TSK (JSON, ex: {\"Risco_Alto\": [50, 0.5]})"</label>
-                                  <textarea class="text-input" style="min-height:60px;font-family:monospace;font-size:10px"
+                               }).collect_view()}
+                               <div style="display:flex;gap:8px;align-items:center;margin-top:12px;margin-bottom:12px">
+                                   <input type="text" class="text-input" style="margin-bottom:0;flex:1" placeholder="Cidade (ex: Belém)"
+                                       prop:value=move || city_input.get()
+                                       on:input=move |e| city_input.set(event_target_value(&e))/>
+                                   <button class="btn btn-primary" style="font-size:10px;padding:4px 10px" on:click=move |_| fetch_weather()>
+                                       <i class="ti ti-cloud"></i>"Buscar Clima"
+                                   </button>
+                               </div>
+                               {move || { let m = weather_msg.get(); if !m.is_empty() { view! { <div style="font-size:10px;color:var(--teal);margin-bottom:12px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+                               <div style="margin-top:12px">
+                                   <label class="input-label">"Coeficientes TSK (JSON, ex: {\"Risco_Alto\": [50, 0.5]})"</label>
+                                   <textarea class="text-input" style="min-height:60px;font-family:monospace;font-size:10px"
                                       prop:value=move || tsk_coeffs_str.get()
                                       on:input=move |e| tsk_coeffs_str.set(event_target_value(&e))></textarea>
                               </div>
@@ -1869,33 +1936,88 @@ fn Variaveis() -> impl IntoView {
                           }.into_any()
                       }}
                   </div>
-                  <div class="panel">
-                      <div class="panel-title">"Resultado TSK"</div>
-                      {move || {
-                          if tsk_loading.get() { return view! { <div style="font-size:11px;color:var(--text3);padding:16px 0">"Calculando..."</div> }.into_any(); }
-                          match tsk_result.get() {
-                              None => view! { <div style="font-size:11px;color:var(--text3);padding:16px 0">"Configure os coeficientes e execute."</div> }.into_any(),
-                              Some(r) => {
-                                  let outputs = r["outputs"].as_object().cloned().unwrap_or_default();
-                                  view! {
-                                      {outputs.into_iter().map(|(k, v)| {
-                                          let val = v.as_f64().unwrap_or(0.0);
-                                          view! {
-                                              <div class="output-display">
-                                                  <div class="output-val">{format!("{:.4}", val)}</div>
-                                                  <div class="output-label">{k}</div>
-                                              </div>
-                                          }
-                                      }).collect_view()}
-                                  }.into_any()
-                              }
-                          }
-                      }}
-                  </div>
-              </div>
-              }.into_any() } else { view! {}.into_any() }}
+                   <div class="panel">
+                       <div class="panel-title">"Resultado TSK"</div>
+                       {move || {
+                           let vars = variables.get();
+                           let uni_info = vars.iter().find(|v| v["role"].as_str() == Some("consequent"))
+                               .map(|v| format!("universo [{}, {}]", v["universe_min"].as_f64().unwrap_or(0.0), v["universe_max"].as_f64().unwrap_or(1.0)))
+                               .unwrap_or_default();
+                           view! { <div style="font-size:9px;color:var(--text3);margin-bottom:8px">{uni_info}</div> }
+                       }}
+                       {move || {
+                           if tsk_loading.get() { return view! { <div style="font-size:11px;color:var(--text3);padding:16px 0">"Calculando..."</div> }.into_any(); }
+                           match tsk_result.get() {
+                               None => view! { <div style="font-size:11px;color:var(--text3);padding:16px 0">"Configure os coeficientes e execute."</div> }.into_any(),
+                               Some(r) => {
+                                   let outputs = r["outputs"].as_object().cloned().unwrap_or_default();
+                                   view! {
+                                       {outputs.into_iter().map(|(k, v)| {
+                                           let val = v.as_f64().unwrap_or(0.0);
+                                           view! {
+                                               <div class="output-display">
+                                                   <div class="output-val">{format!("{:.4}", val)}</div>
+                                                   <div class="output-label">{k}</div>
+                                               </div>
+                                           }
+                                       }).collect_view()}
+                                   }.into_any()
+                               }
+                           }
+                       }}
+                   </div>
+                   {move || {
+                       let sid = selected_sys.get();
+                       if sid.is_empty() { return view! {}.into_any(); }
+                       let sc_list = scenarios.get();
+                       view! {
+                           <div style="margin-top:20px;display:flex;gap:20px;flex-wrap:wrap">
+                               <div class="panel" style="flex:1;min-width:280px">
+                                   <div class="panel-title">"Cenarios TSK (UC12)"</div>
+                                   <div style="display:flex;gap:6px;margin-bottom:8px">
+                                       <input type="text" class="text-input" style="margin-bottom:0;flex:1;font-size:11px" placeholder="Nome do cenario"
+                                           prop:value=move || scenario_name.get()
+                                           on:input=move |e| scenario_name.set(event_target_value(&e))/>
+                                       <button class="btn btn-primary" style="font-size:10px;padding:4px 10px" on:click=move |_| save_scenario()>
+                                           <i class="ti ti-device-floppy"></i>"Salvar"
+                                       </button>
+                                   </div>
+                                   {move || { let m = scenario_msg.get(); if !m.is_empty() { view! { <div style="font-size:10px;color:var(--teal);margin-bottom:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
+                                   {if sc_list.is_empty() {
+                                       view! { <div style="font-size:10px;color:var(--text3)">"Nenhum cenario salvo."</div> }.into_any()
+                                   } else {
+                                       view! {
+                                           <div style="max-height:200px;overflow-y:auto">
+                                               {sc_list.into_iter().map(|sc| {
+                                                   let sc_id = sc.id.clone();
+                                                   let sc_name = sc.name.clone();
+                                                   let load_fn = load_scenario.clone();
+                                                   let del_fn = delete_scenario_fn.clone();
+                                                   view! {
+                                                       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+                                                           <span style="font-size:11px">{sc_name.clone()}</span>
+                                                           <div style="display:flex;gap:4px">
+                                                               <button class="icon-btn" title="Carregar" on:click=move |_| load_fn(sc.clone())>
+                                                                   <i class="ti ti-upload"></i>
+                                                               </button>
+                                                               <button class="icon-btn" title="Deletar" on:click=move |_| del_fn(sc_id.clone())>
+                                                                   <i class="ti ti-trash"></i>
+                                                               </button>
+                                                           </div>
+                                                       </div>
+                                                   }
+                                               }).collect_view()}
+                                           </div>
+                                       }.into_any()
+                                   }}
+                               </div>
+                           </div>
+                       }.into_any()
+                   }}
+               </div>
+               }.into_any() } else { view! {}.into_any() }}
 
-              // ─── SVG Tab ───
+               // ─── SVG Tab ───
               {move || if active_tab.get() == "svg" { view! {
               <div>
                   <button class="btn btn-primary" style="margin-bottom:16px" on:click={

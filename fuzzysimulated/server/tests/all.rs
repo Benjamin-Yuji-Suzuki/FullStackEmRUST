@@ -12,6 +12,7 @@ use std::sync::OnceLock;
 static TEST_POOL: OnceLock<PgPool> = OnceLock::new();
 
 async fn get_test_pool() -> PgPool {
+    dotenvy::dotenv().ok();
     if let Some(pool) = TEST_POOL.get() {
         return pool.clone();
     }

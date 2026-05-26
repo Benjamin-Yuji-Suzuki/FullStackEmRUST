@@ -93,3 +93,21 @@ fn test_validate_gaussmf_wrong_params() {
         result
     );
 }
+
+#[test]
+fn test_validate_trimf_b_gt_c() {
+    let result = validate_trimf(&[0.0, 100.0, 50.0]);
+    assert!(result.is_err(), "trimf [0,100,50]: b=100 > c=50 deve ser Err: {:?}", result);
+}
+
+#[test]
+fn test_validate_trapmf_b_gt_c() {
+    let result = validate_trapmf(&[0.0, 40.0, 20.0, 60.0]);
+    assert!(result.is_err(), "trapmf [0,40,20,60]: b=40 > c=20 deve ser Err: {:?}", result);
+}
+
+#[test]
+fn test_validate_trapmf_c_gt_d() {
+    let result = validate_trapmf(&[0.0, 20.0, 60.0, 40.0]);
+    assert!(result.is_err(), "trapmf [0,20,60,40]: c=60 > d=40 deve ser Err: {:?}", result);
+}

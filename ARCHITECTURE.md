@@ -138,7 +138,7 @@ Na primeira execução, `server/migrations/002_seed.sql` insere automaticamente 
 
 ```
 FullStackEmRUST/
-├── USE_CASES.md         # 25 casos de uso
+├── USE_CASES.md         # 20 casos de uso
 ├── TEST_CASES.md # 44 casos de teste (30 inline + 16 unit + 64 HTTP + 6 integração)
 ├── FUZZY_MODEL.md       # Modelos Mamdani + TSK + PSO
 ├── ARCHITECTURE.md      # Este documento

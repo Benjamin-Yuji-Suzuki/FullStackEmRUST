@@ -97,17 +97,16 @@ migrations/
 
 ## 4. Suíte de Testes
 
-### 4.1 Nível Unitário (30 + 16 = 46 testes)
+### 4.1 Nível Unitário (31 + 20 = 51 testes)
 
 | Módulo | Arquivo | Testes |
 |--------|---------|--------|
-| Engine | `server/src/engine.rs` (inline) | 14 |
+| Engine | `server/src/engine.rs` (inline) | 15 |
 | Errors | `server/src/errors.rs` (inline) | 4 |
 | Weather | `server/src/routes/weather.rs` (inline) | 4 |
-| Audit | `server/src/routes/audit_routes.rs` (inline) | 9 |
-| MF Validation | `tests/unit/mf_validation.rs` | 10 |
+| Audit | `server/src/routes/audit_routes.rs` (inline) | 8 |
+| MF Validation | `tests/unit/mf_validation.rs` | 14 |
 | System Validation | `tests/unit/system_validation.rs` | 6 |
-
 
 ### 4.2 Nível Integração HTTP (64 testes)
 
@@ -123,40 +122,73 @@ migrations/
 | Sweep/Surface | `sweep_surface.rs` | 5 |
 | Batch | `batch.rs` | 5 |
 | Audit | `audit.rs` | 3 |
-
 | Misc | `misc.rs` | 3 |
 | Pipeline | `pipeline.rs` | 1 |
-| **Integração DB** | `tests/integration_db/` | 6 (ignored) |
 
-### 4.3 Totais
+### 4.3 Mapa UC → Testes
+
+| UC | Unit (inline) | Unit (tests/) | HTTP | Integração DB | Integração API | E2E | Total |
+|----|:-------------:|:-------------:|:----:|:-------------:|:--------------:|:---:|:-----:|
+| UC01 — Gerenciar Sistemas | 4 | 6 | 8 | 2 | — | 6 | 26 |
+| UC02 — Variáveis e Termos | — | 14 | 12 | 3 | — | 3 | 32 |
+| UC03 — Regras | — | — | 5 | — | — | 1 | 6 |
+| UC04 — Simulação Mamdani | 15 | — | 2 | 1 | — | 2 | 20 |
+| UC05 — OpenWeather | 4 | — | 2 | — | 3 | 1 | 10 |
+| UC06 — Histórico | — | — | 1 | — | — | 1 | 2 |
+| UC07 — Batch | — | — | 5 | — | — | 1 | 6 |
+| UC08 — Comparar | — | — | 2 | — | — | 1 | 3 |
+| UC09 — Exportar Relatório | — | — | 1 | — | — | 1 | 2 |
+| UC10 — Duplicar | — | — | 1 | — | — | 1 | 2 |
+| UC11 — Exportar/Importar | — | — | 1 | — | — | 1 | 2 |
+| UC12 — Cenários | — | — | 5 | — | — | — | 5 |
+| UC13 — Varredura (Sweep) | — | — | 2 | — | — | 1 | 3 |
+| UC14 — Matriz de Regras | — | — | 1 | — | — | 1 | 2 |
+| UC15 — Superfície | — | — | 3 | — | — | 1 | 4 |
+| UC16 — Auditoria | 8 | — | 3 | — | — | 1 | 12 |
+| UC17 — PSO | — | — | 2 | — | — | 1 | 3 |
+| UC18 — TSK | — | — | 2 | — | — | 1 | 3 |
+| UC19 — SVG | — | — | 2 | — | — | 1 | 3 |
+| UC20 — Diagnóstico | — | — | 2 | — | — | 1 | 3 |
+| **Totais** | **31** | **20** | **64** | **6** | **3** | **40** | **164** |
+
+> Nota: testes contados múltiplas vezes se cobrem mais de um UC. Total real único: 124 server + 40 E2E = 164.
+>
+> O teste `test_e2e_full_pipeline` (pipeline.rs) executa 20 operações encadeadas: criar sistema → variáveis → termos → regras → simular Mamdani → diagnóstico → SVG → TSK → batch → rule-matrix → sweep → surface → cenários CRUD → comparar → duplicar → import/export → status → PSO → auditoria.
+>
+> Testes de integração OpenWeather API (ignorados, requerem chave real) testam: Belém (cidade válida), São Paulo (acentos/encoding), cidade inexistente (404 da API). A chave é lida automaticamente do `.env`.
+
+### 4.4 Totais
 
 | Nível | Qtde |
 |-------|------|
-| Unitários (src inline) | 30 |
-| Unitários (tests/unit) | 16 |
+| Unitários (src inline) | 31 |
+| Unitários (tests/unit) | 20 |
 | Integração HTTP | 64 |
+| Integração API (OpenWeather, ignored) | 3 |
 | Integração DB (ignored) | 6 |
-| **Total server** | **116** |
+| **Total server** | **124** |
 
 ---
 
 ## 5. Cobertura de Código (llvm-cov)
 
-| Módulo | Cobertura |
-|--------|-----------|
-| `engine.rs` (motor inferência) | **91.76%** |
+| Módulo | Cobertura (regiões) |
+|--------|---------------------|
+| `audit.rs` | **100%** |
 | `errors.rs` | **100%** |
-| `validation.rs` | **98.15%** |
+| `routes/mod.rs` | **100%** |
+| `validation.rs` | **95.71%** |
+| `engine.rs` (motor inferência) | **92.55%** |
 | `routes/rules.rs` | **90.06%** |
 | `routes/scenarios.rs` | **88.16%** |
-| `routes/simulate.rs` | **74.79%** |
-| `routes/variables.rs` | **79.60%** |
-| `routes/audit_routes.rs` | **70.43%** |
+| `routes/simulate.rs` | **85.82%** |
+| `routes/variables.rs` | **79.42%** |
+| `routes/audit_routes.rs` | **70.18%** |
 | `routes/systems.rs` | **64.79%** |
 | `routes/batch.rs` | **44.11%** |
 | `routes/weather.rs` | **50.39%** |
 
-**Meta 70-80% atingida** para os módulos centrais de lógica de negócio (engine, validation, rules, scenarios). Rotas HTTP têm cobertura variável devido à dependência de parquet files reais (batch) e API key (weather).
+**Meta 70-80% atingida** para os módulos centrais (engine 93%, validation 96%, rules 90%, scenarios 88%). Rotas HTTP têm cobertura variável: batch (44%) depende de arquivos Parquet reais; weather (50%) precisa de API key externa. Cobertura geral: **77.93% regiões / 80.55% linhas**.
 
 Relatório HTML: `coverage/html/html/index.html`
 
@@ -176,7 +208,7 @@ Relatório HTML: `coverage/html/html/index.html`
 
 ```
 tests/
-  all.rs         → 80 testes (16 unit + 64 HTTP)
+  all.rs         → 84 testes (19 unit + 65 HTTP)
 ```
 
 ### 7.2 Para: Módulos por domínio

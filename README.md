@@ -4,7 +4,7 @@
 
 [![codecov](https://codecov.io/gh/Benjamin-Yuji-Suzuki/FullStackEmRUST/branch/main/graph/badge.svg)](https://codecov.io/gh/Benjamin-Yuji-Suzuki/FullStackEmRUST)
 
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados · Resolução de Problemas Multivariáveis — CESUPA 02/2026  
+**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 02/2026  
 **Modalidade (IA):** Opção B + Opção C-B (TSK) + Pontuação Extra (PSO)  
 **Equipe:** Benjamin Yuji Suzuki  
 **Repositório principal:** https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST
@@ -44,7 +44,7 @@ O projeto é composto por dois repositórios:
 
 ```
 FullStackEmRUST/
-├── USE_CASES.md              # 25 casos de uso
+├── USE_CASES.md              # 20 casos de uso
 ├── TEST_CASES.md             # 55 casos de teste
 ├── FUZZY_MODEL.md            # Modelo fuzzy de demonstração
 ├── ARCHITECTURE.md           # Arquitetura técnica
@@ -184,7 +184,7 @@ cargo leptos watch
 |---|---|---|---|
 | Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
 | Unit (tests/) | 19 | ❌ | `cargo test -p server --test all -- unit::` |
-| HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored` |
+| HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored --test-threads=1` |
 | Integration | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
 | **Total server** | **120** | | `DATABASE_URL=... cargo test -p server` |
 
