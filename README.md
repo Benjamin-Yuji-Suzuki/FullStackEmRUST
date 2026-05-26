@@ -75,13 +75,13 @@ FullStackEmRUST/
     │   │   ├── 008_seed_risco_cibernetico.sql
     │   │   └── 009_reset_and_seed.sql
     │   └── tests/
-    │       ├── all.rs           # 80 testes (16 unit + 64 HTTP)
+    │       ├── all.rs           # 84 testes (20 unit + 64 HTTP)
     │       ├── common/          # TestApp helper
-    │       ├── unit/            # 16 unit tests sem DB
+    │       ├── unit/            # 20 unit tests sem DB
     │       └── integration/     # 6 integration tests com DB
     ├── frontend/              # crate WASM — entry point hydrate
     │   └── src/lib.rs
-    ├── end2end/               # 41 testes Playwright E2E
+    ├── end2end/               # 40 testes Playwright E2E
     ├── style/
     │   └── main.scss          # SCSS global (tema escuro Catppuccin)
     └── public/                # assets estáticos
@@ -181,12 +181,13 @@ cargo leptos watch
 ## Testes
 
 | Suite | Qtde | DB | Como rodar |
-|---|---|---|---|
-| Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
-| Unit (tests/) | 19 | ❌ | `cargo test -p server --test all -- unit::` |
-| HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored --test-threads=1` |
-| Integration | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
-| **Total server** | **120** | | `DATABASE_URL=... cargo test -p server` |
+|---|---|---|---|---|
+| Unit (inline) | 31 | ❌ | `cargo test -p server --lib` |
+| Unit (tests/) | 20 | ❌ | `cargo test -p server --test all -- unit::` |
+| HTTP Axum | 64 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored --test-threads=1` |
+| Integration API (OpenWeather) | 3 | ❌ | `DATABASE_URL=... cargo test -p server --test all -- --ignored integration_api::` |
+| Integration DB | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
+| **Total server** | **124** | | `DATABASE_URL=... cargo test -p server` |
 
 Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRUNCATE CASCADE`.
 
@@ -197,7 +198,7 @@ Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRU
 | Documento | Conteúdo |
 |---|---|
 | [USE_CASES.md](./USE_CASES.md) | Especificação dos 20 casos de uso |
-| [TEST_CASES.md](./TEST_CASES.md) | 44 casos de teste (116 testes server) |
+| [RELATORIO_ENTREGA.md](./fuzzysimulated/RELATORIO_ENTREGA.md) | Relatório de entrega (testes, cobertura, qualidade) |
 | [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Modelos Mamdani, TSK e Otimização PSO |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Banco de dados, integrações e fluxos |
 

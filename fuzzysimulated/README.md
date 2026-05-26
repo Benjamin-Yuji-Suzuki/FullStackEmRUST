@@ -15,7 +15,7 @@ Plataforma full-stack **100% Rust** para construção e simulação de sistemas 
 | **Backend** | Axum 0.8 (REST API) |
 | **Banco** | PostgreSQL via SQLx (queries compile-checked) |
 | **Build** | `cargo-leptos` |
-| **Testes** | 116 testes (30 inline + 16 unit + 64 HTTP + 6 integration) |
+| **Testes** | 124 testes (31 inline + 20 unit + 64 HTTP + 3 API + 6 DB) |
 
 ## Arquitetura
 
@@ -28,10 +28,11 @@ fuzzysimulated/
 │   │   ├── validation.rs  # Validação de MF, sistema, defuzz method
 │   │   └── routes/        # systems, variables, terms, rules, simulate, optimize, audit, weather
 │   ├── tests/
-│   │   ├── all.rs         # 80 testes (16 unit + 64 HTTP)
+│   │   ├── all.rs         # 84 testes (20 unit + 64 HTTP)
 │   │   ├── common/        # TestApp helper
-│   │   ├── unit/          # 16 unit tests
-│   │   └── integration/   # 6 integration tests (transaction rollback)
+│   │   ├── unit/          # 20 unit tests
+│   │   ├── integration/   # 6 integration tests (transaction rollback)
+│   │   └── integration_api/ # 3 OpenWeather API tests (ignored)
 │   └── migrations/        # SQLx migrations (schema + seed + audit + status)
 ├── app/             # Leptos components + server_fns
 │   └── src/
@@ -99,12 +100,13 @@ cargo check -p server && cargo check -p app && cargo check -p frontend
 ## Testes
 
 | Suite | Qtde | DB | Como rodar |
-|---|---|---|---|
-| Unit (inline) | 30 | ❌ | `cargo test -p server --lib` |
-| Unit (tests/) | 19 | ❌ | `cargo test -p server --test all -- unit::` |
-| HTTP Axum | 65 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored --test-threads=1` |
-| Integration | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
-| **Total server** | **120** | | `DATABASE_URL=... cargo test -p server` |
+|---|---|---|---|---|
+| Unit (inline) | 31 | ❌ | `cargo test -p server --lib` |
+| Unit (tests/) | 20 | ❌ | `cargo test -p server --test all -- unit::` |
+| HTTP Axum | 64 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --skip ignored --test-threads=1` |
+| Integration API (OpenWeather) | 3 | ❌ | `DATABASE_URL=... cargo test -p server --test all -- --ignored integration_api::` |
+| Integration DB | 6 | ✅ | `DATABASE_URL=... cargo test -p server --test all -- --ignored` |
+| **Total server** | **124** | | `DATABASE_URL=... cargo test -p server` |
 
 Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRUNCATE CASCADE` concorrente. Inclui teste E2E `test_e2e_full_pipeline` que percorre 20 operações: criar sistema → variáveis → termos → regras → simular Mamdani → diagnóstico → SVG → TSK → batch → sweep → surface → cenários → comparar → duplicar → import/export → status → PSO → auditoria.
 
