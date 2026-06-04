@@ -13,7 +13,7 @@ use cfg_if::cfg_if;
 
 fn status_color(status: &str) -> &'static str {
     match status {
-        "favorito" => "tag-amber",
+        "favorito" => "tag-rust",
         "concluido" => "tag-teal",
         "desativado" => "tag-gray",
         _ => "tag-green",
@@ -175,7 +175,7 @@ fn Sidebar() -> impl IntoView {
     view! {
         <aside class="sidebar">
             <div class="sidebar-logo">
-                <div class="logo-mark"><span class="logo-icon">"⬡"</span><span class="logo-text">"FuzzySimulated"</span></div>
+                <div class="logo-mark"><span class="logo-icon">"⚙"</span><span class="logo-text">"FuzzySimulated"</span></div>
                 <div class="logo-sub">"Inference Platform"</div>
             </div>
 
@@ -232,7 +232,7 @@ fn Sidebar() -> impl IntoView {
             </nav>
 
             <div class="sidebar-footer">
-                <span class="sprint-badge">"⬡ Sprint 3 — Entrega Final"</span>
+                <span class="sprint-badge">"⚙ Sprint 3 — Entrega Final"</span>
                 <div class="sidebar-course">"Disciplina QPS · CESUPA"</div>
             </div>
         </aside>
@@ -278,13 +278,12 @@ fn Dashboard() -> impl IntoView {
 
             <div class="section-header">
                 <div class="section-title">"Sistemas Fuzzy"</div>
-                <div style="display:flex;gap:6px">
+                <div class="flex gap-6">
                     <a class="btn btn-primary" href="/newsys" target="_self"
-                        style="font-size:10px;padding:5px 12px;text-decoration:none">
+                        class="btn btn-primary text-sm">
                         <i class="ti ti-plus"></i>"Criar Sistema"
                     </a>
-                    <a class="btn btn-outline" href="/import" target="_self"
-                        style="font-size:10px;padding:5px 12px;text-decoration:none">
+                    <a class="btn btn-outline text-sm" href="/import" target="_self">
                         <i class="ti ti-upload"></i>"Importar"
                     </a>
                 </div>
@@ -319,11 +318,11 @@ fn Dashboard() -> impl IntoView {
                                                     " " {st.clone()}
                                                 </span>
                                             </div>
-                                            <div style="font-size:10px;color:var(--text3)">
-                                                "Defuzz: " <span style="color:var(--amber)">{sys.defuzz_method.clone()}</span>
+                                            <div class="text-sm text-3">
+                                                "Defuzz: " <span class="text-rust">{sys.defuzz_method.clone()}</span>
                                                 " · Criado: " <span>{sys.created_at[..10].to_string()}</span>
                                             </div>
-                                            <div class="system-meta" style="margin-top:8px">
+                                            <div class="system-meta mt-8">
                                                 <select class="text-input" style="font-size:9px;padding:2px 4px;width:auto"
                                                     prop:value=move || sys_for_status.status.clone()
                                                     on:change={
@@ -434,13 +433,13 @@ fn Auditoria() -> impl IntoView {
     view! {
         <Topbar breadcrumb="Auditoria"/>
         <div class="content">
-            <div class="section-header" style="margin-bottom:16px">
+            <div class="section-header mb-16">
                 <div class="section-title">"Histórico de Alterações (UC16)"</div>
             </div>
 
-            <div class="panel" style="margin-bottom:16px">
+            <div class="panel mb-16">
                 <div class="panel-title">"Sistemas"</div>
-                <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <div class="flex gap-8 mt-8 items-center">
                     <select class="text-input" style="flex:1"
                         prop:value=move || selected_id.get()
                         on:change=move |e| { selected_id.set(event_target_value(&e)); show_orphans.set(false); }>
@@ -467,7 +466,7 @@ fn Auditoria() -> impl IntoView {
                             } else {
                                 view! {
                                     <div class="panel">
-                                        <div class="panel-title" style="color:var(--red)">"Sistemas Deletados"</div>
+                                        <div class="panel-title" class="text-red">"Sistemas Deletados"</div>
                                         <div class="timeline">
                                             <For each=move || summary.events.clone() key=|e| e.id.clone() let:evt>
                                                 <div class="timeline-item">
@@ -476,7 +475,7 @@ fn Auditoria() -> impl IntoView {
                                                         <div class="timeline-header">
                                                             <span class="tag tag-red">{evt.action_type.clone()}</span>
                                                             <span class="tag tag-teal">{evt.entity_type.clone()}</span>
-                                                            <span style="font-size:10px;color:var(--text3);margin-left:auto">
+                                                            <span class="text-sm text-3 ml-auto">
                                                                 {evt.created_at[..19].replace("T", " ")}
                                                             </span>
                                                         </div>
@@ -527,9 +526,9 @@ fn Auditoria() -> impl IntoView {
                                                 <div class="timeline-dot" data-action=evt.action_type.clone()></div>
                                                 <div class="timeline-content">
                                                     <div class="timeline-header">
-                                                        <span class="tag tag-amber">{evt.action_type.clone()}</span>
+                                                        <span class="tag tag-rust">{evt.action_type.clone()}</span>
                                                         <span class="tag tag-teal">{evt.entity_type.clone()}</span>
-                                                        <span style="font-size:10px;color:var(--text3);margin-left:auto">
+                                                        <span class="text-sm text-3 ml-auto">
                                                             {evt.created_at[..19].replace("T", " ")}
                                                         </span>
                                                     </div>
@@ -540,7 +539,7 @@ fn Auditoria() -> impl IntoView {
                                                         if at.starts_with("undo") {
                                                             view! { <span class="tag" style="margin-top:6px;opacity:0.6">"Desfeito"</span> }.into_any()
                                                         } else {
-                                                            view! { <button class="btn" style="margin-top:6px"
+                                                            view! { <button class="btn mt-6"
                                                                 on:click=move |_| undo_event(deid.clone(), trigger)>
                                                                 <i class="ti ti-arrow-back-up"></i> " Desfazer"
                                                             </button> }.into_any()
@@ -599,7 +598,7 @@ fn OptimizePage() -> impl IntoView {
     view! {
         <Topbar breadcrumb="Otimizador"/>
         <div class="content">
-            <div class="section-header" style="margin-bottom:16px">
+            <div class="section-header mb-16">
                 <div class="section-title">"Otimizador de Parâmetros (UC17)"</div>
             </div>
             <div class="panel">
@@ -616,10 +615,10 @@ fn OptimizePage() -> impl IntoView {
             </div>
             <div class="panel">
                 <div class="panel-title">"Otimização PSO (UC17)"</div>
-                <div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+                <div class="text-base text-3 mb-8">
                     "Otimiza os parâmetros das funções de pertinência com base em dados de referência."
                 </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                <div class="flex gap-8 flex-wrap mb-8">
                     <div>
                         <label class="input-label">"População"</label>
                         <input type="number" class="text-input" style="width:80px;font-size:10px"
@@ -635,8 +634,8 @@ fn OptimizePage() -> impl IntoView {
                 </div>
 
                 /* ── Presets ── */
-                <div style="font-size:9px;color:var(--text3);margin-bottom:4px">"Presets de dados de referência:"</div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                <div class="text-xs text-3 mb-4">"Presets de dados de referência:"</div>
+                <div class="flex gap-6 flex-wrap mb-8">
                     <button class="btn btn-primary" style="font-size:10px;padding:4px 12px" on:click={
                         let ss = selected_sys.clone();
                         let pop = pso_pop.clone(); let iters = pso_iters.clone();
@@ -711,7 +710,7 @@ fn OptimizePage() -> impl IntoView {
                             let cons2 = cons_names.clone();
 
                             view! {
-                                <div style="font-size:9px;color:var(--text3);margin-bottom:4px">
+                                <div class="text-xs text-3 mb-4">
                                     {format!("{} antecedentes, {} consequentes", ant_names.len(), cons_names.len())}
                                 </div>
 
@@ -734,14 +733,14 @@ fn OptimizePage() -> impl IntoView {
                                                 let ant_n2 = ant_n.clone();
                                                 let cons_n2 = cons_n.clone();
                                                 view! {
-                                                    <tr style="border-bottom:1px solid var(--surface0)">
+                                                    <tr style="border-bottom:1px solid var(--surface5)">
                                                         {ant_n2.iter().map(|vname| {
                                                             let vn = vname.clone();
                                                             let cur = row.get(&vn).and_then(|x| x.as_f64()).unwrap_or(0.0);
                                                             let cr = pso_custom_rows.clone();
                                                             view! {
                                                                 <td style="padding:1px 4px">
-                                                                    <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface0);border:1px solid var(--border);border-radius:2px;color:var(--text)"
+                                                                    <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface5);border:1px solid var(--border);border-radius:2px;color:var(--text)"
                                                                         prop:value=move || cur
                                                                         on:input=move |e| {
                                                                             let val: f64 = event_target_value(&e).parse().unwrap_or(0.0);
@@ -762,7 +761,7 @@ fn OptimizePage() -> impl IntoView {
                                                             let cor = pso_custom_out_rows.clone();
                                                             view! {
                                                                 <td style="padding:1px 4px">
-                                                                    <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface0);border:1px solid var(--border);border-radius:2px;color:var(--text)"
+                                                                    <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface5);border:1px solid var(--border);border-radius:2px;color:var(--text)"
                                                                         prop:value=move || cur
                                                                         on:input=move |e| {
                                                                             let val: f64 = event_target_value(&e).parse().unwrap_or(0.0);
@@ -802,7 +801,7 @@ fn OptimizePage() -> impl IntoView {
                                                 let cons_n3 = cons_names.clone();
                                                 view! {
                                                     <td style="padding:1px 4px">
-                                                        <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface0);border:1px solid var(--border);border-radius:2px;color:var(--text3)"
+                                                        <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface5);border:1px solid var(--border);border-radius:2px;color:var(--text3)"
                                                             placeholder="0"
                                                             on:input=move |e| {
                                                                 let val: f64 = event_target_value(&e).parse().unwrap_or(0.0);
@@ -832,7 +831,7 @@ fn OptimizePage() -> impl IntoView {
                                                 let cons_n4 = cons_names.clone();
                                                 view! {
                                                     <td style="padding:1px 4px">
-                                                        <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface0);border:1px solid var(--border);border-radius:2px;color:var(--text3)"
+                                                        <input type="number" step="any" style="width:70px;font-size:9px;padding:2px;background:var(--surface5);border:1px solid var(--border);border-radius:2px;color:var(--text3)"
                                                             placeholder="0"
                                                             on:input=move |e| {
                                                                 let val: f64 = event_target_value(&e).parse().unwrap_or(0.0);
@@ -933,7 +932,7 @@ fn OptimizePage() -> impl IntoView {
                                 let grid_lines: String = (0..=n_grid).map(|i| {
                                     let y = pad_t + (i as f64 / n_grid as f64) * plot_h;
                                     let val = max_fit - (i as f64 / n_grid as f64) * range;
-                                    format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface0)" stroke-width="0.5"/>
+                                    format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface5)" stroke-width="0.5"/>
                                         <text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="end">{:.3e}</text>"#,
                                         pad_l, y, w - pad_r, y, pad_l - 4.0, y + 3.0, val)
                                 }).collect();
@@ -941,7 +940,7 @@ fn OptimizePage() -> impl IntoView {
                                 // Vertical grid
                                 let vgrid: String = (0..=n_grid).map(|i| {
                                     let x = pad_l + (i as f64 / n_grid as f64) * plot_w;
-                                    format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface0)" stroke-width="0.5"/>"#, x, pad_t, x, h - pad_b)
+                                    format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface5)" stroke-width="0.5"/>"#, x, pad_t, x, h - pad_b)
                                 }).collect();
 
                                 // Axis labels
@@ -957,7 +956,7 @@ fn OptimizePage() -> impl IntoView {
                                 let svg_content = if let Some(last) = pts.last() {
                                     let lx = pad_l + (last[0] / iter_max) * plot_w;
                                     let ly = pad_t + ((max_fit - last[1]) / range) * plot_h;
-                                    format!(r#"<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="background:var(--surface1);border-radius:4px;width:100%;max-width:600px">
+                                    format!(r#"<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="background:var(--surface4);border-radius:4px;width:100%;max-width:600px">
                                         {grid_lines}{vgrid}
                                         {x_label}{y_label}
                                         <path d="{path_d}" fill="none" stroke="var(--teal)" stroke-width="1.5"/>
@@ -979,7 +978,7 @@ fn OptimizePage() -> impl IntoView {
                             }).collect();
                             let table_html = if !table_rows.is_empty() {
                                 format!(r#"<table style="width:100%;border-collapse:collapse;margin-top:6px">
-                                    <thead><tr style="border-bottom:1px solid var(--surface1)">
+                                    <thead><tr style="border-bottom:1px solid var(--surface4)">
                                         <th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">Variável</th>
                                         <th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">Termo</th>
                                         <th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">MF</th>
@@ -1011,14 +1010,14 @@ fn OptimizePage() -> impl IntoView {
                                         let val = in_row.get(h).or_else(|| out_row.get(h)).and_then(|v| v.as_f64()).unwrap_or(0.0);
                                         format!(r#"<td style="padding:2px 6px;font-size:9px;text-align:right">{:.2}</td>"#, val)
                                     }).collect();
-                                    format!("<tr style=\"border-bottom:1px solid var(--surface0)\">{}</tr>", cells)
+                                    format!("<tr style=\"border-bottom:1px solid var(--surface5)\">{}</tr>", cells)
                                 }).collect();
 
-                                format!(r#"<details style="margin-top:6px">
+                                format!(r#"<details class="mt-6">
                                     <summary style="cursor:pointer;font-size:9px;color:var(--text2)">"Dados de Treino ({n_pts} linhas)"</summary>
                                     <div style="max-height:160px;overflow-y:auto;margin-top:4px">
                                         <table style="width:100%;border-collapse:collapse;font-size:9px">
-                                            <thead><tr style="border-bottom:1px solid var(--surface1)">{}</tr></thead>
+                                            <thead><tr style="border-bottom:1px solid var(--surface4)">{}</tr></thead>
                                             <tbody>{}</tbody>
                                         </table>
                                     </div>
@@ -1026,7 +1025,7 @@ fn OptimizePage() -> impl IntoView {
                             } else { String::new() };
 
                             view! {
-                                <div style="margin-top:8px;padding:8px;background:var(--surface1);border-radius:4px;font-size:10px">
+                                <div style="margin-top:8px;padding:8px;background:var(--surface4);border-radius:4px;font-size:10px">
                                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                                         <div>"Fitness: " <span style="color:var(--teal);font-weight:600">{format!("{:.6}", best_fit)}</span>
                                             <span style="color:var(--text3);margin-left:4px">(0 = perfeito)</span></div>
@@ -1216,7 +1215,7 @@ fn Variaveis() -> impl IntoView {
                                     let vid = v["id"].as_str().unwrap_or("").to_string();
                                     let name = v["name"].as_str().unwrap_or("?").to_string();
                                     let role = v["role"].as_str().unwrap_or("").to_string();
-                                    let dot = if role=="antecedent"{"var(--amber)"}else{"var(--teal)"};
+                                    let dot = if role=="antecedent"{"var(--rust)"}else{"var(--teal)"};
                                     let is_sel = sel_var_id == vid;
                                     let sel_style = if is_sel { "background:var(--surface2);border-left:3px solid var(--blue)" } else { "" };
                                     let vid_del = vid.clone();
@@ -1313,7 +1312,7 @@ fn Variaveis() -> impl IntoView {
       view! {
           <Topbar breadcrumb="Editor de Regras"/>
           <div class="content">
-              <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Editor de Regras (UC03)"</div></div>
+              <div class="section-header mb-16"><div class="section-title">"Editor de Regras (UC03)"</div></div>
               <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
                   <label class="input-label">"Sistema"</label>
                   <select class="text-input" style="margin-bottom:0"
@@ -1650,10 +1649,13 @@ fn Variaveis() -> impl IntoView {
       let analyze_result = RwSignal::new(None::<serde_json::Value>);
       let analyze_loading = RwSignal::new(false);
 
+      let surface3d_result = RwSignal::new(None::<serde_json::Value>);
+      let surface3d_loading = RwSignal::new(false);
+
       view! {
          <Topbar breadcrumb="Simulador"/>
          <div class="content">
-             <div class="section-header" style="margin-bottom:16px">
+             <div class="section-header mb-16">
                  <div class="section-title">"Simulador"</div>
                  <div style="display:flex;gap:4px;font-size:11px">
                       <button class="btn" class:btn-primary=move || active_tab.get() == "mamdani"
@@ -1664,9 +1666,11 @@ fn Variaveis() -> impl IntoView {
                           on:click=move |_| active_tab.set("svg".into())>"SVG"</button>
                       <button class="btn" class:btn-primary=move || active_tab.get() == "diagnostic"
                           on:click=move |_| active_tab.set("diagnostic".into())>"Diagnóstico"</button>
-                      <button class="btn" class:btn-primary=move || active_tab.get() == "analyze"
-                          on:click=move |_| active_tab.set("analyze".into())>"Analisar"</button>
-                 </div>
+                       <button class="btn" class:btn-primary=move || active_tab.get() == "analyze"
+                           on:click=move |_| active_tab.set("analyze".into())>"Analisar"</button>
+                       <button class="btn" class:btn-primary=move || active_tab.get() == "surface3d"
+                           on:click=move |_| active_tab.set("surface3d".into())>"Gráfico 3D"</button>
+                  </div>
              </div>
 
               <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:500px">
@@ -1734,7 +1738,7 @@ fn Variaveis() -> impl IntoView {
                                        </div>
                                    }
                               }).collect_view()}
-                              <button class="btn btn-primary" on:click=move |_| run_sim() style="margin-top:8px">
+                              <button class="btn btn-primary mt-8" on:click=move |_| run_sim()>
                                   <i class="ti ti-player-play"></i>"Executar Simulação"
                               </button>
                           }.into_any()
@@ -1787,7 +1791,7 @@ fn Variaveis() -> impl IntoView {
                                </div>
                                {move || { let m = scenario_msg.get(); if !m.is_empty() { view! { <div style="font-size:10px;color:var(--teal);margin-bottom:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
                                {if sc_list.is_empty() {
-                                   view! { <div style="font-size:10px;color:var(--text3)">"Nenhum cenario salvo."</div> }.into_any()
+                                   view! { <div class="text-sm text-3">"Nenhum cenario salvo."</div> }.into_any()
                                } else {
                                    view! {
                                        <div style="max-height:200px;overflow-y:auto">
@@ -1816,7 +1820,7 @@ fn Variaveis() -> impl IntoView {
                            </div>
                            <div class="panel" style="flex:1;min-width:280px">
                                <div class="panel-title">"Varredura - Sweep (UC13)"</div>
-                               <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                               <div class="flex gap-6 flex-wrap mb-8">
                                    <select class="text-input" style="margin-bottom:0;font-size:10px;flex:1"
                                        prop:value=move || sweep_var.get()
                                        on:change=move |e| sweep_var.set(event_target_value(&e))>
@@ -1984,7 +1988,7 @@ fn Variaveis() -> impl IntoView {
                                    </div>
                                    {move || { let m = scenario_msg.get(); if !m.is_empty() { view! { <div style="font-size:10px;color:var(--teal);margin-bottom:8px">{m}</div> }.into_any() } else { view! {}.into_any() } }}
                                    {if sc_list.is_empty() {
-                                       view! { <div style="font-size:10px;color:var(--text3)">"Nenhum cenario salvo."</div> }.into_any()
+                                       view! { <div class="text-sm text-3">"Nenhum cenario salvo."</div> }.into_any()
                                    } else {
                                        view! {
                                            <div style="max-height:200px;overflow-y:auto">
@@ -2020,7 +2024,7 @@ fn Variaveis() -> impl IntoView {
                // ─── SVG Tab ───
               {move || if active_tab.get() == "svg" { view! {
               <div>
-                  <button class="btn btn-primary" style="margin-bottom:16px" on:click={
+                  <button class="btn btn-primary mb-16" on:click={
                       let ss = selected_sys.clone();
                       let sr = svg_result.clone();
                       let sl = svg_loading.clone();
@@ -2139,8 +2143,8 @@ fn Variaveis() -> impl IntoView {
                                               let crisp = fv["crisp_input"].as_f64().unwrap_or(0.0);
                                               let terms = fv["term_degrees"].as_array().cloned().unwrap_or_default();
                                               view! {
-                                                  <div style="margin:8px 0;padding:8px;background:var(--surface1);border-radius:4px;font-size:10px">
-                                                      <div style="font-weight:600">{vname} <span style="color:var(--amber)">= {format!("{:.2}", crisp)}</span></div>
+                                                  <div style="margin:8px 0;padding:8px;background:var(--surface4);border-radius:4px;font-size:10px">
+                                                      <div style="font-weight:600">{vname} <span class="text-rust">= {format!("{:.2}", crisp)}</span></div>
                                                       {terms.clone().iter().map(|t| {
                                                           let label = t["term"].as_str().unwrap_or("").to_string();
                                                           let mu = t["mu"].as_f64().unwrap_or(0.0);
@@ -2159,7 +2163,7 @@ fn Variaveis() -> impl IntoView {
                                               let degree = rf["firing_degree"].as_f64().unwrap_or(0.0);
                                               let fired = rf["fired"].as_bool().unwrap_or(false);
                                               view! {
-                                                  <div style="margin:4px 0;padding:4px 8px;background:var(--surface1);border-radius:4px;font-size:10px">
+                                                  <div style="margin:4px 0;padding:4px 8px;background:var(--surface4);border-radius:4px;font-size:10px">
                                                       <span>{text}</span>
                                                       <span style="margin-left:8px;color:var(--amber)">"μ=" {format!("{:.4}", degree)}</span>
                                                       <span style=format!("margin-left:8px;color:{}", if fired { "var(--green)" } else { "var(--coral)" })>
@@ -2198,7 +2202,7 @@ fn Variaveis() -> impl IntoView {
                <div class="sim-layout">
                    <div class="panel">
                        <div class="panel-title">"Analisador de Superfície (PSO)"</div>
-                       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                       <div class="flex gap-6 flex-wrap mb-8">
                            <select class="text-input" style="margin-bottom:0;flex:1"
                                prop:value=move || analyze_x_var.get()
                                on:change=move |e| analyze_x_var.set(event_target_value(&e))>
@@ -2267,7 +2271,7 @@ fn Variaveis() -> impl IntoView {
                                    let max_y = res["max_point"]["y"].as_f64().unwrap_or(0.0);
                                    let max_z = res["max_point"]["z"].as_f64().unwrap_or(0.0);
                                    view! {
-                                       <div class="panel" style="padding:10px;background:var(--surface1);margin-bottom:8px">
+                                       <div class="panel" style="padding:10px;background:var(--surface4);margin-bottom:8px">
                                            <div style="font-size:13px;font-weight:700;margin-bottom:4px">
                                                {class_icon}" "{class_label}
                                            </div>
@@ -2277,7 +2281,7 @@ fn Variaveis() -> impl IntoView {
                                            </div>
                                        </div>
                                        <div style="display:flex;gap:12px;flex-wrap:wrap">
-                                           <div class="panel" style="flex:1;min-width:140px;padding:8px;background:var(--surface1)">
+                                           <div class="panel" style="flex:1;min-width:140px;padding:8px;background:var(--surface4)">
                                                <div style="font-size:10px;color:var(--teal);font-weight:600">"⬇ Mínimo"</div>
                                                <div style="font-size:9px;color:var(--text2)">
                                                    {res["x_var"].as_str().unwrap_or("X")}" = "{format!("{:.2}", min_x)}<br/>
@@ -2285,7 +2289,7 @@ fn Variaveis() -> impl IntoView {
                                                    "saída = "{format!("{:.3}", min_z)}
                                                </div>
                                            </div>
-                                           <div class="panel" style="flex:1;min-width:140px;padding:8px;background:var(--surface1)">
+                                           <div class="panel" style="flex:1;min-width:140px;padding:8px;background:var(--surface4)">
                                                <div style="font-size:10px;color:var(--coral);font-weight:600">"⬆ Máximo"</div>
                                                <div style="font-size:9px;color:var(--text2)">
                                                    {res["x_var"].as_str().unwrap_or("X")}" = "{format!("{:.2}", max_x)}<br/>
@@ -2300,13 +2304,94 @@ fn Variaveis() -> impl IntoView {
                        }}
                    </div>
                </div>
-               }.into_any() } else { view! {}.into_any() }}
-           </div>
-      }
-  }
+                }.into_any() } else { view! {}.into_any() }}
 
- #[component]
- fn Historico() -> impl IntoView {
+                // ─── Surface 3D Tab ───
+                {move || if active_tab.get() == "surface3d" { view! {
+                <div>
+                    {move || {
+                        let vars = variables.get();
+                        let ante: Vec<&serde_json::Value> = vars.iter().filter(|v| v["role"].as_str() == Some("antecedent")).collect();
+                        let has_two = ante.len() == 2;
+                        view! {
+                            <div class="panel mb-16">
+                                <div class="panel-title">"Gráfico de Superfície 3D"</div>
+                                <div style="font-size:10px;color:var(--text2);margin-bottom:12px">
+                                    "Gera um gráfico 3D onde os eixos X e Y são as duas variáveis de entrada e Z é a saída defuzzificada, com gradiente de cor por valor."
+                                </div>
+                                {if !has_two {
+                                    view! { <div style="color:var(--coral);font-size:11px;padding:8px 0">"O gráfico 3D requer exatamente 2 variáveis de entrada (antecedentes). Este sistema tem "{ante.len()}"."</div> }.into_any()
+                                } else {
+                                    let names: Vec<String> = ante.iter().filter_map(|v| v["name"].as_str().map(String::from)).collect();
+                                    view! {
+                                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+                                            <span style="font-size:10px;color:var(--teal)">{format!("2 entradas: {} e {} → saída", names[0], names[1])}</span>
+                                        </div>
+                                        <button class="btn btn-primary" style="font-size:10px;padding:4px 12px"
+                                            on:click={
+                                                let ss = selected_sys.clone();
+                                                let x0 = names[0].clone();
+                                                let y0 = names[1].clone();
+                                                let sr = surface3d_result.clone();
+                                                let sl = surface3d_loading.clone();
+                                                move |_| {
+                                                    let sid = ss.get();
+                                                    if sid.is_empty() { return; }
+                                                    sl.set(true);
+                                                    let sr2 = sr.clone();
+                                                    let sl2 = sl.clone();
+                                                    let x = x0.clone();
+                                                    let y = y0.clone();
+                                                    spawn_async(async move {
+                                                        let res = get_surface_3d(&sid, Some(&x), Some(&y), Some(25)).await;
+                                                        sr2.set(res);
+                                                        sl2.set(false);
+                                                    });
+                                                }
+                                            }>
+                                            <i class="ti ti-chart-3d"></i>"Gerar Superfície 3D"
+                                        </button>
+                                    }.into_any()
+                                }}
+                            </div>
+                        }.into_any()
+                    }}
+                    {move || {
+                        if surface3d_loading.get() {
+                            return view! { <div style="font-size:11px;color:var(--text3);padding:16px;text-align:center">"Calculando superfície 3D... (pode levar alguns segundos)"</div> }.into_any();
+                        }
+                        match surface3d_result.get() {
+                            None => view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Selecione um sistema com 2 entradas e clique em \"Gerar Superfície 3D\"."</div> }.into_any(),
+                            Some(r) => {
+                                let svg = r["svg"].as_str().unwrap_or("").to_string();
+                                let x_var = r["x_var"].as_str().unwrap_or("X").to_string();
+                                let y_var = r["y_var"].as_str().unwrap_or("Y").to_string();
+                                let out_var = r["out_var"].as_str().unwrap_or("Z").to_string();
+                                if svg.is_empty() {
+                                    view! { <div style="color:var(--coral);font-size:11px">"Erro ao gerar gráfico."</div> }.into_any()
+                                } else {
+                                    view! {
+                                        <div class="panel">
+                                            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:10px;color:var(--text2)">
+                                                <span><span class="text-rust">X:</span> {x_var.clone()}</span>
+                                                <span><span class="text-rust">Y:</span> {y_var.clone()}</span>
+                                                <span><span class="text-rust">Z:</span> {out_var.clone()}</span>
+                                            </div>
+                                            <div inner_html=svg.clone() style="max-width:640px;margin:0 auto"></div>
+                                        </div>
+                                    }.into_any()
+                                }
+                            }
+                        }
+                    }}
+                </div>
+                }.into_any() } else { view! {}.into_any() }}
+            </div>
+       }
+   }
+
+  #[component]
+  fn Historico() -> impl IntoView {
      let systems_list = RwSignal::new(Vec::<SystemInfo>::new());
      let selected_sys = RwSignal::new(String::new());
      let sims = RwSignal::new(Vec::<serde_json::Value>::new());
@@ -2381,7 +2466,7 @@ fn Variaveis() -> impl IntoView {
     view! {
         <Topbar breadcrumb="Histórico"/>
         <div class="content">
-            <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Histórico (UC06)"</div></div>
+            <div class="section-header mb-16"><div class="section-title">"Histórico (UC06)"</div></div>
             <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:400px">
                 <label class="input-label">"Sistema"</label>
                 <select class="text-input" style="margin-bottom:0"
@@ -2402,7 +2487,7 @@ fn Variaveis() -> impl IntoView {
                  if compare_loading.get() { return view! { <div style="font-size:11px;color:var(--text3);padding:8px 0">"Comparando..."</div> }.into_any(); }
                  if let Some(comp) = compare_result.get() {
                      return view! {
-                         <div class="panel" style="margin-bottom:16px">
+                         <div class="panel mb-16">
                              <div class="panel-title">"Comparacao"</div>
                              <table class="hist-table"><thead><tr><th>"#"</th><th>"Entradas"</th><th>"Saida"</th><th>"Data"</th></tr></thead>
                              <tbody>{comp.iter().enumerate().map(|(i, s)| {
@@ -2725,7 +2810,7 @@ fn Variaveis() -> impl IntoView {
      view! {
          <Topbar breadcrumb="Análise"/>
          <div class="content">
-             <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Superficie & Matriz de Regras"</div></div>
+             <div class="section-header mb-16"><div class="section-title">"Superficie & Matriz de Regras"</div></div>
              <div class="panel" style="margin-bottom:16px;padding:12px 16px;max-width:500px">
                  <label class="input-label">"Sistema"</label>
                  <select class="text-input" style="margin-bottom:0"
@@ -2739,7 +2824,7 @@ fn Variaveis() -> impl IntoView {
              <div style="display:flex;gap:20px;flex-wrap:wrap">
                  <div class="panel" style="flex:1;min-width:300px">
                      <div class="panel-title">"Superficie de Controle (UC15)"</div>
-                     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                     <div class="flex gap-6 flex-wrap mb-8">
                          <select class="text-input" style="margin-bottom:0;font-size:10px;flex:1"
                              prop:value=move || surf_x.get()
                              on:change=move |e| surf_x.set(event_target_value(&e))>
@@ -2770,7 +2855,7 @@ fn Variaveis() -> impl IntoView {
                              Some(res) => {
                                  let grid = res["grid"].as_array().cloned().unwrap_or_default();
                                  let n = (grid.len() as f64).sqrt() as usize;
-                                 if grid.is_empty() || n == 0 { return view! { <div style="font-size:10px;color:var(--text3)">"Sem dados"</div> }.into_any(); }
+                                 if grid.is_empty() || n == 0 { return view! { <div class="text-sm text-3">"Sem dados"</div> }.into_any(); }
                                  let x_var = res["x_var"].as_str().unwrap_or("X");
                                  let y_var = res["y_var"].as_str().unwrap_or("Y");
                                  let mut min_z = f64::MAX; let mut max_z = f64::MIN;
@@ -2809,7 +2894,7 @@ fn Variaveis() -> impl IntoView {
                               None => view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Clique em Calcular Ativacoes."</div> }.into_any(),
                               Some(res) => {
                                   let rules = res["rules"].as_array().cloned().unwrap_or_default();
-                                  if rules.is_empty() { return view! { <div style="font-size:10px;color:var(--text3)">"Nenhuma regra."</div> }.into_any(); }
+                                  if rules.is_empty() { return view! { <div class="text-sm text-3">"Nenhuma regra."</div> }.into_any(); }
                                   let cols = (rules.len() as f64).sqrt().ceil() as usize;
                                   let cell = 20usize;
                                   view! {
@@ -3421,7 +3506,7 @@ fn ImportPage() -> impl IntoView {
     view! {
         <Topbar breadcrumb="Importar Sistema"/>
         <div class="content">
-            <div class="section-header" style="margin-bottom:16px"><div class="section-title">"Importar Sistema (UC11)"</div></div>
+            <div class="section-header mb-16"><div class="section-title">"Importar Sistema (UC11)"</div></div>
             <div class="panel" style="max-width:600px">
                 <div style="font-size:11px;color:var(--text3);margin-bottom:12px">
                     "Cole o JSON de um sistema exportado (use o botao de download no Dashboard para exportar)."
