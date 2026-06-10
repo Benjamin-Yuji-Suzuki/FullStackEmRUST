@@ -2619,6 +2619,8 @@ fn Variaveis() -> impl IntoView {
     let upload_error = RwSignal::new(None::<String>);
     let file_name = RwSignal::new(String::new());
     let file_input: NodeRef<leptos::html::Input> = NodeRef::new();
+    let batch_page = RwSignal::new(0usize);
+    const PAGE_SIZE: usize = 50;
 
     spawn_async({ let sl = systems_list.clone(); async move { sl.set(list_systems().await); } });
 
@@ -2727,34 +2729,44 @@ fn Variaveis() -> impl IntoView {
                      {move || {
                          match batch_result.get() {
                              None => view! { <div style="font-size:10px;color:var(--text3);padding:8px 0">"Execute um lote para ver os resultados."</div> }.into_any(),
-                             Some(res) => {
-                                 let err_style = if res.errors > 0 { "color:var(--red)" } else { "color:var(--teal)" };
-                                 view! {
-                                     <div style="display:flex;gap:16px;margin-bottom:12px;font-size:11px">
-                                         <div>"Processados: " <strong>{res.processed}</strong></div>
-                                          <div>"Erros: " <strong style={err_style}>{res.errors}</strong></div>
-                                         <div>"Total: " <strong>{res.total}</strong></div>
-                                     </div>
-                                     <div style="max-height:400px;overflow-y:auto">
-                                         <table style="width:100%;font-size:10px;border-collapse:collapse">
-                                             <thead><tr style="background:var(--surface2)">
-                                                 <th style="padding:4px;text-align:left">"#"</th>
-                                                 <th style="padding:4px;text-align:left">"Inputs"</th>
-                                                 <th style="padding:4px;text-align:right">"Output"</th>
-                                             </tr></thead>
-                                             <tbody>{res.results.iter().map(|r| {
-                                                 let inputs_str = r.inputs.to_string();
-                                                 view! {
-                                                     <tr style="border-bottom:1px solid var(--border)">
-                                                         <td style="padding:4px">{r.row_index + 1}</td>
-                                                         <td style="padding:4px;font-size:9px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{inputs_str}</td>
-                                                         <td style="padding:4px;text-align:right;font-weight:bold">{format!("{:.2}", r.output)}</td>
-                                                     </tr>
-                                                 }
-                                             }).collect_view()}</tbody>
-                                         </table>
-                                     </div>
-                                 }.into_any()
+                              Some(res) => {
+                                  let bp = batch_page.clone();
+                                  let total_pages = (res.results.len() + PAGE_SIZE - 1) / PAGE_SIZE;
+                                  let page = bp.get().min(total_pages.saturating_sub(1));
+                                  let start = page * PAGE_SIZE;
+                                  let page_rows: Vec<&BatchResultInfo> = res.results.iter().skip(start).take(PAGE_SIZE).collect();
+                                  view! {
+                                      <div style="display:flex;gap:16px;margin-bottom:12px;font-size:11px;align-items:center;flex-wrap:wrap">
+                                          <div>"Processados: " <strong>{res.processed}</strong></div>
+                                          <div>"Total: " <strong>{res.total}</strong></div>
+                                          <div style="margin-left:auto;font-size:9px;display:flex;gap:4px;align-items:center">
+                                              <button class="btn" style="font-size:9px;padding:2px 6px" disabled=move || bp.get() == 0
+                                                  on:click=move |_| bp.update(|p| *p = p.saturating_sub(1))>"‹"</button>
+                                              <span>{move || format!("{} / {}", bp.get() + 1, total_pages)}</span>
+                                              <button class="btn" style="font-size:9px;padding:2px 6px" disabled=move || bp.get() + 1 >= total_pages
+                                                  on:click=move |_| bp.update(|p| *p += 1)>"›"</button>
+                                          </div>
+                                      </div>
+                                      <div style="max-height:400px;overflow-y:auto">
+                                          <table style="width:100%;font-size:10px;border-collapse:collapse">
+                                              <thead><tr style="background:var(--surface2)">
+                                                  <th style="padding:4px;text-align:left">"#"</th>
+                                                  <th style="padding:4px;text-align:left">"Inputs"</th>
+                                                  <th style="padding:4px;text-align:right">"Output"</th>
+                                              </tr></thead>
+                                              <tbody>{page_rows.iter().map(|r| {
+                                                  let inputs_str = r.inputs.to_string();
+                                                  view! {
+                                                      <tr style="border-bottom:1px solid var(--border)">
+                                                          <td style="padding:4px">{r.row_index + 1}</td>
+                                                          <td style="padding:4px;font-size:9px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{inputs_str}</td>
+                                                          <td style="padding:4px;text-align:right;font-weight:bold">{format!("{:.2}", r.output)}</td>
+                                                      </tr>
+                                                  }
+                                              }).collect_view()}</tbody>
+                                          </table>
+                                      </div>
+                                  }.into_any()
                              }
                          }
                      }}
