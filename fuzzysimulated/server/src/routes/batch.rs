@@ -26,15 +26,58 @@ pub struct BatchRequest {
     pub inputs: Vec<std::collections::HashMap<String, serde_json::Value>>,
 }
 
-fn row_to_f64_map(row: &std::collections::HashMap<String, serde_json::Value>) -> std::collections::HashMap<String, f64> {
-    row.iter().filter_map(|(k, v)| {
+/// Mapeia nomes de colunas do dataset_ml.parquet para variáveis do sistema fuzzy
+/// e converte attack_vector_primary (string) para gravidade_ataque (numérico).
+fn prepare_batch_input(row: &std::collections::HashMap<String, serde_json::Value>) -> std::collections::HashMap<String, f64> {
+    let mut out = std::collections::HashMap::new();
+
+    // Mapeamento attack_vector_primary → gravidade_ataque
+    let attack_map: std::collections::HashMap<&str, f64> = [
+        ("phishing", 20.0),
+        ("malware", 40.0),
+        ("trojan", 40.0),
+        ("dos", 50.0),
+        ("ddos", 50.0),
+        ("insider", 60.0),
+        ("data_breach", 70.0),
+        ("apt", 80.0),
+        ("ransomware", 85.0),
+    ].into_iter().collect();
+
+    for (k, v) in row {
+        let mapped_key = match k.as_str() {
+            "company_revenue_usd" => "receita_anual_usd",
+            "employee_count" => "total_funcionarios",
+            "attack_vector_primary" => "gravidade_ataque",
+            _ => k.as_str(),
+        };
+
+        // Se for attack_vector_primary, tenta mapear string → número
+        if k == "attack_vector_primary" {
+            if let serde_json::Value::String(s) = v {
+                if let Some(&n) = attack_map.get(s.as_str()) {
+                    out.insert("gravidade_ataque".to_string(), n);
+                }
+            }
+            continue;
+        }
+
+        // Pula colunas que não são inputs do fuzzy
+        if matches!(k.as_str(), "total_loss_usd" | "incident_date" | "discovery_date" | "country_hq" | "industry_primary" | "is_public_company" | "systems_affected" | "data_type" | "confidence_tier" | "quality_score" | "quality_grade" | "attributed_group" | "attribution_confidence" | "incident_date_estimated" | "data_source_primary" | "data_source_secondary" | "data_source_type" | "attack_chain") {
+            continue;
+        }
+
+        // Converte numérico normalmente
         let num = match v {
             serde_json::Value::Number(n) => n.as_f64(),
-            serde_json::Value::String(s) => s.parse::<f64>().ok(),
             _ => None,
         };
-        num.map(|n| (k.clone(), n))
-    }).collect()
+        if let Some(n) = num {
+            out.insert(mapped_key.to_string(), n);
+        }
+    }
+
+    out
 }
 
 async fn load_engine_data(
@@ -117,40 +160,48 @@ async fn process_batch(
     }
 
     let mut results = Vec::new();
-    let mut errors = 0;
 
     for (i, input_row) in req.inputs.iter().enumerate() {
-        let numeric_row = row_to_f64_map(input_row);
-        let engine_input: &std::collections::HashMap<String, f64> = &numeric_row;
-        match engine::evaluate_mamdani(&var_infos, &rule_infos, engine_input) {
-            outputs if !outputs.is_empty() => {
-                let output_val = outputs.values().copied().sum::<f64>() / outputs.len() as f64;
-                let outputs_json = serde_json::to_value(&outputs).unwrap_or_else(|_| json!({}));
+        let engine_input = prepare_batch_input(input_row);
+        let fuzzy_output = engine::evaluate_mamdani(&var_infos, &rule_infos, &engine_input);
+        let outputs_json = serde_json::to_value(&fuzzy_output).unwrap_or_else(|_| json!({}));
 
-                let record = sqlx::query_as::<_, BatchResult>(
-                    "INSERT INTO batch_results (system_id, source_file, row_index, inputs, output) \
-                     VALUES ($1, 'batch-api', $2, $3::jsonb, $4) RETURNING *"
-                )
-                .bind(req.system_id)
-                .bind(i as i32)
-                .bind(json!(input_row))
-                .bind(output_val)
-                .fetch_one(&state.pool)
-                .await?;
+        // Usa total_loss_usd como target real para PSO, normalizado para [0,100]
+        let target = input_row.get("total_loss_usd")
+            .and_then(|v| v.as_f64())
+            .map(|v| (v / 1_000_000.0).clamp(0.0, 100.0))
+            .or_else(|| {
+                if fuzzy_output.is_empty() { return None; }
+                let sum = fuzzy_output.values().copied().sum::<f64>();
+                let avg = sum / fuzzy_output.len() as f64;
+                if avg.is_finite() { Some(avg) } else { None }
+            })
+            .unwrap_or(50.0);
 
-                results.push(json!({
-                    "id": record.id,
-                    "row_index": record.row_index,
-                    "inputs": record.inputs,
-                    "output": record.output,
-                    "outputs_detail": outputs_json,
-                    "executed_at": record.executed_at,
-                }));
-            }
-            _ => {
-                errors += 1;
-            }
-        }
+        let record = sqlx::query_as::<_, BatchResult>(
+            "INSERT INTO batch_results (system_id, source_file, row_index, inputs, output) \
+             VALUES ($1, 'batch-api', $2, $3::jsonb, $4) RETURNING *"
+        )
+        .bind(req.system_id)
+        .bind(i as i32)
+        .bind(json!(input_row))
+        .bind(target)
+        .fetch_one(&state.pool)
+        .await?;
+
+        let fuzzy_avg = if !fuzzy_output.is_empty() {
+            fuzzy_output.values().copied().sum::<f64>() / fuzzy_output.len() as f64
+        } else { f64::NAN };
+
+        results.push(json!({
+            "id": record.id,
+            "row_index": record.row_index,
+            "inputs": record.inputs,
+            "output": record.output,
+            "fuzzy_output": fuzzy_avg,
+            "outputs_detail": outputs_json,
+            "executed_at": record.executed_at,
+        }));
     }
 
     Ok(Json(json!({
@@ -158,7 +209,6 @@ async fn process_batch(
         "system_name": system.name,
         "total": req.inputs.len(),
         "processed": results.len(),
-        "errors": errors,
         "results": results,
     })))
 }
