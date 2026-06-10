@@ -531,6 +531,7 @@ pub struct BatchResultInfo {
     pub row_index: i32,
     pub inputs: Value,
     pub output: f64,
+    pub fuzzy_output: Option<f64>,
     pub outputs_detail: Value,
     pub executed_at: String,
 }

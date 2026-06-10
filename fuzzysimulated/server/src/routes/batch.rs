@@ -55,9 +55,8 @@ fn prepare_batch_input(row: &std::collections::HashMap<String, serde_json::Value
         // Se for attack_vector_primary, tenta mapear string → número
         if k == "attack_vector_primary" {
             if let serde_json::Value::String(s) = v {
-                if let Some(&n) = attack_map.get(s.as_str()) {
-                    out.insert("gravidade_ataque".to_string(), n);
-                }
+                let n = attack_map.get(s.as_str()).copied().unwrap_or(30.0);
+                out.insert("gravidade_ataque".to_string(), n);
             }
             continue;
         }
@@ -209,6 +208,7 @@ async fn process_batch(
         "system_name": system.name,
         "total": req.inputs.len(),
         "processed": results.len(),
+        "errors": 0,
         "results": results,
     })))
 }
