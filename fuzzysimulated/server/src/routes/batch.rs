@@ -85,7 +85,7 @@ async fn load_engine_data(
     system_id: Uuid,
 ) -> Result<(Vec<engine::VarInfo>, Vec<engine::RuleInfo>), AppError> {
     let variables = sqlx::query_as::<_, FuzzyVariable>(
-        "SELECT * FROM fuzzy_variables WHERE system_id = $1"
+        "SELECT * FROM fuzzy_variables WHERE system_id = $1 ORDER BY name"
     )
     .bind(system_id)
     .fetch_all(pool)
@@ -94,7 +94,8 @@ async fn load_engine_data(
     let all_terms: Vec<FuzzyTerm> = sqlx::query_as(
         "SELECT ft.* FROM fuzzy_terms ft \
          JOIN fuzzy_variables fv ON fv.id = ft.variable_id \
-         WHERE fv.system_id = $1"
+         WHERE fv.system_id = $1 \
+         ORDER BY fv.name, ft.label"
     )
     .bind(system_id)
     .fetch_all(pool)

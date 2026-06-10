@@ -718,7 +718,7 @@ fn OptimizePage() -> impl IntoView {
                             pl.set(true);
                             let r2 = pr.clone(); let l2 = pl.clone(); let e2 = pe.clone();
                             spawn_async(async move {
-                                match run_pso_auto_optimization(&sid, pop_val, iter_val).await {
+                                match run_pso_auto_optimization(&sid, pop_val, iter_val, Some(200)).await {
                                     Some(res) => { r2.set(Some(res)); e2.set(String::new()); }
                                     None => { e2.set("Erro. Execute o batch primeiro.".into()); }
                                 }
@@ -728,6 +728,26 @@ fn OptimizePage() -> impl IntoView {
                     }>
                         <i class="ti ti-database"></i>"Auto — usar resultados do Batch"
                     </button>
+                    <button class="btn" style="font-size:10px;padding:4px 12px;background:var(--red);color:#fff" on:click={
+                        let ss = selected_sys.clone();
+                        let pr = pso_result.clone(); let pe = pso_err.clone();
+                        move |_| {
+                            let sid = ss.get();
+                            if sid.is_empty() { pe.set("Selecione um sistema primeiro.".into()); return; }
+                            pe.set(String::new());
+                            let r2 = pr.clone(); let e2 = pe.clone();
+                            spawn_async(async move {
+                                match corrupt_system_params(&sid).await {
+                                    Some(res) => {
+                                        let msg = res["message"].as_str().unwrap_or("Corrompido");
+                                        e2.set(msg.into());
+                                        r2.set(None);
+                                    }
+                                    None => { e2.set("Erro ao corromper.".into()); }
+                                }
+                            });
+                        }
+                    }>"Corromper params (demo PSO)"</button>
                 </div>
 
                 /* ── Modo Personalizado com builder ── */
@@ -953,8 +973,12 @@ fn OptimizePage() -> impl IntoView {
                             let nr_used = r["num_runs"].as_u64().unwrap_or(1);
                             let runs_data = r["runs"].as_array().cloned().unwrap_or_default();
                             let pso_cfg = r["pso_config"].as_object().cloned().unwrap_or_default();
-                            let train_inputs = r["training_inputs"].as_array().cloned().unwrap_or_default();
-                            let train_outputs = r["training_outputs"].as_array().cloned().unwrap_or_default();
+                            let _train_inputs = r["training_inputs"].as_array().cloned().unwrap_or_default();
+                            let _train_outputs = r["training_outputs"].as_array().cloned().unwrap_or_default();
+                            let predictions = r["predictions"].as_array().cloned().unwrap_or_default();
+                            let initial_fit = r["initial_fitness"].as_f64().unwrap_or(0.0);
+                            let pso_fit = r["pso_fitness"].as_f64().unwrap_or(best_fit);
+                            let initial_preds = r["initial_predictions"].as_array().cloned().unwrap_or_default();
                             let ss = selected_sys.clone();
                             let am = pso_apply_msg.clone();
                             let is_multi = nr_used > 1;
@@ -1054,45 +1078,74 @@ fn OptimizePage() -> impl IntoView {
                                     <tbody>{}</tbody></table>"#, table_rows.join(""))
                             } else { String::new() };
 
-                            // ── Training data table ──
-                            let train_table = if !train_inputs.is_empty() {
-                                let mut headers: Vec<&str> = Vec::new();
-                                if let Some(first) = train_inputs.first().and_then(|v| v.as_object()) {
+                            // ── Helper: build prediction table HTML ──
+                            let build_pred_table = |preds: &[Value], label: &str, n_pts: u64| -> String {
+                                if preds.is_empty() { return String::new(); }
+                                let mut headers = vec!["#"];
+                                if let Some(first) = preds[0]["inputs"].as_object() {
                                     for k in first.keys() { headers.push(k.as_str()); }
                                 }
-                                if let Some(first) = train_outputs.first().and_then(|v| v.as_object()) {
-                                    for k in first.keys() { headers.push(k.as_str()); }
-                                }
-                                let header_html: String = headers.iter().map(|h| {
+                                headers.push("Real");
+                                headers.push("Predito");
+                                headers.push("Erro");
+                                let hdr: String = headers.iter().map(|h| {
                                     format!(r#"<th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">{}</th>"#, h)
                                 }).collect();
-                                let default_obj = serde_json::json!({});
-                                let body_rows: String = (0..train_inputs.len()).map(|i| {
-                                    let in_row = train_inputs.get(i).unwrap_or(&default_obj);
-                                    let out_row = train_outputs.get(i).unwrap_or(&default_obj);
-                                    let cells: String = headers.iter().map(|h| {
-                                        let val = in_row.get(h).or_else(|| out_row.get(h)).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                                        format!(r#"<td style="padding:2px 6px;font-size:9px;text-align:right">{:.2}</td>"#, val)
+                                let rows: String = preds.iter().enumerate().map(|(i, pred)| {
+                                    let inps = pred["inputs"].as_object().cloned().unwrap_or_default();
+                                    let real = pred["real"].as_f64().unwrap_or(0.0);
+                                    let predicted = pred["predicted"].as_f64().unwrap_or(0.0);
+                                    let err = (real - predicted).abs();
+                                    let err_color = if err < 10.0 { "var(--teal)" } else if err < 30.0 { "var(--yellow)" } else { "var(--red)" };
+                                    let cell_inp: String = inps.values().map(|v| {
+                                        format!(r#"<td style="padding:2px 6px;font-size:9px;text-align:right">{:.2}</td>"#, v.as_f64().unwrap_or(0.0))
                                     }).collect();
-                                    format!("<tr style=\"border-bottom:1px solid var(--surface5)\">{}</tr>", cells)
+                                    format!(r#"<tr style="border-bottom:1px solid var(--surface5)">
+                                        <td style="padding:2px 6px;font-size:9px;color:var(--text3)">{}</td>{}{}
+                                        <td style="padding:2px 6px;font-size:9px;text-align:right">{:.2}</td>
+                                        <td style="padding:2px 6px;font-size:9px;text-align:right;color:{err_color};font-weight:600">{:.2}</td>
+                                    </tr>"#, i + 1, cell_inp,
+                                        format!(r#"<td style="padding:2px 6px;font-size:9px;text-align:right">{:.2}</td>"#, real),
+                                        predicted, err
+                                    )
                                 }).collect();
                                 format!(r#"<details class="mt-6">
-                                    <summary style="cursor:pointer;font-size:9px;color:var(--text2)">"Dados de Treino ({n_pts} linhas)"</summary>
-                                    <div style="max-height:160px;overflow-y:auto;margin-top:4px">
+                                    <summary style="cursor:pointer;font-size:9px;color:var(--accent);font-weight:600">{label} ({n_pts} amostras)</summary>
+                                    <div style="max-height:200px;overflow-y:auto;margin-top:4px">
                                         <table style="width:100%;border-collapse:collapse;font-size:9px">
-                                            <thead><tr style="border-bottom:1px solid var(--surface4)">{}</tr></thead>
-                                            <tbody>{}</tbody>
+                                            <thead><tr style="border-bottom:1px solid var(--surface4)">{hdr}</tr></thead>
+                                            <tbody>{rows}</tbody>
                                         </table>
                                     </div>
-                                </details>"#, header_html, body_rows)
+                                </details>"#)
+                            };
+
+                            let show_antes = (initial_fit - pso_fit).abs() > 1.0 && !initial_preds.is_empty();
+                            let train_table = if show_antes {
+                                let antes = build_pred_table(&initial_preds, "Antes (params corrompidos)", n_pts);
+                                let depois = build_pred_table(&predictions, "Depois (PSO otimizado)", n_pts);
+                                format!("{antes}<div style=\"margin-top:4px\">{depois}</div>")
+                            } else if !predictions.is_empty() {
+                                build_pred_table(&predictions, "Comparacao Real x Predito", n_pts)
                             } else { String::new() };
 
                             view! {
                                 <div style="margin-top:8px;padding:8px;background:var(--surface4);border-radius:4px;font-size:10px">
                                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:4px">
                                         <div>
-                                            "Fitness: " <span style="color:var(--teal);font-weight:600">{format!("{:.6}", best_fit)}</span>
-                                            <span style="color:var(--text3);margin-left:4px">(0 = perfeito)</span>
+                                            {if (initial_fit - pso_fit).abs() > 1.0 {
+                                                view! {
+                                                    <span style="color:var(--red);font-size:9px">"Antes: " <span style="font-weight:600">{format!("{:.1}", initial_fit)}</span></span>
+                                                    <span style="color:var(--text3);margin:0 4px">"→"</span>
+                                                    <span style="color:var(--teal);font-weight:600">{format!("{:.1}", pso_fit)}</span>
+                                                    <span style="color:var(--text3);margin-left:4px;font-size:9px">(0 = perfeito)</span>
+                                                }.into_any()
+                                            } else {
+                                                view! {
+                                                    "Fitness: " <span style="color:var(--teal);font-weight:600">{format!("{:.6}", best_fit)}</span>
+                                                    <span style="color:var(--text3);margin-left:4px">(0 = perfeito)</span>
+                                                }.into_any()
+                                            }}
                                             {if is_multi {
                                                 view! { <span style="color:var(--accent);margin-left:6px;font-size:9px">{nr_used}" execuções"</span> }.into_any()
                                             } else { view! {}.into_any() }}

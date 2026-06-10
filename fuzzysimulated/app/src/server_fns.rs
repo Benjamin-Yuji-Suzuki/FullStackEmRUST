@@ -510,17 +510,26 @@ pub async fn run_pso_auto_optimization(
     system_id: &str,
     population_size: usize,
     max_iterations: usize,
+    max_samples: Option<usize>,
 ) -> Option<Value> {
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "population_size": population_size,
         "max_iterations": max_iterations,
     });
+    if let Some(ms) = max_samples {
+        body["max_samples"] = serde_json::json!(ms);
+    }
     api_post(&format!("/api/systems/{system_id}/optimize-pso-auto"), &body).await
 }
 
 pub async fn apply_pso_params(system_id: &str, params: &Value) -> Option<Value> {
     let body = serde_json::json!({ "params": params });
     api_post(&format!("/api/systems/{system_id}/apply-pso-params"), &body).await
+}
+
+pub async fn corrupt_system_params(system_id: &str) -> Option<Value> {
+    let body = serde_json::json!({});
+    api_post(&format!("/api/systems/{system_id}/corrupt-params"), &body).await
 }
 
 // ── Batch (UC07) ──

@@ -34,7 +34,7 @@ pub struct RuleInfo {
     pub weight: f64,
 }
 
-fn mf_from_params(mf_type: &str, params: &[f64]) -> Option<MembershipFn> {
+pub fn mf_from_params(mf_type: &str, params: &[f64]) -> Option<MembershipFn> {
     match mf_type {
         "trimf" if params.len() >= 3 => {
             Some(MembershipFn::Trimf([params[0], params[1], params[2]]))
@@ -43,7 +43,8 @@ fn mf_from_params(mf_type: &str, params: &[f64]) -> Option<MembershipFn> {
             Some(MembershipFn::Trapmf([params[0], params[1], params[2], params[3]]))
         }
         "gaussmf" if params.len() >= 2 => {
-            Some(MembershipFn::Gaussmf { mean: params[0], sigma: params[1] })
+            let sigma = params[1].max(1e-6);
+            Some(MembershipFn::Gaussmf { mean: params[0], sigma })
         }
         _ => None,
     }

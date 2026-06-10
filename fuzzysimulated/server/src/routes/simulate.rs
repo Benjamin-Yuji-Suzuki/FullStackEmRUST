@@ -46,6 +46,7 @@ pub fn routes() -> Router<AppState> {
         .route("/systems/{id}/apply-pso-params", post(apply_pso_params))
         .route("/systems/{id}/analyze-surface", post(analyze_surface))
         .route("/systems/{id}/surface-3d", post(surface_3d))
+        .route("/systems/{id}/corrupt-params", post(corrupt_params))
 }
 
 #[derive(Deserialize)]
@@ -629,6 +630,7 @@ pub struct OptimizePsoAutoRequest {
     pub w: Option<f64>,
     pub c1: Option<f64>,
     pub c2: Option<f64>,
+    pub max_samples: Option<usize>,
 }
 
 /// PSO automático: lê batch_results do DB e otimiza MF params sem o usuário precisar
@@ -661,7 +663,7 @@ async fn optimize_pso_auto(
         return Err(AppError::Validation("Sistema não tem variável consequente".into()));
     }
 
-    let batch_rows = sqlx::query_as::<_, crate::models::BatchResult>(
+    let mut batch_rows = sqlx::query_as::<_, crate::models::BatchResult>(
         "SELECT * FROM batch_results WHERE system_id = $1 ORDER BY row_index"
     )
     .bind(system_id)
@@ -672,6 +674,20 @@ async fn optimize_pso_auto(
         return Err(AppError::Validation(
             "Nenhum resultado batch encontrado. Execute o batch primeiro.".into()
         ));
+    }
+
+    // Limita amostras para acelerar PSO (default: 200)
+    let max_samp = req.max_samples.unwrap_or(200).min(batch_rows.len());
+    if max_samp < batch_rows.len() {
+        // Amostragem uniforme pelo intervalo
+        let step = batch_rows.len() / max_samp;
+        batch_rows = batch_rows.into_iter().step_by(step).take(max_samp).collect();
+        // Garante que tenha pelo menos max_samp (step pode dar menos)
+        while batch_rows.len() < max_samp {
+            if let Some(row) = batch_rows.last().cloned() {
+                batch_rows.push(row);
+            } else { break; }
+        }
     }
 
     let mut target_inputs: Vec<std::collections::HashMap<String, f64>> = Vec::new();
@@ -721,7 +737,19 @@ async fn optimize_pso_auto(
         (pos, fit, hist_json, Vec::new())
     };
 
+    // Avalia predições com os parâmetros ATUAIS do DB (antes do PSO)
+    let cons_name = consequents.first().copied();
+    let (initial_fitness, initial_predictions) = evaluate_batch_predictions(
+        &var_infos, &rule_infos, &target_inputs, &target_outputs, cons_name,
+    );
+
     let optimized_params = build_optimized_params(&best_pos, &var_infos);
+
+    // Avalia predições com os parâmetros PSO otimizados
+    let (pso_fitness, predictions) = evaluate_with_params(
+        &best_pos, &var_infos, &rule_infos,
+        &target_inputs, &target_outputs, cons_name,
+    );
 
     let term_rows = sqlx::query_as::<_, FuzzyTermWithVar>(
         "SELECT ft.*, fv.name as variable_name FROM fuzzy_terms ft \
@@ -760,6 +788,10 @@ async fn optimize_pso_auto(
         "trained_on": target_inputs.len(),
         "training_inputs": target_inputs,
         "training_outputs": target_outputs,
+        "predictions": predictions,
+        "initial_fitness": initial_fitness,
+        "initial_predictions": initial_predictions,
+        "pso_fitness": pso_fitness,
         "population_size": pop,
         "max_iterations": iters,
     })))
@@ -789,6 +821,122 @@ fn row_to_f64_filtered(
 
 /// Constrói `optimized_params` a partir do flat `best_position` e dos `var_infos`.
 /// Percorre variáveis→termos→dimensões na mesma ordenação que optimize_with_pso usa.
+/// Avalia predições usando os parâmetros ATUAIS do `var_infos` (sem modificar).
+/// Retorna (mse, predictions).
+fn evaluate_batch_predictions(
+    var_infos: &[engine::VarInfo],
+    rule_infos: &[engine::RuleInfo],
+    target_inputs: &[std::collections::HashMap<String, f64>],
+    target_outputs: &[std::collections::HashMap<String, f64>],
+    cons_name: Option<&str>,
+) -> (f64, Vec<serde_json::Value>) {
+    let cons_name = match cons_name {
+        Some(n) => n,
+        None => return (f64::INFINITY, vec![]),
+    };
+    let (mse, preds) = run_eval(var_infos, var_infos, rule_infos, target_inputs, target_outputs, cons_name);
+    (mse, preds)
+}
+
+/// Aplica `params_flat` aos termos de `var_infos` e avalia predições.
+/// Retorna (mse, predictions).
+fn evaluate_with_params(
+    params_flat: &[f64],
+    var_infos: &[engine::VarInfo],
+    rule_infos: &[engine::RuleInfo],
+    target_inputs: &[std::collections::HashMap<String, f64>],
+    target_outputs: &[std::collections::HashMap<String, f64>],
+    cons_name: Option<&str>,
+) -> (f64, Vec<serde_json::Value>) {
+    let cons_name = match cons_name {
+        Some(n) => n,
+        None => return (f64::INFINITY, vec![]),
+    };
+    let mut eval_vars = var_infos.to_vec();
+    let mut pidx = 0usize;
+    for var in &mut eval_vars {
+        for term in &mut var.terms {
+            let n = match term.mf_type.as_str() {
+                "trimf" => 3, "trapmf" => 4, "gaussmf" => 2, _ => 0,
+            };
+            if n > 0 && pidx + n <= params_flat.len() {
+                let mut p = params_flat[pidx..pidx + n].to_vec();
+                if matches!(term.mf_type.as_str(), "trimf" | "trapmf") {
+                    p.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                }
+                term.params = p;
+                pidx += n;
+            }
+        }
+    }
+    run_eval(var_infos, &eval_vars, rule_infos, target_inputs, target_outputs, cons_name)
+}
+
+/// Interno: constrói engine a partir de `eval_vars` e avalia todas as amostras.
+fn run_eval(
+    _original_vars: &[engine::VarInfo],
+    eval_vars: &[engine::VarInfo],
+    rule_infos: &[engine::RuleInfo],
+    target_inputs: &[std::collections::HashMap<String, f64>],
+    target_outputs: &[std::collections::HashMap<String, f64>],
+    cons_name: &str,
+) -> (f64, Vec<serde_json::Value>) {
+    let var_names: Vec<String> = _original_vars.iter().map(|v| v.name.clone()).collect();
+    let mut engine = logicfuzzy_academic::MamdaniEngine::new();
+    for var in eval_vars {
+        let uni = logicfuzzy_academic::Universe::new(var.universe_min, var.universe_max, var.resolution.max(2));
+        let mut fv = logicfuzzy_academic::FuzzyVariable::new(&var.name, uni);
+        for term in &var.terms {
+            if let Some(mf) = engine::mf_from_params(&term.mf_type, &term.params) {
+                fv.add_term(logicfuzzy_academic::Term::new(&term.label, mf));
+            }
+        }
+        match var.role.as_str() {
+            "antecedent" | "input" => engine.add_antecedent(fv),
+            "consequent" | "output" => engine.add_consequent(fv),
+            _ => {}
+        }
+    }
+    for rule in rule_infos {
+        let conditions = crate::engine::parse_rule_conditions(&rule.rule_text, &var_names);
+        if conditions.len() < 2 { continue; }
+        let ante = &conditions[..conditions.len() - 1];
+        let conseq = &conditions[conditions.len() - 1];
+        let mut b = logicfuzzy_academic::rule::RuleBuilder::new();
+        b = b.when(&ante[0].0, &ante[0].1);
+        for (vn, tl) in &ante[1..] { b = b.and(vn, tl); }
+        b = b.then(&conseq.0, &conseq.1);
+        if (rule.weight - 1.0).abs() > f64::EPSILON { b = b.weight(rule.weight); }
+        engine.add_rule(b.build());
+    }
+    let mut total_mse = 0.0_f64;
+    let mut predictions = Vec::with_capacity(target_inputs.len());
+    for (i, inputs) in target_inputs.iter().enumerate() {
+        for (name, value) in inputs { let _ = engine.set_input(name, *value); }
+        let fuzzy_out = match engine.compute() {
+            Ok(o) => o,
+            Err(_) => {
+                let mut fb = std::collections::HashMap::new();
+                for var in eval_vars {
+                    if var.role == "consequent" || var.role == "output" {
+                        fb.insert(var.name.clone(), (var.universe_min + var.universe_max) / 2.0);
+                    }
+                }
+                fb
+            }
+        };
+        let pred_val = fuzzy_out.get(cons_name).copied().unwrap_or(f64::NAN);
+        let real_val = target_outputs.get(i).and_then(|m| m.get(cons_name)).copied().unwrap_or(f64::NAN);
+        if pred_val.is_finite() && real_val.is_finite() {
+            let diff = pred_val - real_val;
+            total_mse += diff * diff;
+        }
+        predictions.push(json!({ "inputs": inputs, "real": real_val, "predicted": pred_val }));
+    }
+    let mse = total_mse / target_inputs.len().max(1) as f64;
+    (mse, predictions)
+}
+
 fn build_optimized_params(
     best_position: &[f64],
     var_infos: &[engine::VarInfo],
@@ -857,6 +1005,9 @@ async fn apply_pso_params(
         if term.mf_type == "trimf" || term.mf_type == "trapmf" {
             new_params.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         }
+        if term.mf_type == "gaussmf" && new_params.len() >= 2 {
+            new_params[1] = new_params[1].max(1e-3);
+        }
         let params_json = serde_json::to_value(&new_params).unwrap_or_default();
         sqlx::query("UPDATE fuzzy_terms SET params = $1::jsonb WHERE id = $2")
             .bind(&params_json)
@@ -875,7 +1026,7 @@ async fn load_engine_data(
     system_id: Uuid,
 ) -> Result<(Vec<engine::VarInfo>, Vec<engine::RuleInfo>), AppError> {
     let variables = sqlx::query_as::<_, FuzzyVariable>(
-        "SELECT * FROM fuzzy_variables WHERE system_id = $1"
+        "SELECT * FROM fuzzy_variables WHERE system_id = $1 ORDER BY name"
     )
     .bind(system_id)
     .fetch_all(pool)
@@ -884,7 +1035,8 @@ async fn load_engine_data(
     let all_terms: Vec<FuzzyTerm> = sqlx::query_as(
         "SELECT ft.* FROM fuzzy_terms ft \
          JOIN fuzzy_variables fv ON fv.id = ft.variable_id \
-         WHERE fv.system_id = $1"
+         WHERE fv.system_id = $1 \
+         ORDER BY fv.name, ft.label"
     )
     .bind(system_id)
     .fetch_all(pool)
@@ -1121,4 +1273,79 @@ async fn analyze_surface(
     ).map_err(AppError::Validation)?;
 
     Ok(Json(result))
+}
+
+/// Corrompe propositalmente todos os parâmetros dos termos para demonstrar
+/// recuperação pelo PSO. Antecedentes viram MF ultra-larga (tudo dispara),
+/// consequentes viram pico no máximo do universo (saída = 100 sempre),
+/// fitness dispara para ~5000+.
+async fn corrupt_params(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let _system = sqlx::query_as::<_, FuzzySystem>(
+        "SELECT * FROM fuzzy_systems WHERE id = $1"
+    )
+    .bind(system_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Sistema não encontrado".into()))?;
+
+    let vars: Vec<FuzzyVariable> = sqlx::query_as(
+        "SELECT * FROM fuzzy_variables WHERE system_id = $1 ORDER BY name"
+    )
+    .bind(system_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let terms: Vec<FuzzyTerm> = sqlx::query_as(
+        "SELECT ft.* FROM fuzzy_terms ft \
+         JOIN fuzzy_variables fv ON fv.id = ft.variable_id \
+         WHERE fv.system_id = $1 ORDER BY fv.name, ft.label"
+    )
+    .bind(system_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut updated = 0u32;
+    for term in &terms {
+        let var = match vars.iter().find(|v| v.id == term.variable_id) {
+            Some(v) => v,
+            None => continue,
+        };
+        let is_consequent = var.role == "consequent" || var.role == "output";
+        let params: Vec<f64> = if is_consequent {
+            // Consequente: MF estreita no MÁXIMO → centroid ≈ max, área > 0
+            let hi = var.universe_max;
+            match term.mf_type.as_str() {
+                "trimf" => vec![hi - 1.0, hi, hi],
+                "trapmf" => vec![hi - 1.0, hi - 0.5, hi, hi],
+                "gaussmf" => vec![hi, 3.0],
+                _ => continue,
+            }
+        } else {
+            // Antecedente: MF ultra-larga → membership ~1.0 para qualquer input
+            let (lo, hi) = (var.universe_min, var.universe_max);
+            let range = (hi - lo).max(1.0);
+            match term.mf_type.as_str() {
+                "trimf" => vec![lo, (lo + hi) / 2.0, hi],
+                "trapmf" => vec![lo, lo, hi, hi],
+                "gaussmf" => vec![(lo + hi) / 2.0, range * 10.0],
+                _ => continue,
+            }
+        };
+        let params_json = serde_json::to_value(&params).unwrap_or_default();
+        sqlx::query("UPDATE fuzzy_terms SET params = $1::jsonb WHERE id = $2")
+            .bind(&params_json)
+            .bind(term.id)
+            .execute(&state.pool)
+            .await?;
+        updated += 1;
+    }
+
+    Ok(Json(json!({
+        "updated_terms": updated,
+        "system_id": system_id,
+        "message": format!("{updated} termos corrompidos — antecedentes chatos, consequentes no máximo (100). Rode PSO para recuperar."),
+    })))
 }
