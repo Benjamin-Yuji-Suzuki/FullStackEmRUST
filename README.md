@@ -4,9 +4,9 @@
 
 [![codecov](https://codecov.io/gh/Benjamin-Yuji-Suzuki/FullStackEmRUST/branch/main/graph/badge.svg)](https://codecov.io/gh/Benjamin-Yuji-Suzuki/FullStackEmRUST)
 
-**Disciplinas:** Qualidade e Projeto de Software · Inteligência Artificial e Computacional · Ciência de Dados — CESUPA 01/2026  
-**Modalidade (IA) — Parte 1:** Opção B + Opção C-B (TSK) + Pontuação Extra (PSO)  
-**Modalidade (IA) — Parte 2:** Opção 2 — Protótipo de programa com PSO (Computação Evolutiva)  
+**Disciplina:** Inteligência Artificial e Computacional — CESUPA 01/2026  
+**Modalidade — Parte 1:** Opção B + Opção C-B (TSK) + Pontuação Extra (PSO)  
+**Modalidade — Parte 2:** Opção 2 — Protótipo de programa com PSO (Computação Evolutiva)  
 **Equipe:** Benjamin Yuji Suzuki  
 **Repositório principal:** https://github.com/Benjamin-Yuji-Suzuki/FullStackEmRUST
 
@@ -39,7 +39,6 @@ O projeto é composto por dois repositórios:
 | Pipeline de dados | [Polars](https://pola.rs/) (Rust) | Leitura de Parquet + inferência em lote (planejado) |
 | API Externa | [OpenWeather API](https://openweathermap.org/api) | Temperatura e umidade reais por cidade |
 | Build | [cargo-leptos](https://github.com/leptos-rs/cargo-leptos) | Gerencia WASM + servidor em um único comando |
-| Qualidade | [SonarQube Cloud](https://sonarcloud.io) | Análise estática: complexidade, duplicação, code smells, vulnerabilidades |
 
 ---
 
@@ -53,12 +52,11 @@ FullStackEmRUST/
 │   ├── USE_CASES.md
 │   ├── FUZZY_MODEL.md
 │   ├── ARCHITECTURE.md
-│   ├── DECLARACAO_IA.md
 │   ├── RELATORIO_FUZZY.md
-│   ├── RELATORIO_ENTREGA.md
 │   ├── SLIDES.md
 │   ├── CENARIOS_TESTE.md
-│   └── Lauda_Atividade_IA_AV2_Parte_1.md
+│   ├── Lauda_Atividade_IA_AV2_Parte_1.md
+│   └── images/               # Gráficos e screenshots
 └── fuzzysimulated/
     ├── Cargo.toml             # workspace Rust
     ├── Cargo.lock             # versões fixadas (commitado)
@@ -210,8 +208,8 @@ Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRU
 
 | Documento | Conteúdo |
 |---|---|
+| [RELATORIO_FUZZY.md](./docs/RELATORIO_FUZZY.md) | Relatório completo da disciplina de IA (modelagem, experimentos, resultados) |
 | [USE_CASES.md](./docs/USE_CASES.md) | Especificação dos 20 casos de uso |
-| [RELATORIO_ENTREGA.md](./docs/RELATORIO_ENTREGA.md) | Relatório de entrega (testes, cobertura, qualidade) |
 | [FUZZY_MODEL.md](./docs/FUZZY_MODEL.md) | Modelos Mamdani, TSK e Otimização PSO |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Banco de dados, integrações e fluxos |
 
@@ -233,9 +231,8 @@ O banco já vem com 4 sistemas de demonstração após a migration `009_reset_an
 
 | Sistema | Entradas | Saída | Regras | Cenários |
 |---|---|---|---|---|
-| **Risco Cibernético Avançado** | probabilidade_ataque, impacto_financeiro, vulnerabilidade_sistema | nivel_risco (5 termos) | 12 | 14 |
-| **Conforto Térmico** | temperatura (5 termos, incl. muito_frio/muito_quente), umidade (5 termos, incl. muito_seco/muito_umido) | conforto (5 termos, incl. extremo_desconfortavel/ideal) | **17** | 17 (+6 TSK) |
-| **Risco Cibernetico** | receita_anual_usd, total_funcionarios, gravidade_ataque | impacto_financeiro | 9 | 9 |
+| **Conforto Térmico** | temperatura (5 termos), umidade (5 termos) | conforto (5 termos) | **17** (9 base + 8 extremos gaussmf) | 17 (+6 TSK) |
+| **Risco Cibernetico** | receita_anual_usd, total_funcionarios, gravidade_ataque | impacto_financeiro | **19** (9 base + 10 extremos) | batch (778 linhas) |
 | **Detecção de Intrusão** | pacotes_suspeitos, conexoes_anomalas, trafego_noturno | nivel_ameaca (5 termos) | 12 | 10 |
 
 O **Conforto Térmico** foi expandido com termos extremos usando `gaussmf` (função gaussiana = `e^(-(x-μ)²/(2σ²))`), que naturalmente produz comportamento quadrático suave nos extremos. As regras passaram de 9 para 17, cobrindo desde frio extremo (Sibéria) até calor extremo (Deserto).
