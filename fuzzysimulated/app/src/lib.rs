@@ -569,7 +569,7 @@ fn OptimizePage() -> impl IntoView {
     let selected_sys = RwSignal::new(String::new());
     let pso_pop = RwSignal::new("20".to_string());
     let pso_iters = RwSignal::new("50".to_string());
-    let pso_num_runs = RwSignal::new("1".to_string());
+    let pso_num_runs = RwSignal::new("3".to_string());
     let pso_seed = RwSignal::new("42".to_string());
     let pso_w = RwSignal::new("0.729".to_string());
     let pso_c1 = RwSignal::new("1.494".to_string());

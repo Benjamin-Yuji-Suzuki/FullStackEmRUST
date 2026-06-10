@@ -529,6 +529,7 @@ O deslocamento à esquerda do termo "agradavel" antecipa a faixa de conforto par
 | Representação | Vetor de parâmetros das MF (trimf: a, b, c; trapmf: a, b, c, d) |
 | Tamanho do enxame | 20 partículas (padrão) / 30 (modo auto) |
 | Iterações máximas | 50 (padrão) / 100 (modo auto) |
+| Execuções (runs) | 3 (padrão) |
 | w (inércia) | 0,729 |
 | c1 (cognitivo) | 1,494 |
 | c2 (social) | 1,494 |
