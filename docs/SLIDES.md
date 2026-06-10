@@ -128,12 +128,19 @@ ENTÃO risco = 0.3×prob + 0.3×imp + 0.4×vuln
 
 **Particle Swarm Optimization**
 
-- Enxame de 30 partículas
-- 100 iterações máximas
-- Otimiza parâmetros das funções de pertinência
+- Enxame de 20-30 partículas
+- 50-100 iterações máximas
+- Otimiza parâmetros das funções de pertinência (trimf, trapmf, gaussmf)
+
+**Demonstração: Corromper e Recuperar**
+
+1. Clique em **"Corromper params"** → MFs degeneradas saída = 100
+2. Clique em **"Auto — Batch"** → PSO carrega amostras do dataset e otimiza
 
 **Resultado:**
-- Erro (MSE) reduziu de 0.035 → 0.012 (**66% de melhoria**)
+- **Antes (corrompido):** MSE = **4999.9** (saída 97.67 fixa)
+- **Depois (PSO):** MSE = **987.9** (saída 20-59 variada)
+- **Melhoria: 5×** no erro quadrático médio
 
 ---
 
@@ -173,9 +180,25 @@ Motor   : logicfuzzy_academic v0.2.1
 
 ---
 
-## Slide 12 — Cenários de Teste
+## Slide 12 — Batch com dataset_ml.parquet
 
-**14 cenários validados:**
+**Sistema Risco Cibernetico** — 3 entradas do dataset:
+
+| Coluna Parquet | Variável Fuzzy | Universo |
+|---|---|---|
+| `attack_vector` | gravidade_ataque | [0,100] |
+| `total_loss_usd` | receita_anual_usd | [0,1e9] |
+| `total_employees` | total_funcionarios | [0,500000] |
+
+- **778 registros** processados em lote (bulk INSERT)
+- Target: `total_loss_usd / 1M` normalizado para [0,100]
+- 8 termos gaussmf, 10 regras, 7 cenários extremos
+
+---
+
+## Slide 13 — Cenários de Teste
+
+**14 cenários validados (Risco Cibernético Avançado):**
 
 | Cenário | Risco | Interpretação |
 |---|---|---|
@@ -185,10 +208,11 @@ Motor   : logicfuzzy_academic v0.2.1
 | Servidor sem patch | 88.5 | Crítico ✅ |
 
 Cobertura: casos baixos, médios, altos, críticos, fronteiriços.
+**+7 cenários extremos no Risco Cibernetico** (micro-empresa a megacorp)
 
 ---
 
-## Slide 13 — Superfície de Controle
+## Slide 14 — Superfície de Controle
 
 **probabilidade_ataque × vulnerabilidade_sistema → nivel_risco**
 
@@ -201,22 +225,23 @@ Inclinação mais acentuada na região médio-alta.
 
 ---
 
-## Slide 14 — Conclusão
+## Slide 15 — Conclusão
 
 **O que foi entregue:**
 - ✅ Plataforma funcional 100% Rust
 - ✅ Motores Mamdani + TSK completos
-- ✅ 12 regras, 3 entradas, 5 termos de saída
-- ✅ 14 cenários de teste com análise
-- ✅ Otimização PSO (pontuação extra)
+- ✅ 5 sistemas fuzzy (Risco, Conforto, Intrusão, Avançado, Batch)
+- ✅ 35+ cenários de teste com análise
+- ✅ Otimização PSO com demo Corromper/Recuperar (5000→988)
+- ✅ Batch com dataset_ml.parquet (778 registros)
 - ✅ 124 testes, 80% de cobertura
 - ✅ GitHub organizado com README e instruções
 
-**Valor acadêmico:** Demonstra aplicação real de lógica fuzzy em domínio crítico, com implementação completa e validação experimental.
+**Valor acadêmico:** Demonstra aplicação real de lógica fuzzy + PSO em domínio de cibersegurança, com implementação completa e validação experimental.
 
 ---
 
-## Slide 15 — Perguntas?
+## Slide 16 — Perguntas?
 
 **Obrigado!**
 

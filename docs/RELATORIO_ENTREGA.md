@@ -55,14 +55,18 @@ server/src/routes/
 
 ```
 migrations/
-  001_schema.sql          → Tabelas base (systems, variables, terms, rules)
-  002_seed.sql            → Seed Conforto Térmico (9 regras)
-  004_audit_orphan.sql    → Índices para orphan events
-  005_system_status.sql   → Coluna status (ativo/favorito/concluido/desativado)
-  006_scenarios.sql       → Tabela scenarios
-  007_seed_risco.sql      → Seed Análise de Risco
+  001_schema.sql                → Tabelas base (systems, variables, terms, rules)
+  002_seed.sql                  → Seed Conforto Térmico (9 regras)
+  004_audit_orphan.sql          → Índices para orphan events
+  005_system_status.sql         → Coluna status (ativo/favorito/concluido/desativado)
+  006_scenarios.sql             → Tabela scenarios
+  007_seed_risco.sql            → Seed Análise de Risco
   008_seed_risco_cibernetico.sql → Seed Risco Cibernético
-   009_reset_and_seed.sql  → Reset + 4 sistemas seed — JSONB constante + dollar-quoting (42 regras, 43 cenários)
+  009_reset_and_seed.sql        → Reset + 4 sistemas seed — JSONB constante + dollar-quoting (42 regras, 43 cenários)
+  011_tsk_scenario_belem.sql    → Cenário TSK demonstrativo (Clima de Belém)
+  012_extreme_conforto.sql      → Termos gaussmf extremos no Conforto Térmico
+  013_tsk_scenarios.sql         → Suporte a cenários TSK
+  014_extreme_risco_cibernetico.sql → 8 termos gaussmf + 10 regras + 7 cenários no Risco Cibernetico
 ```
 
 ---
@@ -87,7 +91,7 @@ migrations/
 | UC14 | Matriz de Regras | ✅ | 1 API + E2E |
 | UC15 | Superfície | ✅ | 1 API + 1 E2E |
 | UC16 | Histórico de Alterações | ✅ | 2 API + E2E |
-| UC17 | PSO | ✅ | 2 API + 1 E2E |
+| UC17 | PSO + Corromper/Recuperar | ✅ | 2 API + 1 E2E |
 | UC18 | TSK | ✅ | 2 API + 1 E2E |
 | UC19 | SVG | ✅ | 2 API + 1 E2E |
 | UC20 | Diagnóstico | ✅ | 2 API + 1 E2E |
@@ -281,7 +285,8 @@ cargo leptos watch
 | **JSONB snapshots p/ auditoria** | Undo completo de sistema + variáveis + termos + regras |
 | **Testes com `#[serial]`** | Banco compartilhado entre testes paralelos |
 | **4 seeds distintos** | Cobertura de OpenWeather, dataset_ml.parquet, cibersegurança |
-| **Output-50 fallback** | Quando `compute()` retorna Err, avalia midpoint do universo |
+| **Output-50 fallback** | Quando `compute()` retorna Err, avalia midpoint do universo consequente |
+| **Corrupt-params para demo PSO** | Degenera MFs propositalmente (antecedentes ultra-largos, consequentes no máximo) para mostrar MSE subir de ~1049 para ~5000, depois PSO recupera |
 
 ---
 

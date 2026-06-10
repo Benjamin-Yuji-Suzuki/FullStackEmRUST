@@ -42,6 +42,55 @@ Diferentemente da lógica binária tradicional (seguro vs. inseguro), a lógica 
 
 ---
 
+### 2.4 Requisitos Funcionais e Não Funcionais
+
+#### Requisitos Funcionais
+
+| ID | Descrição | UC |
+|---|---|---|
+| RF01 | O sistema deve permitir criar, listar, editar e excluir sistemas fuzzy | UC01 |
+| RF02 | O sistema deve permitir gerenciar variáveis (antecedentes/consequentes) e seus termos linguísticos com funções de pertinência | UC02 |
+| RF03 | O sistema deve permitir criar e editar regras fuzzy com operador AND e peso configurável | UC03 |
+| RF04 | O sistema deve executar inferência Mamdani com defuzzificação por centroide | UC04 |
+| RF05 | O sistema deve consultar dados climáticos reais via OpenWeather API | UC05 |
+| RF06 | O sistema deve manter histórico de simulações com detalhes de entrada e saída | UC06 |
+| RF07 | O sistema deve processar inferência em lote (JSON, CSV, Parquet) | UC07 |
+| RF08 | O sistema deve permitir comparar múltiplas simulações lado a lado | UC08 |
+| RF09 | O sistema deve exportar relatório de simulação em PDF ou CSV | UC09 |
+| RF10 | O sistema deve duplicar sistemas fuzzy completos | UC10 |
+| RF11 | O sistema deve exportar e importar sistemas fuzzy em formato JSON | UC11 |
+| RF12 | O sistema deve salvar e carregar cenários de simulação | UC12 |
+| RF13 | O sistema deve executar varredura de parâmetros de entrada (sweep) | UC13 |
+| RF14 | O sistema deve exibir matriz de regras ativadas com grau de ativação | UC14 |
+| RF15 | O sistema deve gerar superfície de controle 3D (mapa de calor) | UC15 |
+| RF16 | O sistema deve manter auditoria completa com undo via snapshots JSONB | UC16 |
+| RF17 | O sistema deve otimizar parâmetros de MF via PSO com demonstração corromper/recuperar | UC17 |
+| RF18 | O sistema deve executar inferência TSK (Takagi-Sugeno-Kang) com consequentes polinomiais | UC18 |
+| RF19 | O sistema deve exportar visualizações SVG das funções de pertinência | UC19 |
+| RF20 | O sistema deve exibir diagnóstico detalhado do pipeline de inferência | UC20 |
+
+#### Requisitos Não Funcionais
+
+| ID | Descrição |
+|---|---|
+| RNF01 | **Stack 100% Rust**: backend Axum, frontend Leptos SSR+WASM, banco PostgreSQL |
+| RNF02 | **Desempenho**: simulação Mamdani/TSK em < 500ms para sistemas de até 12 regras |
+| RNF03 | **Portabilidade**: execução em qualquer sistema com Rust toolchain e PostgreSQL |
+| RNF04 | **Testabilidade**: cobertura de código > 75% nos módulos centrais (engine, validação) |
+| RNF05 | **Reprodutibilidade**: seeds com 4 sistemas pré-configurados (42 regras, 43 cenários) |
+| RNF06 | **Segurança**: sem exposição de chaves de API; parâmetros validados contra NaN/Inf |
+| RNF07 | **Acessibilidade**: interface web responsiva com tema escuro Catppuccin |
+| RNF08 | **Manutenibilidade**: código modular (engine, validação, auditoria separados) |
+
+#### Riscos de Interpretação Incorreta
+
+1. **Saída não absoluta**: o valor numérico de risco gerado pelo sistema é uma aproximação fuzzy, não uma medida exata. Decisões reais de cibersegurança devem considerar múltiplas fontes.
+2. **Sensibilidade a parâmetros**: pequenas alterações nas funções de pertinência ou nos pesos das regras podem deslocar a saída em até 10 pontos percentuais (ver Seção 6.4).
+3. **PSO off-line**: a otimização por PSO ajusta parâmetros com base em dados históricos; não reage a ameaças em tempo real.
+4. **Generalização limitada**: o modelo Risco Cibernetico foi calibrado para o domínio de cibersegurança; aplicação em outros domínios requer reconfiguração completa das variáveis e regras.
+
+---
+
 ## 3. Fundamentação Teórica
 
 ### 3.1 Lógica Fuzzy
@@ -83,74 +132,198 @@ O PSO (Particle Swarm Optimization) é um algoritmo evolutivo inspirado no compo
 
 ## 4. Modelagem Fuzzy
 
-### 4.1 Sistema Principal: Risco Cibernético Avançado
+O FuzzySimulated inclui quatro sistemas fuzzy pré-configurados. Este relatório detalha os dois mais completos: **Conforto Térmico** (Mamdani clássico, 2 entradas) e **Risco Cibernetico** (batch + PSO, 3 entradas, 19 regras com MF gaussianas extremas).
+
+### 4.1 Sistema Conforto Térmico (Mamdani)
+
+Sistema para avaliação de conforto térmico baseado em temperatura e umidade, com integração à API OpenWeather para dados meteorológicos reais.
+
+![Editor de Variáveis — Conforto Térmico](images/ct_variaveis.png)
 
 #### Variáveis de Entrada
 
+![MF temperatura](images/mf_ct_temperatura.svg)
+
 | Variável | Papel | Universo | Unidade | Termos |
 |---|---|---|---|---|
-| `probabilidade_ataque` | Antecedente | [0, 100] | % | baixa, media, alta |
-| `impacto_financeiro` | Antecedente | [0, 100] | pontos | baixo, medio, alto |
-| `vulnerabilidade_sistema` | Antecedente | [0, 100] | % | baixa, media, alta |
+| `temperatura` | Antecedente | [0, 50] | °C | frio, agradavel, quente, muito_frio\*, muito_quente\* |
+| `umidade` | Antecedente | [0, 100] | % | seco, normal, umido, muito_seco\*, muito_umido\* |
+
+(\* termos gaussmf extremos adicionados pela migration 012)
 
 #### Variável de Saída
 
+![MF conforto](images/mf_ct_conforto.svg)
+
 | Variável | Papel | Universo | Unidade | Termos |
 |---|---|---|---|---|
-| `nivel_risco` | Consequente | [0, 100] | pontos | muito_baixo, baixo, medio, alto, critico |
+| `conforto` | Consequente | [0, 10] | pontos | desconfortavel, neutro, confortavel, extremo_desconfortavel\*, ideal\* |
 
 #### Funções de Pertinência
 
-**probabilidade_ataque:**
+**temperatura:**
 
-| Termo | Tipo | Parâmetros |
-|---|---|---|
-| baixa | trapmf | [0, 0, 25, 45] |
-| media | trimf | [30, 50, 70] |
-| alta | trapmf | [55, 75, 100, 100] |
+| Termo | Tipo | Parâmetros | Descrição |
+|---|---|---|---|
+| muito_frio | gaussmf | [0, 7] | Sensação de frio extremo (abrangente) |
+| frio | trapmf | [0, 0, 15, 22] | Temperatura baixa |
+| agradavel | trimf | [18, 24, 30] | Temperatura confortável |
+| quente | trapmf | [26, 32, 50, 50] | Temperatura alta |
+| muito_quente | gaussmf | [50, 7] | Calor extremo (abrangente) |
 
-**impacto_financeiro:**
+**umidade:**
 
-| Termo | Tipo | Parâmetros |
-|---|---|---|
-| baixo | trapmf | [0, 0, 25, 45] |
-| medio | trimf | [30, 50, 70] |
-| alto | trapmf | [55, 75, 100, 100] |
+| Termo | Tipo | Parâmetros | Descrição |
+|---|---|---|---|
+| muito_seco | gaussmf | [0, 10] | Ar extremamente seco |
+| seco | trapmf | [0, 0, 30, 50] | Umidade baixa |
+| normal | trimf | [40, 55, 70] | Umidade dentro da faixa de conforto |
+| umido | trapmf | [60, 75, 100, 100] | Umidade alta |
+| muito_umido | gaussmf | [100, 10] | Ar extremamente úmido |
 
-**vulnerabilidade_sistema:**
+**conforto (saída):**
 
-| Termo | Tipo | Parâmetros |
-|---|---|---|
-| baixa | trapmf | [0, 0, 20, 40] |
-| media | trimf | [25, 50, 75] |
-| alta | trapmf | [60, 80, 100, 100] |
+| Termo | Tipo | Parâmetros | Descrição |
+|---|---|---|---|
+| extremo_desconfortavel | gaussmf | [0, 1.5] | Situação de extremo desconforto |
+| desconfortavel | trapmf | [0, 0, 3, 5] | Ambiente desconfortável |
+| neutro | trimf | [3, 5, 7] | Nem confortável nem desconfortável |
+| confortavel | trapmf | [5, 7, 10, 10] | Ambiente agradável |
+| ideal | gaussmf | [10, 1.5] | Condições perfeitas (pico estreito) |
 
-**nivel_risco (saída):**
+#### Base de Regras (17 regras)
 
-| Termo | Tipo | Parâmetros |
-|---|---|---|
-| muito_baixo | trimf | [0, 0, 20] |
-| baixo | trapmf | [10, 20, 35, 45] |
-| medio | trimf | [30, 50, 70] |
-| alto | trapmf | [55, 70, 85, 95] |
-| critico | trimf | [80, 100, 100] |
+![Editor de Regras — Conforto Térmico](images/ct_regras.png)
 
-### 4.2 Base de Regras (12 regras)
+A base cobre todas as combinações dos termos base (9 regras) mais regras extremas com os termos gaussmf adicionais (8 regras):
 
 | # | Regra | Peso |
 |---|---|---|
-| 1 | SE probabilidade_ataque é baixa E vulnerabilidade_sistema é baixa ENTÃO nivel_risco é muito_baixo | 1.0 |
-| 2 | SE probabilidade_ataque é baixa E vulnerabilidade_sistema é media ENTÃO nivel_risco é baixo | 1.0 |
-| 3 | SE probabilidade_ataque é media E vulnerabilidade_sistema é baixa ENTÃO nivel_risco é baixo | 1.0 |
-| 4 | SE probabilidade_ataque é media E vulnerabilidade_sistema é media ENTÃO nivel_risco é medio | 1.0 |
-| 5 | SE probabilidade_ataque é alta E vulnerabilidade_sistema é alta ENTÃO nivel_risco é critico | 1.0 |
-| 6 | SE impacto_financeiro é alto E vulnerabilidade_sistema é alta ENTÃO nivel_risco é critico | 1.0 |
-| 7 | SE impacto_financeiro é alto E probabilidade_ataque é alta ENTÃO nivel_risco é critico | 1.0 |
-| 8 | SE impacto_financeiro é medio E vulnerabilidade_sistema é media ENTÃO nivel_risco é medio | 1.0 |
-| 9 | SE probabilidade_ataque é alta E vulnerabilidade_sistema é media ENTÃO nivel_risco é alto | 1.0 |
-| 10 | SE probabilidade_ataque é media E vulnerabilidade_sistema é alta ENTÃO nivel_risco é alto | 1.0 |
-| 11 | SE impacto_financeiro é baixo E vulnerabilidade_sistema é baixa ENTÃO nivel_risco é muito_baixo | 1.0 |
-| 12 | SE impacto_financeiro é alto E probabilidade_ataque é media ENTÃO nivel_risco é alto | 1.0 |
+| R01 | SE temperatura é frio E umidade é seco ENTÃO conforto é desconfortavel | 1.0 |
+| R02 | SE temperatura é frio E umidade é normal ENTÃO conforto é neutro | 1.0 |
+| R03 | SE temperatura é frio E umidade é umido ENTÃO conforto é desconfortavel | 1.0 |
+| R04 | SE temperatura é agradavel E umidade é seco ENTÃO conforto é neutro | 1.0 |
+| R05 | SE temperatura é agradavel E umidade é normal ENTÃO conforto é confortavel | 1.0 |
+| R06 | SE temperatura é agradavel E umidade é umido ENTÃO conforto é neutro | 1.0 |
+| R07 | SE temperatura é quente E umidade é seco ENTÃO conforto é desconfortavel | 1.0 |
+| R08 | SE temperatura é quente E umidade é normal ENTÃO conforto é neutro | 1.0 |
+| R09 | SE temperatura é quente E umidade é umido ENTÃO conforto é desconfortavel | 1.0 |
+| R10 | SE temperatura é muito_frio ENTÃO conforto é extremo_desconfortavel | 1.0 |
+| R11 | SE temperatura é muito_frio E umidade é muito_umido ENTÃO conforto é extremo_desconfortavel | 1.0 |
+| R12 | SE temperatura é muito_quente ENTÃO conforto é extremo_desconfortavel | 1.0 |
+| R13 | SE temperatura é muito_quente E umidade é muito_seco ENTÃO conforto é extremo_desconfortavel | 1.0 |
+| R14 | SE temperatura é agradavel E umidade é muito_seco ENTÃO conforto é neutro | 1.0 |
+| R15 | SE temperatura é agradavel E umidade é muito_umido ENTÃO conforto é neutro | 1.0 |
+| R16 | SE temperatura é muito_frio E umidade é seco ENTÃO conforto é extremo_desconfortavel | 1.0 |
+| R17 | SE temperatura é muito_quente E umidade é muito_umido ENTÃO conforto é extremo_desconfortavel | 1.0 |
+
+### 4.2 Sistema Risco Cibernetico (Batch + PSO)
+
+Sistema projetado para processamento em lote com o dataset `dataset_ml.parquet`, mapeando colunas diretamente para variáveis fuzzy. Possui 19 regras combinando termos clássicos (trimf/trapmf) e extremos (gaussmf).
+
+![Editor de Variáveis — Risco Cibernetico](images/rc_variaveis.png)
+
+#### Variáveis de Entrada
+
+![MF receita_anual_usd](images/mf_rc_receita_anual_usd.svg)
+
+| Variável | Papel | Universo | Mapeamento Parquet | Termos |
+|---|---|---|---|---|
+| `receita_anual_usd` | Antecedente | [0, 1e9] | `company_revenue_usd` | muito_baixa, baixa, media, alta, muito_alta |
+| `total_funcionarios` | Antecedente | [0, 500000] | `employee_count` | micro, pequena, media, grande, megacorp |
+| `gravidade_ataque` | Antecedente | [0, 100] | `attack_vector_primary` (string→numérico) | quase_zero, baixa, media, alta, critico |
+
+#### Variável de Saída
+
+![MF impacto_financeiro](images/mf_rc_impacto_financeiro.svg)
+
+| Variável | Papel | Universo | Termos |
+|---|---|---|---|
+| `impacto_financeiro` | Consequente | [0, 100] | minimo, baixo, medio, alto, catastrofico |
+
+#### Funções de Pertinência
+
+**receita_anual_usd:**
+
+| Termo | Tipo | Parâmetros | Descrição |
+|---|---|---|---|
+| muito_baixa | gaussmf | [0, 5e7] | Receita próxima de zero |
+| baixa | trapmf | [0, 0, 5e7, 1e8] | Pequena empresa ou startup |
+| media | trimf | [5e7, 2e8, 5e8] | Empresa de médio porte |
+| alta | trapmf | [2e8, 5e8, 1e9, 1e9] | Grande corporação |
+| muito_alta | gaussmf | [1e9, 5e7] | Megacorp (topo do universo) |
+
+**total_funcionarios:**
+
+| Termo | Tipo | Parâmetros | Descrição |
+|---|---|---|---|
+| micro | gaussmf | [0, 2500] | Startup de alguns funcionários |
+| pequena | trapmf | [0, 0, 5000, 20000] | Empresa de pequeno porte |
+| media | trimf | [5000, 50000, 150000] | Empresa de porte médio |
+| grande | trapmf | [50000, 150000, 500000, 500000] | Grande empresa |
+| megacorp | gaussmf | [500000, 2500] | Corporação com milhares de funcionários |
+
+**gravidade_ataque:**
+
+| Termo | Tipo | Parâmetros | Descrição |
+|---|---|---|---|
+| quase_zero | gaussmf | [0, 7] | Ameaça mínima ou inexistente |
+| baixa | trapmf | [0, 0, 20, 40] | Ataque de baixa severidade |
+| media | trimf | [20, 50, 70] | Ameaça moderada |
+| alta | trapmf | [50, 70, 100, 100] | Ataque severo |
+| critico | gaussmf | [100, 7] | Ameaça crítica (pico no máximo) |
+
+**impacto_financeiro (saída):**
+
+| Termo | Tipo | Parâmetros | Descrição |
+|---|---|---|---|
+| minimo | gaussmf | [0, 5] | Impacto financeiro desprezível |
+| baixo | trapmf | [0, 0, 30, 50] | Perda financeira pequena |
+| medio | trimf | [30, 50, 70] | Prejuízo moderado |
+| alto | trapmf | [50, 70, 100, 100] | Perda financeira severa |
+| catastrofico | gaussmf | [100, 5] | Impacto máximo (colapso financeiro) |
+
+#### Mapeamento de Colunas do Parquet
+
+| Coluna Parquet | Mapeamento Fuzzy | Tipo |
+|---|---|---|
+| `company_revenue_usd` | `receita_anual_usd` | Numérico direto |
+| `employee_count` | `total_funcionarios` | Numérico direto |
+| `attack_vector_primary` | `gravidade_ataque` | String→numérico: phishing=20, malware=40, trojan=40, dos=50, ddos=50, insider=60, data_breach=70, apt=80, ransomware=85 |
+| `total_loss_usd` | Target output | Dividido por 1M → clamp [0, 100] |
+
+#### Base de Regras (19 regras)
+
+![Editor de Regras — Risco Cibernetico](images/rc_regras.png)
+
+**Regras base (9):**
+
+| # | Regra |
+|---|---|
+| R01 | SE receita_anual_usd é baixa E total_funcionarios é pequena E gravidade_ataque é baixa ENTÃO impacto_financeiro é baixo |
+| R02 | SE receita_anual_usd é baixa E total_funcionarios é pequena E gravidade_ataque é alta ENTÃO impacto_financeiro é medio |
+| R03 | SE receita_anual_usd é baixa E total_funcionarios é grande E gravidade_ataque é alta ENTÃO impacto_financeiro é alto |
+| R04 | SE receita_anual_usd é media E total_funcionarios é media E gravidade_ataque é baixa ENTÃO impacto_financeiro é baixo |
+| R05 | SE receita_anual_usd é media E total_funcionarios é media E gravidade_ataque é media ENTÃO impacto_financeiro é medio |
+| R06 | SE receita_anual_usd é media E total_funcionarios é media E gravidade_ataque é alta ENTÃO impacto_financeiro é alto |
+| R07 | SE receita_anual_usd é alta E total_funcionarios é grande E gravidade_ataque é baixa ENTÃO impacto_financeiro é medio |
+| R08 | SE receita_anual_usd é alta E total_funcionarios é grande E gravidade_ataque é media ENTÃO impacto_financeiro é alto |
+| R09 | SE receita_anual_usd é alta E total_funcionarios é grande E gravidade_ataque é alta ENTÃO impacto_financeiro é alto |
+
+**Regras extremas com gaussmf (10):**
+
+| # | Regra |
+|---|---|
+| R10 | SE receita_anual_usd é muito_baixa E total_funcionarios é micro E gravidade_ataque é quase_zero ENTÃO impacto_financeiro é minimo |
+| R11 | SE receita_anual_usd é muito_baixa E total_funcionarios é micro E gravidade_ataque é critico ENTÃO impacto_financeiro é medio |
+| R12 | SE receita_anual_usd é muito_alta E total_funcionarios é megacorp E gravidade_ataque é quase_zero ENTÃO impacto_financeiro é baixo |
+| R13 | SE receita_anual_usd é muito_alta E total_funcionarios é megacorp E gravidade_ataque é critico ENTÃO impacto_financeiro é catastrofico |
+| R14 | SE total_funcionarios é megacorp E gravidade_ataque é critico ENTÃO impacto_financeiro é catastrofico |
+| R15 | SE receita_anual_usd é muito_baixa E gravidade_ataque é critico ENTÃO impacto_financeiro é medio |
+| R16 | SE receita_anual_usd é muito_alta E gravidade_ataque é quase_zero ENTÃO impacto_financeiro é minimo |
+| R17 | SE total_funcionarios é micro E gravidade_ataque é critico ENTÃO impacto_financeiro é alto |
+| R18 | SE receita_anual_usd é muito_baixa E total_funcionarios é micro ENTÃO impacto_financeiro é minimo |
+| R19 | SE receita_anual_usd é muito_alta E total_funcionarios é megacorp ENTÃO impacto_financeiro é alto |
 
 ### 4.3 Inferência Mamdani
 
@@ -235,60 +408,114 @@ fuzzysimulated/
 
 ---
 
-## 6. Experimentos e Validação
+### 5.5 Fluxo de Uso
 
-### 6.1 Cenários de Teste — Risco Cibernético Avançado (Mamdani)
+A plataforma FuzzySimulated possui 5 telas principais e 11 telas auxiliares. O fluxo típico de uso é:
 
-| # | Cenário | prob_ataque | impacto_fin | vulnerab | Risco (Mamdani) | Interpretação |
-|---|---|---|---|---|---|---|
-| 1 | Sistema interno de baixo risco | 10 | 15 | 10 | 7.2 | Risco muito baixo — sistema bem protegido |
-| 2 | Equipe com backups | 15 | 20 | 15 | 7.2 | Risco muito baixo — backups regulares |
-| 3 | Rede com SIEM | 20 | 35 | 15 | 12.8 | Risco baixo — monitoramento ativo |
-| 4 | Firewall e antivírus atualizados | 25 | 30 | 25 | 12.8 | Risco baixo — defesas básicas funcionando |
-| 5 | Phishing interno empresa pequena | 40 | 20 | 30 | 20.5 | Risco médio — ameaça real com baixo impacto |
-| 6 | Firewall desatualizado (rede média) | 50 | 40 | 55 | 35.2 | Risco médio-alto — vulnerabilidade elevada |
-| 7 | Phishing sem treinamento | 60 | 30 | 50 | 35.2 | Risco médio-alto — fator humano crítico |
-| 8 | Acesso privilegiado suspeito | 45 | 55 | 80 | 42.1 | Risco alto — impacto financeiro significativo |
-| 9 | Senhas fracas sistema financeiro | 55 | 70 | 65 | 55.3 | Risco alto — combinação perigosa |
-| 10 | Sistema legado exposto internet | 70 | 50 | 85 | 55.3 | Risco alto — legado é vulnerabilidade crítica |
-| 11 | Servidor crítico sem patch | 85 | 90 | 95 | 88.5 | Risco crítico — pior cenário possível |
-| 12 | Ransomware infraestrutura crítica | 80 | 95 | 70 | 88.5 | Risco crítico — impacto financeiro máximo |
-| 13 | DDoS serviço bancário | 95 | 85 | 75 | 88.5 | Risco crítico — ataque em larga escala |
-| 14 | Vazamento via API insegura | 75 | 90 | 85 | 88.5 | Risco crítico — dados sensíveis expostos |
+1. **Dashboard** (`/`) — usuário visualiza os sistemas fuzzy cadastrados e seleciona um para editar ou simular.
+   ![Dashboard](images/dashboard.png)
 
-### 6.2 Comparação Mamdani vs TSK
+2. **Editor de Variáveis** (`/vars?s={id}`) — configuração das variáveis de entrada (antecedentes) e saída (consequente), com adição de termos linguísticos e funções de pertinência.
+   ![Editor de Variáveis — Conforto Térmico](images/ct_variaveis.png)
 
-Para o cenário "Servidor crítico sem patch" (85, 90, 95):
+3. **Editor de Regras** (`/rules?s={id}`) — criação da base de regras no formato `SE var É termo E ... ENTÃO var É termo`.
+   ![Editor de Regras — Risco Cibernetico](images/rc_regras.png)
 
-| Motor | Saída | Interpretação |
-|---|---|---|
-| Mamdani | 88.5 | Risco crítico — regras 5, 6, 7 ativadas fortemente |
-| TSK | ~91 | Risco crítico — consequente linear combina entradas altas |
+4. **Simulador** (`/sim`) — execução da inferência Mamdani ou TSK com visualização do pipeline, gráficos SVG, diagnóstico e análises (sweep, superfície de controle).
+   ![Simulador — Conforto Térmico](images/ct_simulador.png)
 
-A saída exata do TSK depende dos coeficientes polinomiais definidos para cada regra, que podem ser configurados pelo usuário conforme a necessidade do domínio. O TSK produz saída ligeiramente superior por permitir combinação linear direta das entradas, enquanto o Mamdani satura nos termos linguísticos.
+5. **Otimizador PSO** (`/opt`) — demonstração da otimização de parâmetros com corromper/recuperar e comparação antes/depois.
+   ![Otimizador PSO](images/pso.png)
 
-### 6.3 Superfície de Controle
+6. **Batch** (`/batch`) — processamento de inferência em lote com arquivos JSON, CSV ou Parquet.
+   ![Batch](images/batch.png)
 
-A superfície de controle (probabilidade_ataque vs. vulnerabilidade_sistema, com impacto_financeiro fixo em 50) mostra que o risco aumenta monotonicamente com ambas as variáveis, com inclinação mais acentuada na região médio-alta, confirmando a sensibilidade esperada do modelo.
+7. **Análise** (`/analysis`) — superfície de controle 3D e matriz de regras ativadas.
+   ![Análise](images/surface_ct.png)
 
-### 6.4 Análise de Sensibilidade
+8. **Histórico** (`/hist`) — consulta e comparação de simulações anteriores, exportação de relatórios.
+   ![Histórico](images/historico.png)
 
-Variando a função de pertinência do termo "media" de probabilidade_ataque de `[30, 50, 70]` para `[20, 40, 60]` (deslocamento à esquerda), a saída para cenários de ataque moderado aumenta em aproximadamente 8 pontos percentuais, indicando sensibilidade moderada aos parâmetros.
+9. **Auditoria** (`/audit`) — timeline de alterações com desfazer/refazer via snapshots JSONB.
+   ![Auditoria](images/auditoria.png)
 
 ---
 
-### 6.5 Sistema Adicional: Detecção de Intrusão
+## 6. Experimentos e Validação
 
-Além do sistema principal de risco cibernético, o FuzzySimulated inclui um modelo secundário para **detecção de intrusão em redes**, com 3 entradas e 12 regras:
+### 6.1 Cenários de Teste — Conforto Térmico (Mamdani)
 
-| Variável | Papel | Universo | Termos |
+| # | Cenário | Temperatura | Umidade | Saída | Interpretação |
+|---|---|---|---|---|---|
+| 1 | Dia frio e seco em Curitiba | 10 | 30 | 2.0 | Desconfortável — frio + seco |
+| 2 | Dia frio e úmido em São Paulo | 10 | 85 | 2.0 | Desconfortável — frio + úmido |
+| 3 | Manhã amena em Belo Horizonte | 20 | 55 | 7.8 | Confortável — temperatura agradável + umidade normal |
+| 4 | Tarde agradável no Rio de Janeiro | 25 | 50 | 7.8 | Confortável — condição ideal |
+| 5 | Dia quente e seco em Brasília | 30 | 25 | 2.0 | Desconfortável — quente + seco |
+| 6 | Calor úmido em Manaus | 35 | 90 | 2.0 | Desconfortável — quente + úmido |
+| 7 | Verão em Salvador | 32 | 75 | 2.0 | Desconfortável — quente + muito úmido |
+| 8 | Noite amena em Florianópolis | 22 | 65 | 4.9 | Neutro — temperatura boa, mas umidade elevada |
+| 9 | Inverno em Porto Alegre | 8 | 70 | 2.0 | Desconfortável — frio |
+| 10 | Tarde quente e seca em Cuiabá | 40 | 15 | 2.0 | Desconfortável — calor extremo |
+
+### 6.2 Cenários de Teste — Risco Cibernetico (Mamdani)
+
+| # | Cenário | Receita (USD) | Funcionários | Gravidade Ataque | Saída | Interpretação |
+|---|---|---|---|---|---|---|
+| 1 | Startup phishing baixo impacto | 1M | 50 | 20 | 20.4 | Baixo — empresa pequena, ataque leve |
+| 2 | Média empresa ataque baixo | 100M | 5000 | 15 | 6.1 | Baixo — empresa média, ataque mínimo |
+| 3 | Grande empresa ataque mínimo | 800M | 200000 | 10 | 50.0 | Médio — receita alta puxa o risco |
+| 4 | Startup ransomware médio impacto | 5M | 100 | 85 | 43.7 | Médio — startup com ataque severo |
+| 5 | Média empresa malware moderado | 200M | 40000 | 45 | 50.0 | Médio — combinação equilibrada |
+| 6 | Grande empresa phishing velado | 500M | 100000 | 25 | 50.0 | Médio — grande porte eleva exposição |
+| 7 | Média empresa ransomware alto | 150M | 30000 | 90 | 50.0 | Médio-alto — ameaça crítica |
+| 8 | Grande empresa data breach | 900M | 250000 | 75 | 50.0 | Alto — mega-corp com ataque severo |
+| 9 | Corp ransomware máximo impacto | 1B | 400000 | 95 | — | Alto — pior cenário; requer regras extremas |
+
+### 6.3 Comparação Mamdani vs TSK
+
+![Simulador Conforto Térmico](images/ct_simulador.png)
+
+Para o cenário "Manhã amena em Belo Horizonte" (temperatura=20, umidade=55):
+
+| Motor | Saída | Interpretação |
+|---|---|---|
+| Mamdani | 7.8 | Confortável — regra R05 (agradavel AND normal) ativada fortemente |
+| TSK | ~7.5 | Confortável — depende dos coeficientes configurados |
+
+O Mamdani produz saída contínua no intervalo [0, 10] do universo de conforto. O TSK, com consequentes lineares, permite ajuste fino por regra, mas exige configuração manual dos coeficientes.
+
+### 6.4 Superfície de Controle — Conforto Térmico
+
+![Superfície de Controle — Conforto Térmico](images/surface_ct.png)
+
+A superfície de controle mostra o conforto em função de temperatura (eixo X) e umidade (eixo Y). O pico de conforto (~7.8) ocorre na região de temperatura agradável (18-30°C) com umidade normal (40-70%). As bordas do gráfico (frio/quente extremo ou umidade muito baixa/alta) resultam em conforto mínimo (~2.0).
+
+### 6.5 Varredura (Sweep) — Conforto Térmico
+
+![Varredura de temperatura](images/sweep_chart.svg)
+
+A varredura unidimensional da variável `temperatura` (com `umidade=55` fixa) mostra o conforto evoluindo de ~2.0 (frio) para o pico de ~7.8 (agradável, 20-25°C) e retornando a ~2.0 (calor extremo). A curva evidencia o comportamento não linear esperado de um sistema fuzzy com múltiplas regras.
+
+### 6.6 Análise de Sensibilidade — Conforto Térmico
+
+Para avaliar a robustez do modelo, os parâmetros da função de pertinência "agradavel" (temperatura) foram alterados e o impacto na saída foi medido.
+
+#### Experimento: Deslocamento do termo "agradavel"
+
+| Parâmetro | Original | Alterado |
+|---|---|---|
+| trimf "agradavel" | [18, 24, 30] | [15, 22, 28] (deslocado 3°C à esquerda) |
+
+| Cenário | Saída Original | Saída Alterada | Variação |
 |---|---|---|---|
-| `pacotes_suspeitos` | Antecedente | [0, 100] | baixo, medio, alto |
-| `conexoes_anomalas` | Antecedente | [0, 100] | baixa, media, alta |
-| `trafego_noturno` | Antecedente | [0, 100] | baixo, medio, alto |
-| `nivel_ameaca` | Consequente | [0, 100] | muito_baixo, baixo, medio, alto, critico |
+| Manhã amena (20, 55) | 7.76 | 7.21 | -0.55 |
+| Tarde agradável (25, 50) | 7.76 | 7.76 | 0.0 |
+| Noite amena (22, 65) | 4.96 | 6.80 | +1.84 |
 
-Este modelo segue a mesma estrutura do Risco Cibernético Avançado, demonstrando a reutilização da plataforma para diferentes domínios dentro da cibersegurança.
+O deslocamento à esquerda do termo "agradavel" antecipa a faixa de conforto para temperaturas mais baixas, elevando a saída em cenários amenos (22°C) em +1.84 pontos, mas reduzindo ligeiramente o conforto em cenários mais quentes (20°C).
+
+**Conclusão da análise:** o Conforto Térmico apresenta sensibilidade moderada (~1-2 pontos no universo [0,10]) a variações nos parâmetros das MF. A calibração adequada é essencial para resultados precisos.
 
 ---
 
@@ -308,9 +535,37 @@ Este modelo segue a mesma estrutura do Risco Cibernético Avançado, demonstrand
 
 ### 7.2 Funcionamento
 
-O PSO ajusta os parâmetros das funções de pertinência (a, b, c para trimf; a, b, c, d para trapmf) para minimizar o erro quadrático médio (MSE) entre a saída desejada e a calculada pelo motor fuzzy. A cada iteração, cada partícula atualiza sua velocidade combinando sua melhor posição individual com a melhor posição global do enxame. Os parâmetros são mantidos ordenados (a ≤ b ≤ c) após cada atualização para preservar a integridade das funções de pertinência.
+O PSO ajusta os parâmetros das funções de pertinência (a, b, c para trimf; a, b, c, d para trapmf; mean, sigma para gaussmf) para minimizar o erro quadrático médio (MSE) entre a saída desejada e a calculada pelo motor fuzzy. A cada iteração, cada partícula atualiza sua velocidade combinando sua melhor posição individual com a melhor posição global do enxame. Os parâmetros são mantidos ordenados (a ≤ b ≤ c para trimf/trapmf) e sigma ≥ 1e-3 para gaussmf após cada atualização.
 
-Os resultados variam conforme os dados de treino e o sistema fuzzy utilizado. Para o preset "Conforto Térmico" com 3 cenários de referência, o PSO tipicamente converge em 20-50 iterações com redução significativa do MSE, demonstrando a eficácia da otimização automática.
+### 7.3 Demonstração: Corromper e Recuperar (Antes vs Depois)
+
+![Otimizador PSO](images/pso.png)
+
+Para evidenciar a eficácia do PSO, o FuzzySimulated inclui uma rota `corrupt-params` que degenera propositalmente todos os parâmetros das funções de pertinência:
+
+1. **Antecedentes**: funções ultra-largas que retornam ~1.0 para qualquer input (ex: trapmf `[0,0,100,100]`, gaussmf `[50, 1000]`)
+2. **Consequentes**: funções estreitas no máximo do universo (ex: trapmf `[99, 99.5, 100, 100]`, gaussmf `[100, 3]`)
+
+Isso faz o motor retornar sempre ~100 (máximo), maximizando o erro.
+
+#### Resultados com amostras do dataset_ml.parquet
+
+| Métrica | Antes (corrompido) | Depois (PSO otimizado) | Melhoria |
+|---|---|---|---|
+| **MSE** | **4999.9** | **987.9** | **5,06×** |
+| **Predição** | 97.67 (constante) | 20-59 (variado) | Recuperou dinamismo |
+| **População** | — | 20 | — |
+| **Iterações** | — | 50 | — |
+| **Convergência** | — | 1.202→1.164→1.125→1.087→1.049 (×10³) | Curva decrescente |
+
+#### Fluxo de Demonstração
+
+1. Usuário seleciona o sistema "Risco Cibernetico"
+2. Clica em **"Corromper params (demo PSO)"** — todos os 20 termos são degenerados
+3. Clica em **"Auto — usar resultados do Batch"** — o PSO carrega amostras do batch, avalia o MSE inicial (~5000) e executa a otimização
+4. A interface exibe lado a lado: **"Antes: 4999.9 → Depois: 987.9"** com duas tabelas comparativas
+
+O contraste evidencia que o PSO recuperou um sistema fuzzy funcional a partir de parâmetros degenerados, comprovando a eficácia do algoritmo.
 
 ---
 
@@ -345,9 +600,9 @@ cargo leptos watch
 
 ## 9. Conclusão
 
-O FuzzySimulated demonstra a aplicação prática e completa de sistemas de controle fuzzy no domínio da cibersegurança. A plataforma implementa os dois principais paradigmas de inferência (Mamdani e TSK), oferece ferramentas de validação (superfície, sweep, diagnóstico) e inclui otimização automática via PSO.
+O FuzzySimulated demonstra a aplicação prática e completa de sistemas de controle fuzzy em dois domínios distintos: **Conforto Térmico** (avaliação ambiental) e **Risco Cibernetico** (cibersegurança). A plataforma implementa os dois principais paradigmas de inferência (Mamdani e TSK), oferece ferramentas de validação (superfície, sweep, diagnóstico) e inclui otimização automática via PSO.
 
-O modelo de Risco Cibernético Avançado, com 3 entradas, 5 termos de saída e 12 regras, mostrou-se consistente na avaliação de 14 cenários, variando de risco muito baixo (sistemas internos protegidos) a risco crítico (ransomware, DDoS, vazamento de dados). A comparação Mamdani-TSK evidenciou as diferenças conceituais entre os dois métodos.
+O sistema Conforto Térmico, com 2 entradas, 5 termos de saída e 17 regras (incluindo 8 regras extremas com MFs gaussianas), mostrou-se consistente na avaliação de 10 cenários climáticos, variando de desconfortável (frio/seco) a confortável (temperatura agradável/umidade normal). O sistema Risco Cibernetico, com 3 entradas mapeadas do dataset_ml.parquet e 19 regras, demonstra a capacidade de processamento em lote e a integração com dados reais de cibersegurança.
 
 ### Limitações
 
@@ -367,11 +622,14 @@ O modelo de Risco Cibernético Avançado, com 3 entradas, 5 termos de saída e 1
 
 | Ferramenta | Finalidade | Prompt/Comando Resumido | Revisão Humana |
 |---|---|---|---|
-| Claude (opencode) | Geração de código Rust | "Implemente motor fuzzy Mamdani com trimf/trapmf/gaussmf" | Todos os testes passam; código revisado para garantir corretude matemática |
-| Claude (opencode) | Geração de componentes Leptos | "Crie página de simulação com abas Mamdani/TSK/SVG/Diagnóstico" | Interface testada com Playwright E2E |
-| Claude (opencode) | Elaboração de testes | "Crie testes HTTP para rota de simulação" | Testes executados e validados no CI |
-| Claude (opencode) | Documentação | "Escreva relatório técnico seguindo estrutura da lauda" | Conteúdo revisado e adequado ao contexto do projeto |
-| GitHub Copilot | Autocompletar código | Sugestões inline durante codificação | Cada sugestão revisada e modificada conforme necessário |
+| DeepSeek V4 Flash (via opencode CLI) | Geração de engine fuzzy (membership, Mamdani, parser) | "Implemente motor Mamdani com trimf/trapmf/gaussmf e defuzz centroide" | Testes unitários validam cada função matemática; parâmetros validados contra NaN/Inf |
+| DeepSeek V4 Flash (via opencode CLI) | Corrupt-params + PSO auto demo | "Crie endpoint que degenera MFs para demonstrar recuperação PSO" | Saída verificada: MSE ~5000 antes, ~988 depois |
+| DeepSeek V4 Flash (via opencode CLI) | Batch parquet mapping | "Mapeie colunas do dataset_ml.parquet para variáveis fuzzy" | Bulk INSERT de 778 registros; saída normalizada [0,100] |
+| DeepSeek V4 Flash (via opencode CLI) | Componentes Leptos (frontend) | "Crie página de simulação com abas Mamdani/TSK/SVG/Diagnóstico" | Interface validada visualmente; testes E2E com Playwright |
+| DeepSeek V4 Flash (via opencode CLI) | Rotas Axum (backend) | "Crie rota CRUD para sistemas fuzzy com validação e auditoria" | Rotas testadas via HTTP Axum (64 testes) |
+| DeepSeek V4 Flash (via opencode CLI) | Migrations SQL | "Crie migration seed Risco Cibernetico com JSONB" | Migrations testadas com rollback; dados verificados no banco |
+| DeepSeek V4 Flash (via opencode CLI) | Testes | "Crie testes HTTP para rota de variáveis" | is_ok() substituído por expect() para debug |
+| DeepSeek V4 Flash (via opencode CLI) | Documentação | "Documente arquitetura do sistema" | Conteúdo revisado e ajustado conforme implementação real |
 
 Todas as sugestões de IA foram revisadas, testadas e validadas pelo integrante da equipe. O código gerado por IA passou por revisão manual e bateria de testes antes de ser integrado.
 

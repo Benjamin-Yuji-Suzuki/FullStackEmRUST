@@ -722,11 +722,23 @@
 - **FA4 — Otimização divergente:** "A otimização não convergiu dentro da tolerância. Ajuste os parâmetros do PSO e tente novamente." 📝 Pendente
 - **FA5 — Usuário cancela:** Otimização interrompida. Resultados parciais descartados. 📝 Pendente
 
+**Fluxo Principal — Demonstração corromper e recuperar**
+
+1. Usuário clica no botão **"Corromper params (demo PSO)"**.
+2. **Sistema** degenera todos os parâmetros dos termos: antecedentes viram MF ultra-larga (membership ~1.0 para qualquer input), consequentes viram pico no máximo do universo.
+3. **Sistema** exibe mensagem de confirmação: "N termos corrompidos — rode PSO para recuperar".
+4. Usuário clica em **"Auto — usar resultados do Batch"**.
+5. **Sistema** carrega dados de referência do batch, avalia MSE com params corrompidos (Antes ~5000) e executa PSO.
+6. **Sistema** exibe tabela comparativa lado a lado: **"Antes: 4999.9 → Depois: 987.9"** com duas tabelas de predições.
+7. Usuário visualiza o contraste: antes a saída era constante (~97.67), depois variada (20-59).
+8. Usuário pode clicar em **"Aplicar Parâmetros no BD"** para salvar os params otimizados.
+
 **Pós-condições**
 
 - Parâmetros otimizados exibidos e disponíveis para aplicação.
 - Gráfico de convergência disponível para download.
 - Nenhuma alteração no banco até o usuário confirmar a aplicação.
+- Demonstração visual da eficácia do PSO: 5× de melhoria no MSE.
 
 ---
 

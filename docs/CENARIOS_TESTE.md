@@ -109,14 +109,33 @@ Neste cenário, os consequentes TSK são constantes (coeficiente a₀ apenas, se
 
 ---
 
-## Total de Cenários: 35
+---
+
+## Risco Cibernetico (Parquet/Batch)
+
+Cenários extremos adicionados via migration 014 para o sistema baseado em `dataset_ml.parquet`. Utilizam as variáveis `receita_anual_usd`, `total_funcionarios`, `gravidade_ataque` e `impacto_financeiro`.
+
+| # | Nome do Cenário | receita_anual_usd | total_funcionarios | gravidade_ataque | Saída Esperada | Interpretação |
+|---|---|---|---|---|---|---|
+| 1 | Micro-empresa sem ataque relevante | 50k | 3 | 2 | Mínimo | Empresa pequena, sem ameaças → impacto mínimo |
+| 2 | Micro-empresa com ataque ransomware | 80k | 5 | 85 | Médio | Poucos recursos, mas ataque severo eleva o impacto |
+| 3 | Megacorp com quase nenhum ataque | 950M | 450k | 3 | Baixo | Grande porte, mas sem ameaças → impacto controlado |
+| 4 | Megacorp com ataque APT crítico | 990M | 480k | 98 | Catastrófico | Pior cenário: mega empresa + ataque crítico |
+| 5 | Média empresa com ataque APT avançado | 80M | 3k | 80 | Alto | Empresa média com ataque severo |
+| 6 | Grande empresa com DDoS massivo | 700M | 180k | 50 | Alto | DDoS em grande escala |
+| 7 | Startup comprometida por insider | 3M | 25 | 60 | Médio | Ameaça interna em startup |
+
+---
+
+## Total de Cenários: 42+
 
 | Sistema | Cenários |
 |---|---|
 | Risco Cibernético Avançado | 14 |
+| Risco Cibernetico (Parquet) | 7 |
 | Conforto Térmico | 10 |
 | Detecção de Intrusão | 10 |
 | Conforto Térmico (TSK) | 1 |
-| **Total** | **35** |
+| **Total** | **42+** |
 
-Cobertura de casos: baixos (12), médios (8), altos (8), críticos (6), fronteiriços (6), TSK (1).
+Cobertura de casos: baixos (14), médios (10), altos (10), críticos (8), fronteiriços (6), TSK (1).
