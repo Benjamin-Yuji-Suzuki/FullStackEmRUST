@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
+use sqlx::Row;
 use crate::engine;
 use crate::errors::AppError;
 use crate::models::*;
@@ -158,14 +159,12 @@ async fn process_batch(
         return Err(AppError::Validation("Nenhum input fornecido".into()));
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(req.inputs.len());
 
     for (i, input_row) in req.inputs.iter().enumerate() {
         let engine_input = prepare_batch_input(input_row);
         let fuzzy_output = engine::evaluate_mamdani(&var_infos, &rule_infos, &engine_input);
-        let outputs_json = serde_json::to_value(&fuzzy_output).unwrap_or_else(|_| json!({}));
 
-        // Usa total_loss_usd como target real para PSO, normalizado para [0,100]
         let target = input_row.get("total_loss_usd")
             .and_then(|v| v.as_f64())
             .map(|v| (v / 1_000_000.0).clamp(0.0, 100.0))
@@ -177,41 +176,61 @@ async fn process_batch(
             })
             .unwrap_or(50.0);
 
-        // Armazena inputs mapeados (com nomes de variáveis do fuzzy) para o PSO auto ler
-        let mapped_inputs = serde_json::to_value(&engine_input).unwrap_or_else(|_| json!({}));
-        let record = sqlx::query_as::<_, BatchResult>(
-            "INSERT INTO batch_results (system_id, source_file, row_index, inputs, output) \
-             VALUES ($1, 'batch-api', $2, $3::jsonb, $4) RETURNING *"
-        )
-        .bind(req.system_id)
-        .bind(i as i32)
-        .bind(mapped_inputs)
-        .bind(target)
-        .fetch_one(&state.pool)
-        .await?;
-
         let fuzzy_avg = if !fuzzy_output.is_empty() {
             fuzzy_output.values().copied().sum::<f64>() / fuzzy_output.len() as f64
         } else { f64::NAN };
 
-        results.push(json!({
-            "id": record.id,
-            "row_index": record.row_index,
-            "inputs": record.inputs,
-            "output": record.output,
+        let outputs_json = serde_json::to_value(&fuzzy_output).unwrap_or_else(|_| json!({}));
+        let mapped_inputs = serde_json::to_value(&engine_input).unwrap_or_else(|_| json!({}));
+
+        results.push((i as i32, mapped_inputs, target, fuzzy_avg, outputs_json));
+    }
+
+    // Bulk INSERT único em vez de 778 inserts individuais
+    let now = chrono::Utc::now();
+    let mut query_builder = sqlx::QueryBuilder::new(
+        "INSERT INTO batch_results (system_id, source_file, row_index, inputs, output, executed_at) "
+    );
+    query_builder.push_values(&results, |mut b, (idx, inputs, output, _favg, _odet)| {
+        b.push_bind(req.system_id)
+         .push_bind("batch-api")
+         .push_bind(idx)
+         .push_bind(inputs)
+         .push_bind(output)
+         .push_bind(now);
+    });
+    query_builder.push(" RETURNING id, row_index, inputs, output, executed_at");
+    let inserted = query_builder
+        .build()
+        .fetch_all(&state.pool)
+        .await?;
+
+    let response_results: Vec<serde_json::Value> = inserted.into_iter().map(|row: sqlx::postgres::PgRow| {
+        let id: Uuid = row.get("id");
+        let row_idx: i32 = row.get("row_index");
+        let inputs: serde_json::Value = row.get("inputs");
+        let output: f64 = row.get("output");
+        let executed_at: chrono::DateTime<chrono::Utc> = row.get("executed_at");
+        let idx = row_idx as usize;
+        let (_, _, _, fuzzy_avg, outputs_json) = &results[idx];
+        json!({
+            "id": id,
+            "row_index": row_idx,
+            "inputs": inputs,
+            "output": output,
             "fuzzy_output": fuzzy_avg,
             "outputs_detail": outputs_json,
-            "executed_at": record.executed_at,
-        }));
-    }
+            "executed_at": executed_at,
+        })
+    }).collect();
 
     Ok(Json(json!({
         "system_id": req.system_id,
         "system_name": system.name,
         "total": req.inputs.len(),
-        "processed": results.len(),
+        "processed": response_results.len(),
         "errors": 0,
-        "results": results,
+        "results": response_results,
     })))
 }
 
