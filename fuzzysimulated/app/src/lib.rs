@@ -946,6 +946,7 @@ fn OptimizePage() -> impl IntoView {
                             let best_pos = r["best_position"].as_array().cloned().unwrap_or_default();
                             let history = r["history"].as_array().cloned().unwrap_or_default();
                             let terms_info = r["terms_info"].as_array().cloned().unwrap_or_default();
+                            let optimized_params = r["optimized_params"].as_array().cloned().unwrap_or_default();
                             let n_pts = r["trained_on"].as_u64().unwrap_or(0);
                             let pop_used = r["population_size"].as_u64().unwrap_or(0);
                             let iters_used = r["max_iterations"].as_u64().unwrap_or(0);
@@ -1027,13 +1028,19 @@ fn OptimizePage() -> impl IntoView {
                             } else { String::new() };
 
                             // ── Terms table ──
-                            let table_rows: Vec<String> = terms_info.iter().enumerate().map(|(i, t)| {
-                                let vname = t["variable_name"].as_str().unwrap_or("");
-                                let tlabel = t["term_label"].as_str().unwrap_or("");
-                                let mftype = t["mf_type"].as_str().unwrap_or("");
-                                let cur = t["current_params"].as_array().map(|a| a.iter().map(|v| format!("{:.3}", v.as_f64().unwrap_or(0.0))).collect::<Vec<_>>().join(", ")).unwrap_or_default();
-                                let opt = best_pos.get(i).and_then(|v| v.as_f64()).map_or("—".into(), |v| format!("{:.3}", v));
-                                format!(r#"<tr><td style="padding:2px 6px;font-size:9px">{vname}</td><td style="padding:2px 6px;font-size:9px">{tlabel}</td><td style="padding:2px 6px;font-size:9px">{mftype}</td><td style="padding:2px 6px;font-size:9px;color:var(--text3)">[{cur}]</td><td style="padding:2px 6px;font-size:9px;color:var(--teal)">{opt}</td></tr>"#)
+                            let table_rows: Vec<String> = optimized_params.iter().enumerate().map(|(_, opt_entry)| {
+                                let vname = opt_entry["variable_name"].as_str().unwrap_or("");
+                                let tlabel = opt_entry["term_label"].as_str().unwrap_or("");
+                                let mftype = opt_entry["mf_type"].as_str().unwrap_or("");
+                                let opt_vals: Vec<String> = opt_entry["values"].as_array().map(|a| a.iter().map(|v| format!("{:.3}", v.as_f64().unwrap_or(0.0))).collect()).unwrap_or_default();
+                                let opt_str = if opt_vals.is_empty() { "—".into() } else { format!("[{}]", opt_vals.join(", ")) };
+                                let cur_str = terms_info.iter()
+                                    .find(|ti| ti["variable_name"] == opt_entry["variable_name"] && ti["term_label"] == opt_entry["term_label"])
+                                    .and_then(|ti| ti["current_params"].as_array())
+                                    .map(|a| a.iter().map(|v| format!("{:.3}", v.as_f64().unwrap_or(0.0))).collect::<Vec<_>>().join(", "))
+                                    .map(|s| format!("[{}]", s))
+                                    .unwrap_or_default();
+                                format!(r#"<tr><td style="padding:2px 6px;font-size:9px">{vname}</td><td style="padding:2px 6px;font-size:9px">{tlabel}</td><td style="padding:2px 6px;font-size:9px">{mftype}</td><td style="padding:2px 6px;font-size:9px;color:var(--text3)">{cur_str}</td><td style="padding:2px 6px;font-size:9px;color:var(--teal)">{opt_str}</td></tr>"#)
                             }).collect();
                             let table_html = if !table_rows.is_empty() {
                                 format!(r#"<table style="width:100%;border-collapse:collapse;margin-top:6px">

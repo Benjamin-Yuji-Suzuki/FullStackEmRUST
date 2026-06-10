@@ -586,6 +586,8 @@ async fn optimize_pso(
     .fetch_all(&state.pool)
     .await?;
 
+    let optimized_params = build_optimized_params(&best_pos, &var_infos);
+
     let terms_info: Vec<serde_json::Value> = term_rows.iter().map(|t| {
         json!({
             "variable_name": t.variable_name,
@@ -603,6 +605,7 @@ async fn optimize_pso(
         "runs": runs_data,
         "num_runs": num_runs,
         "terms_info": terms_info,
+        "optimized_params": optimized_params,
         "population_size": pop,
         "max_iterations": iters,
         "pso_config": {
@@ -621,6 +624,11 @@ async fn optimize_pso(
 pub struct OptimizePsoAutoRequest {
     pub population_size: Option<usize>,
     pub max_iterations: Option<usize>,
+    pub num_runs: Option<usize>,
+    pub seed: Option<u64>,
+    pub w: Option<f64>,
+    pub c1: Option<f64>,
+    pub c2: Option<f64>,
 }
 
 /// PSO automático: lê batch_results do DB e otimiza MF params sem o usuário precisar
@@ -688,14 +696,32 @@ async fn optimize_pso_auto(
 
     let pop = req.population_size.unwrap_or(30);
     let iters = req.max_iterations.unwrap_or(100);
+    let num_runs = req.num_runs.unwrap_or(1);
 
-    let (best_pos, best_fit, history) = engine::optimize_with_pso(
-        &var_infos, &rule_infos,
-        &target_inputs, &target_outputs,
-        pop, iters, &engine::PsoConfigParams::default(),
-    ).map_err(AppError::Validation)?;
+    let config = engine::PsoConfigParams {
+        seed: req.seed.unwrap_or(42),
+        w: req.w.unwrap_or(0.729),
+        c1: req.c1.unwrap_or(1.494),
+        c2: req.c2.unwrap_or(1.494),
+    };
 
-    let history_json: Vec<[f64; 2]> = history.iter().map(|&(iter, fit)| [iter, fit]).collect();
+    let (best_pos, best_fit, history, runs_data) = if num_runs > 1 {
+        engine::multi_run_pso(
+            &var_infos, &rule_infos,
+            &target_inputs, &target_outputs,
+            pop, iters, num_runs, &config,
+        ).map_err(AppError::Validation)?
+    } else {
+        let (pos, fit, hist) = engine::optimize_with_pso(
+            &var_infos, &rule_infos,
+            &target_inputs, &target_outputs,
+            pop, iters, &config,
+        ).map_err(AppError::Validation)?;
+        let hist_json: Vec<[f64; 2]> = hist.iter().map(|&(iter, fit)| [iter, fit]).collect();
+        (pos, fit, hist_json, Vec::new())
+    };
+
+    let optimized_params = build_optimized_params(&best_pos, &var_infos);
 
     let term_rows = sqlx::query_as::<_, FuzzyTermWithVar>(
         "SELECT ft.*, fv.name as variable_name FROM fuzzy_terms ft \
@@ -720,8 +746,17 @@ async fn optimize_pso_auto(
         "system_id": system_id,
         "best_position": best_pos,
         "best_fitness": best_fit,
-        "history": history_json,
+        "history": history,
+        "runs": runs_data,
+        "num_runs": num_runs,
         "terms_info": terms_info,
+        "optimized_params": optimized_params,
+        "pso_config": {
+            "seed": config.seed,
+            "w": config.w,
+            "c1": config.c1,
+            "c2": config.c2
+        },
         "trained_on": target_inputs.len(),
         "training_inputs": target_inputs,
         "training_outputs": target_outputs,
@@ -747,6 +782,40 @@ fn row_to_f64_filtered(
                     result.insert(key.to_string(), n);
                 }
             }
+        }
+    }
+    result
+}
+
+/// Constrói `optimized_params` a partir do flat `best_position` e dos `var_infos`.
+/// Percorre variáveis→termos→dimensões na mesma ordenação que optimize_with_pso usa.
+fn build_optimized_params(
+    best_position: &[f64],
+    var_infos: &[engine::VarInfo],
+) -> Vec<serde_json::Value> {
+    let mut idx = 0;
+    let mut result = Vec::new();
+    for var in var_infos {
+        for term in &var.terms {
+            let n = match term.mf_type.as_str() {
+                "trimf" => 3,
+                "trapmf" => 4,
+                "gaussmf" => 2,
+                _ => 0,
+            };
+            let mut values = Vec::with_capacity(n);
+            for _ in 0..n {
+                if idx < best_position.len() {
+                    values.push(best_position[idx]);
+                    idx += 1;
+                }
+            }
+            result.push(json!({
+                "variable_name": var.name,
+                "term_label": term.label,
+                "mf_type": term.mf_type,
+                "values": values,
+            }));
         }
     }
     result
