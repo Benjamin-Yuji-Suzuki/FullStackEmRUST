@@ -697,12 +697,34 @@ async fn optimize_pso_auto(
 
     let history_json: Vec<[f64; 2]> = history.iter().map(|&(iter, fit)| [iter, fit]).collect();
 
+    let term_rows = sqlx::query_as::<_, FuzzyTermWithVar>(
+        "SELECT ft.*, fv.name as variable_name FROM fuzzy_terms ft \
+         JOIN fuzzy_variables fv ON fv.id = ft.variable_id \
+         WHERE fv.system_id = $1 \
+         ORDER BY fv.name, ft.label"
+    )
+    .bind(system_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let terms_info: Vec<serde_json::Value> = term_rows.iter().map(|t| {
+        json!({
+            "variable_name": t.variable_name,
+            "term_label": t.label,
+            "mf_type": t.mf_type,
+            "current_params": t.params,
+        })
+    }).collect();
+
     Ok(Json(json!({
         "system_id": system_id,
         "best_position": best_pos,
         "best_fitness": best_fit,
         "history": history_json,
+        "terms_info": terms_info,
         "trained_on": target_inputs.len(),
+        "training_inputs": target_inputs,
+        "training_outputs": target_outputs,
         "population_size": pop,
         "max_iterations": iters,
     })))

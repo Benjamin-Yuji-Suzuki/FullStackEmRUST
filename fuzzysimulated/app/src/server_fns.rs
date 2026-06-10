@@ -486,12 +486,22 @@ pub async fn run_pso_optimization(
     target_outputs: &Value,
     population_size: usize,
     max_iterations: usize,
+    num_runs: usize,
+    seed: u64,
+    w: f64,
+    c1: f64,
+    c2: f64,
 ) -> Option<Value> {
     let body = serde_json::json!({
         "target_inputs": target_inputs,
         "target_outputs": target_outputs,
         "population_size": population_size,
         "max_iterations": max_iterations,
+        "num_runs": num_runs,
+        "seed": seed,
+        "w": w,
+        "c1": c1,
+        "c2": c2,
     });
     api_post(&format!("/api/systems/{system_id}/optimize-pso"), &body).await
 }

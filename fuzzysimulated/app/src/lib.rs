@@ -569,6 +569,11 @@ fn OptimizePage() -> impl IntoView {
     let selected_sys = RwSignal::new(String::new());
     let pso_pop = RwSignal::new("20".to_string());
     let pso_iters = RwSignal::new("50".to_string());
+    let pso_num_runs = RwSignal::new("1".to_string());
+    let pso_seed = RwSignal::new("42".to_string());
+    let pso_w = RwSignal::new("0.729".to_string());
+    let pso_c1 = RwSignal::new("1.494".to_string());
+    let pso_c2 = RwSignal::new("1.494".to_string());
     let pso_result = RwSignal::new(None::<Value>);
     let pso_loading = RwSignal::new(false);
     let pso_apply_msg = RwSignal::new(String::new());
@@ -621,15 +626,45 @@ fn OptimizePage() -> impl IntoView {
                 <div class="flex gap-8 flex-wrap mb-8">
                     <div>
                         <label class="input-label">"População"</label>
-                        <input type="number" class="text-input" style="width:80px;font-size:10px"
+                        <input type="number" class="text-input" style="width:70px;font-size:10px"
                             prop:value=move || pso_pop.get()
                             on:input=move |e| pso_pop.set(event_target_value(&e))/>
                     </div>
                     <div>
                         <label class="input-label">"Iterações"</label>
-                        <input type="number" class="text-input" style="width:80px;font-size:10px"
+                        <input type="number" class="text-input" style="width:70px;font-size:10px"
                             prop:value=move || pso_iters.get()
                             on:input=move |e| pso_iters.set(event_target_value(&e))/>
+                    </div>
+                    <div>
+                        <label class="input-label">"Execuções"</label>
+                        <input type="number" class="text-input" style="width:60px;font-size:10px"
+                            prop:value=move || pso_num_runs.get()
+                            on:input=move |e| pso_num_runs.set(event_target_value(&e))/>
+                    </div>
+                    <div>
+                        <label class="input-label">"Semente"</label>
+                        <input type="number" class="text-input" style="width:70px;font-size:10px"
+                            prop:value=move || pso_seed.get()
+                            on:input=move |e| pso_seed.set(event_target_value(&e))/>
+                    </div>
+                    <div>
+                        <label class="input-label">"w (inércia)"</label>
+                        <input type="number" class="text-input" style="width:60px;font-size:10px" step="0.01"
+                            prop:value=move || pso_w.get()
+                            on:input=move |e| pso_w.set(event_target_value(&e))/>
+                    </div>
+                    <div>
+                        <label class="input-label">"c1 (cognitivo)"</label>
+                        <input type="number" class="text-input" style="width:60px;font-size:10px" step="0.01"
+                            prop:value=move || pso_c1.get()
+                            on:input=move |e| pso_c1.set(event_target_value(&e))/>
+                    </div>
+                    <div>
+                        <label class="input-label">"c2 (social)"</label>
+                        <input type="number" class="text-input" style="width:60px;font-size:10px" step="0.01"
+                            prop:value=move || pso_c2.get()
+                            on:input=move |e| pso_c2.set(event_target_value(&e))/>
                     </div>
                 </div>
 
@@ -639,24 +674,30 @@ fn OptimizePage() -> impl IntoView {
                     <button class="btn btn-primary" style="font-size:10px;padding:4px 12px" on:click={
                         let ss = selected_sys.clone();
                         let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                        let nr = pso_num_runs.clone(); let sd = pso_seed.clone();
+                        let w = pso_w.clone(); let c1 = pso_c1.clone(); let c2 = pso_c2.clone();
                         let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
-                        move |_| run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe,
+                        move |_| run_pso_preset(&ss, &pop, &iters, &nr, &sd, &w, &c1, &c2, &pr, &pl, &pe,
                             r#"[{"temperatura":10,"umidade":20},{"temperatura":24,"umidade":55},{"temperatura":35,"umidade":85}]"#,
                             r#"[{"conforto":2},{"conforto":8},{"conforto":1}]"#)
                     }>"Conforto Térmico"</button>
                     <button class="btn btn-primary" style="font-size:10px;padding:4px 12px" on:click={
                         let ss = selected_sys.clone();
                         let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                        let nr = pso_num_runs.clone(); let sd = pso_seed.clone();
+                        let w = pso_w.clone(); let c1 = pso_c1.clone(); let c2 = pso_c2.clone();
                         let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
-                        move |_| run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe,
+                        move |_| run_pso_preset(&ss, &pop, &iters, &nr, &sd, &w, &c1, &c2, &pr, &pl, &pe,
                             r#"[{"pacotes_suspeitos":10,"conexoes_anomalas":10,"trafego_noturno":10},{"pacotes_suspeitos":50,"conexoes_anomalas":50,"trafego_noturno":50},{"pacotes_suspeitos":90,"conexoes_anomalas":90,"trafego_noturno":90}]"#,
                             r#"[{"nivel_ameaca":5},{"nivel_ameaca":50},{"nivel_ameaca":95}]"#)
                     }>"Detecção de Intrusão"</button>
                     <button class="btn btn-primary" style="font-size:10px;padding:4px 12px" on:click={
                         let ss = selected_sys.clone();
                         let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                        let nr = pso_num_runs.clone(); let sd = pso_seed.clone();
+                        let w = pso_w.clone(); let c1 = pso_c1.clone(); let c2 = pso_c2.clone();
                         let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
-                        move |_| run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe,
+                        move |_| run_pso_preset(&ss, &pop, &iters, &nr, &sd, &w, &c1, &c2, &pr, &pl, &pe,
                             r#"[{"receita_anual_usd":500000,"total_funcionarios":20,"gravidade_ataque":15},{"receita_anual_usd":50000000,"total_funcionarios":5000,"gravidade_ataque":50},{"receita_anual_usd":500000000,"total_funcionarios":100000,"gravidade_ataque":85}]"#,
                             r#"[{"impacto_financeiro":5},{"impacto_financeiro":50},{"impacto_financeiro":90}]"#)
                     }>"Risco Cibernético"</button>
@@ -873,7 +914,7 @@ fn OptimizePage() -> impl IntoView {
                                         let outputs_json: serde_json::Value = serde_json::json!(orows);
                                         let inputs_str = serde_json::to_string(&inputs_json).unwrap_or_default();
                                         let outputs_str = serde_json::to_string(&outputs_json).unwrap_or_default();
-                                        run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe, &inputs_str, &outputs_str);
+                                        run_pso_preset(&ss, &pop, &iters, &pso_num_runs, &pso_seed, &pso_w, &pso_c1, &pso_c2, &pr, &pl, &pe, &inputs_str, &outputs_str);
                                     }
                                 }>"Executar PSO com dados acima"</button>
                             }.into_any()
@@ -908,66 +949,84 @@ fn OptimizePage() -> impl IntoView {
                             let n_pts = r["trained_on"].as_u64().unwrap_or(0);
                             let pop_used = r["population_size"].as_u64().unwrap_or(0);
                             let iters_used = r["max_iterations"].as_u64().unwrap_or(0);
-                            // Tenta ler dados de treino da resposta (opcional)
+                            let nr_used = r["num_runs"].as_u64().unwrap_or(1);
+                            let runs_data = r["runs"].as_array().cloned().unwrap_or_default();
+                            let pso_cfg = r["pso_config"].as_object().cloned().unwrap_or_default();
                             let train_inputs = r["training_inputs"].as_array().cloned().unwrap_or_default();
                             let train_outputs = r["training_outputs"].as_array().cloned().unwrap_or_default();
                             let ss = selected_sys.clone();
                             let am = pso_apply_msg.clone();
+                            let is_multi = nr_used > 1;
 
-                            // Build SVG chart for fitness convergence (600x220)
-                            let chart_svg = if history.len() > 1 {
-                                let w = 600.0; let h = 220.0; let pad_l = 55.0; let pad_r = 15.0; let pad_t = 20.0; let pad_b = 25.0;
-                                let plot_w = w - pad_l - pad_r;
-                                let plot_h = h - pad_t - pad_b;
-                                let pts: Vec<[f64;2]> = history.iter().filter_map(|v| {
-                                    Some([v[0].as_f64()?, v[1].as_f64()?])
-                                }).collect();
-                                let min_fit = pts.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
-                                let max_fit = pts.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max);
-                                let range = (max_fit - min_fit).max(1e-10);
-                                let iter_max = pts.last().map(|p| p[0]).unwrap_or(1.0);
-
-                                // Grid lines (horizontal)
-                                let n_grid = 4;
-                                let grid_lines: String = (0..=n_grid).map(|i| {
-                                    let y = pad_t + (i as f64 / n_grid as f64) * plot_h;
-                                    let val = max_fit - (i as f64 / n_grid as f64) * range;
-                                    format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface5)" stroke-width="0.5"/>
-                                        <text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="end">{:.3e}</text>"#,
-                                        pad_l, y, w - pad_r, y, pad_l - 4.0, y + 3.0, val)
-                                }).collect();
-
-                                // Vertical grid
-                                let vgrid: String = (0..=n_grid).map(|i| {
-                                    let x = pad_l + (i as f64 / n_grid as f64) * plot_w;
-                                    format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface5)" stroke-width="0.5"/>"#, x, pad_t, x, h - pad_b)
-                                }).collect();
-
-                                // Axis labels
-                                let x_label = format!(r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="middle">Iteração</text>"#, pad_l + plot_w / 2.0, h - 4.0);
-                                let y_label = format!(r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="middle" transform="rotate(-90,12,120)">Fitness (MSE)</text>"#, 12.0, pad_t + plot_h / 2.0);
-
-                                // Path
-                                let path_d: String = pts.iter().enumerate().map(|(i, p)| {
-                                    let x = pad_l + (p[0] / iter_max) * plot_w;
-                                    let y = pad_t + ((max_fit - p[1]) / range) * plot_h;
-                                    if i == 0 { format!("M{x:.1},{y:.1}") } else { format!("L{x:.1},{y:.1}") }
-                                }).collect();
-                                let svg_content = if let Some(last) = pts.last() {
-                                    let lx = pad_l + (last[0] / iter_max) * plot_w;
-                                    let ly = pad_t + ((max_fit - last[1]) / range) * plot_h;
-                                    format!(r#"<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="background:var(--surface4);border-radius:4px;width:100%;max-width:600px">
-                                        {grid_lines}{vgrid}
-                                        {x_label}{y_label}
-                                        <path d="{path_d}" fill="none" stroke="var(--teal)" stroke-width="1.5"/>
-                                        <circle cx="{lx:.1}" cy="{ly:.1}" r="3" fill="var(--teal)"/>
-                                        <text x="{lx:.1}" y="{ly:.1}" fill="var(--teal)" font-size="8" dx="5" dy="-3">{:.4e}</text>
-                                    </svg>"#, last[1])
-                                } else { String::new() };
-                            svg_content
+                            // ── SVG chart (single-run or multi-run overlaid) ──
+                            let chart_svg = if nr_used > 1 && runs_data.len() > 1 {
+                                build_multi_run_chart(&runs_data, 600.0, 220.0)
+                            } else if history.len() > 1 {
+                                build_single_chart(&history, 600.0, 220.0)
                             } else { String::new() };
 
-                            // Build terms table rows
+                            // ── Multi-run statistics ──
+                            let stats_section = if is_multi && !runs_data.is_empty() {
+                                let fits: Vec<f64> = runs_data.iter().filter_map(|run| run["best_fitness"].as_f64()).collect();
+                                if fits.is_empty() {
+                                    String::new()
+                                } else {
+                                    let mean = fits.iter().sum::<f64>() / fits.len() as f64;
+                                    let variance = fits.iter().map(|f| (f - mean).powi(2)).sum::<f64>() / fits.len() as f64;
+                                    let std_dev = variance.sqrt();
+                                    let min_f = fits.iter().cloned().fold(f64::MAX, f64::min);
+                                    let max_f = fits.iter().cloned().fold(f64::MIN, f64::max);
+                                    let mut rows = String::new();
+                                    for (i, run) in runs_data.iter().enumerate() {
+                                        let seed_val = run["seed"].as_u64().unwrap_or(0);
+                                        let fit = run["best_fitness"].as_f64().unwrap_or(0.0);
+                                        rows.push_str(&format!(
+                                            r#"<tr style="border-bottom:1px solid var(--surface5)"><td style="padding:1px 6px;font-size:9px">{}</td><td style="padding:1px 6px;font-size:9px">{}</td><td style="padding:1px 6px;font-size:9px;text-align:right">{:.6}</td></tr>"#,
+                                            i + 1, seed_val, fit
+                                        ));
+                                    }
+                                    format!(
+                                        r#"<details class="mt-6">
+                                            <summary style="cursor:pointer;font-size:10px;color:var(--accent)">Multi-run: {nr_used} execuções — melhor {min_f:.6}, média {mean:.6}, σ {std_dev:.6}</summary>
+                                            <div style="margin-top:4px;display:flex;gap:12px;font-size:9px;flex-wrap:wrap">
+                                                <span>Melhor: <b>{min_f:.6}</b></span>
+                                                <span>Média: <b>{mean:.6}</b></span>
+                                                <span>Pior: <b>{max_f:.6}</b></span>
+                                                <span>Desv.Pad: <b>{std_dev:.6}</b></span>
+                                            </div>
+                                            <table style="width:100%;border-collapse:collapse;margin-top:4px;font-size:9px">
+                                                <thead><tr style="border-bottom:1px solid var(--surface4)">
+                                                    <th style="padding:1px 6px;text-align:left;color:var(--text3)">Run</th>
+                                                    <th style="padding:1px 6px;text-align:left;color:var(--text3)">Semente</th>
+                                                    <th style="padding:1px 6px;text-align:right;color:var(--text3)">Fitness</th>
+                                                </tr></thead>
+                                                <tbody>{rows}</tbody>
+                                            </table>
+                                        </details>"#,
+                                        nr_used = nr_used,
+                                        min_f = min_f,
+                                        mean = mean,
+                                        std_dev = std_dev,
+                                        max_f = max_f,
+                                        rows = rows,
+                                    )
+                                }
+                            } else { String::new() };
+
+                            // ── PSO config display ──
+                            let cfg_display = if !pso_cfg.is_empty() {
+                                let seed_v = pso_cfg.get("seed").and_then(|v| v.as_u64()).unwrap_or(42);
+                                let w_v = pso_cfg.get("w").and_then(|v| v.as_f64()).unwrap_or(0.729);
+                                let c1_v = pso_cfg.get("c1").and_then(|v| v.as_f64()).unwrap_or(1.494);
+                                let c2_v = pso_cfg.get("c2").and_then(|v| v.as_f64()).unwrap_or(1.494);
+                                format!(
+                                    r#"<div style="display:flex;gap:8px;font-size:9px;color:var(--text3);flex-wrap:wrap;margin-top:4px">
+                                        <span>w={:.3}</span><span>c1={:.3}</span><span>c2={:.3}</span><span>seed={}</span>
+                                    </div>"#, w_v, c1_v, c2_v, seed_v
+                                )
+                            } else { String::new() };
+
+                            // ── Terms table ──
                             let table_rows: Vec<String> = terms_info.iter().enumerate().map(|(i, t)| {
                                 let vname = t["variable_name"].as_str().unwrap_or("");
                                 let tlabel = t["term_label"].as_str().unwrap_or("");
@@ -988,7 +1047,7 @@ fn OptimizePage() -> impl IntoView {
                                     <tbody>{}</tbody></table>"#, table_rows.join(""))
                             } else { String::new() };
 
-                            // Tabela de dados de treino
+                            // ── Training data table ──
                             let train_table = if !train_inputs.is_empty() {
                                 let mut headers: Vec<&str> = Vec::new();
                                 if let Some(first) = train_inputs.first().and_then(|v| v.as_object()) {
@@ -997,11 +1056,9 @@ fn OptimizePage() -> impl IntoView {
                                 if let Some(first) = train_outputs.first().and_then(|v| v.as_object()) {
                                     for k in first.keys() { headers.push(k.as_str()); }
                                 }
-
                                 let header_html: String = headers.iter().map(|h| {
                                     format!(r#"<th style="padding:2px 6px;font-size:9px;text-align:left;color:var(--text3)">{}</th>"#, h)
                                 }).collect();
-
                                 let default_obj = serde_json::json!({});
                                 let body_rows: String = (0..train_inputs.len()).map(|i| {
                                     let in_row = train_inputs.get(i).unwrap_or(&default_obj);
@@ -1012,7 +1069,6 @@ fn OptimizePage() -> impl IntoView {
                                     }).collect();
                                     format!("<tr style=\"border-bottom:1px solid var(--surface5)\">{}</tr>", cells)
                                 }).collect();
-
                                 format!(r#"<details class="mt-6">
                                     <summary style="cursor:pointer;font-size:9px;color:var(--text2)">"Dados de Treino ({n_pts} linhas)"</summary>
                                     <div style="max-height:160px;overflow-y:auto;margin-top:4px">
@@ -1026,14 +1082,31 @@ fn OptimizePage() -> impl IntoView {
 
                             view! {
                                 <div style="margin-top:8px;padding:8px;background:var(--surface4);border-radius:4px;font-size:10px">
-                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                                        <div>"Fitness: " <span style="color:var(--teal);font-weight:600">{format!("{:.6}", best_fit)}</span>
-                                            <span style="color:var(--text3);margin-left:4px">(0 = perfeito)</span></div>
-                                        <div style="color:var(--text3);font-size:9px">{n_pts} pontos, {pop_used} partículas, {iters_used} iterações</div>
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:4px">
+                                        <div>
+                                            "Fitness: " <span style="color:var(--teal);font-weight:600">{format!("{:.6}", best_fit)}</span>
+                                            <span style="color:var(--text3);margin-left:4px">(0 = perfeito)</span>
+                                            {if is_multi {
+                                                view! { <span style="color:var(--accent);margin-left:6px;font-size:9px">{nr_used}" execuções"</span> }.into_any()
+                                            } else { view! {}.into_any() }}
+                                        </div>
+                                        <div style="color:var(--text3);font-size:9px;display:flex;gap:8px;flex-wrap:wrap">
+                                            <span>{n_pts}" pontos"</span>
+                                            <span>{pop_used}" partículas"</span>
+                                            <span>{iters_used}" iterações"</span>
+                                        </div>
                                     </div>
+
+                                    {if !cfg_display.is_empty() {
+                                        view! { <div inner_html=cfg_display></div> }.into_any()
+                                    } else { view! {}.into_any() }}
 
                                     {if !chart_svg.is_empty() {
                                         view! { <div style="margin-bottom:8px" inner_html=chart_svg></div> }.into_any()
+                                    } else { view! {}.into_any() }}
+
+                                    {if !stats_section.is_empty() {
+                                        view! { <div inner_html=stats_section></div> }.into_any()
                                     } else { view! {}.into_any() }}
 
                                     {if !train_table.is_empty() {
@@ -3527,12 +3600,140 @@ fn ImportPage() -> impl IntoView {
     }
 }
 
+/// Constrói SVG de convergência para uma única execução.
+fn build_single_chart(history: &[Value], w: f64, h: f64) -> String {
+    if history.len() < 2 { return String::new(); }
+    let pad_l = 55.0; let pad_r = 15.0; let pad_t = 20.0; let pad_b = 25.0;
+    let plot_w = w - pad_l - pad_r;
+    let plot_h = h - pad_t - pad_b;
+    let pts: Vec<[f64;2]> = history.iter().filter_map(|v| {
+        Some([v[0].as_f64()?, v[1].as_f64()?])
+    }).collect();
+    if pts.len() < 2 { return String::new(); }
+    let min_fit = pts.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
+    let max_fit = pts.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max);
+    let range = (max_fit - min_fit).max(1e-10);
+    let iter_max = pts.last().map(|p| p[0]).unwrap_or(1.0);
+    let n_grid = 4;
+    let grid_lines: String = (0..=n_grid).map(|i| {
+        let y = pad_t + (i as f64 / n_grid as f64) * plot_h;
+        let val = max_fit - (i as f64 / n_grid as f64) * range;
+        format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface5)" stroke-width="0.5"/>
+            <text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="end">{:.3e}</text>"#,
+            pad_l, y, w - pad_r, y, pad_l - 4.0, y + 3.0, val)
+    }).collect();
+    let vgrid: String = (0..=n_grid).map(|i| {
+        let x = pad_l + (i as f64 / n_grid as f64) * plot_w;
+        format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface5)" stroke-width="0.5"/>"#, x, pad_t, x, h - pad_b)
+    }).collect();
+    let x_label = format!(r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="middle">Iteração</text>"#, pad_l + plot_w / 2.0, h - 4.0);
+    let y_label = format!(r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="middle" transform="rotate(-90,12,120)">Fitness (MSE)</text>"#, 12.0, pad_t + plot_h / 2.0);
+    let path_d: String = pts.iter().enumerate().map(|(i, p)| {
+        let x = pad_l + (p[0] / iter_max) * plot_w;
+        let y = pad_t + ((max_fit - p[1]) / range) * plot_h;
+        if i == 0 { format!("M{x:.1},{y:.1}") } else { format!("L{x:.1},{y:.1}") }
+    }).collect();
+    if let Some(last) = pts.last() {
+        let lx = pad_l + (last[0] / iter_max) * plot_w;
+        let ly = pad_t + ((max_fit - last[1]) / range) * plot_h;
+        format!(r#"<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="background:var(--surface4);border-radius:4px;width:100%;max-width:600px">
+            {grid_lines}{vgrid}{x_label}{y_label}
+            <path d="{path_d}" fill="none" stroke="var(--teal)" stroke-width="1.5"/>
+            <circle cx="{lx:.1}" cy="{ly:.1}" r="3" fill="var(--teal)"/>
+            <text x="{lx:.1}" y="{ly:.1}" fill="var(--teal)" font-size="8" dx="5" dy="-3">{:.4e}</text>
+        </svg>"#, last[1])
+    } else { String::new() }
+}
+
+/// Constrói SVG de convergência com múltiplas execuções sobrepostas.
+fn build_multi_run_chart(runs_data: &[Value], w: f64, h: f64) -> String {
+    if runs_data.is_empty() { return String::new(); }
+    let pad_l = 55.0; let pad_r = 15.0; let pad_t = 20.0; let pad_b = 25.0;
+    let plot_w = w - pad_l - pad_r;
+    let plot_h = h - pad_t - pad_b;
+
+    // Coletar todos os pontos e limites
+    let mut all_pts: Vec<Vec<[f64;2]>> = Vec::new();
+    let mut global_min = f64::INFINITY;
+    let mut global_max = f64::NEG_INFINITY;
+    let mut max_iter: f64 = 1.0;
+
+    for run in runs_data {
+        if let Some(hist) = run["history"].as_array() {
+            let pts: Vec<[f64;2]> = hist.iter().filter_map(|v| {
+                Some([v[0].as_f64()?, v[1].as_f64()?])
+            }).collect();
+            if pts.len() > 1 {
+                let mn = pts.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
+                let mx = pts.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max);
+                global_min = global_min.min(mn);
+                global_max = global_max.max(mx);
+                if let Some(last) = pts.last() { max_iter = max_iter.max(last[0]); }
+                all_pts.push(pts);
+            }
+        }
+    }
+
+    if all_pts.is_empty() { return String::new(); }
+    let range = (global_max - global_min).max(1e-10);
+    let colors = ["var(--teal)", "var(--accent)", "#e06c75", "#61afef", "#98c379", "#d19a66", "#c678dd", "#56b6c2"];
+    let n_grid = 4;
+
+    let grid_lines: String = (0..=n_grid).map(|i| {
+        let y = pad_t + (i as f64 / n_grid as f64) * plot_h;
+        let val = global_max - (i as f64 / n_grid as f64) * range;
+        format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface5)" stroke-width="0.5"/>
+            <text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="end">{:.3e}</text>"#,
+            pad_l, y, w - pad_r, y, pad_l - 4.0, y + 3.0, val)
+    }).collect();
+    let vgrid: String = (0..=n_grid).map(|i| {
+        let x = pad_l + (i as f64 / n_grid as f64) * plot_w;
+        format!(r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--surface5)" stroke-width="0.5"/>"#, x, pad_t, x, h - pad_b)
+    }).collect();
+    let x_label = format!(r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="middle">Iteração</text>"#, pad_l + plot_w / 2.0, h - 4.0);
+    let y_label = format!(r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="8" text-anchor="middle" transform="rotate(-90,12,120)">Fitness (MSE)</text>"#, 12.0, pad_t + plot_h / 2.0);
+
+    let paths: String = all_pts.iter().enumerate().map(|(ri, pts)| {
+        let color = colors[ri % colors.len()];
+        let path_d: String = pts.iter().enumerate().map(|(i, p)| {
+            let x = pad_l + (p[0] / max_iter) * plot_w;
+            let y = pad_t + ((global_max - p[1]) / range) * plot_h;
+            if i == 0 { format!("M{x:.1},{y:.1}") } else { format!("L{x:.1},{y:.1}") }
+        }).collect();
+        // small endpoint dot per run
+        let last = pts.last().unwrap();
+        let lx = pad_l + (last[0] / max_iter) * plot_w;
+        let ly = pad_t + ((global_max - last[1]) / range) * plot_h;
+        format!(r#"<path d="{path_d}" fill="none" stroke="{color}" stroke-width="1.0" opacity="0.7"/>
+            <circle cx="{lx:.1}" cy="{ly:.1}" r="2" fill="{color}"/>"#)
+    }).collect();
+
+    // Legenda
+    let legend: String = all_pts.iter().enumerate().map(|(ri, _)| {
+        let color = colors[ri % colors.len()];
+        format!(r#"<span style="display:inline-flex;align-items:center;gap:3px;margin-right:6px;font-size:8px;color:var(--text3)">
+            <span style="width:8px;height:2px;background:{color};display:inline-block"></span>Run {ri}</span>"#)
+    }).collect();
+
+    format!(r#"<div>
+        <svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="background:var(--surface4);border-radius:4px;width:100%;max-width:600px">
+            {grid_lines}{vgrid}{x_label}{y_label}{paths}
+        </svg>
+        <div style="margin-top:2px">{legend}</div>
+    </div>"#)
+}
+
 /// Helper: executa PSO com preset de dados de referência.
 /// Não requer JSON manual — os dados vão hardcoded nos botões.
 fn run_pso_preset(
     sid: &RwSignal<String>,
     pop: &RwSignal<String>,
     iters: &RwSignal<String>,
+    num_runs: &RwSignal<String>,
+    seed: &RwSignal<String>,
+    w: &RwSignal<String>,
+    c1: &RwSignal<String>,
+    c2: &RwSignal<String>,
     result: &RwSignal<Option<Value>>,
     loading: &RwSignal<bool>,
     err: &RwSignal<String>,
@@ -3544,6 +3745,11 @@ fn run_pso_preset(
     err.set(String::new());
     let pop_val: usize = pop.get().parse().unwrap_or(20);
     let iter_val: usize = iters.get().parse().unwrap_or(50);
+    let nr_val: usize = num_runs.get().parse().unwrap_or(1);
+    let seed_val: u64 = seed.get().parse().unwrap_or(42);
+    let w_val: f64 = w.get().parse().unwrap_or(0.729);
+    let c1_val: f64 = c1.get().parse().unwrap_or(1.494);
+    let c2_val: f64 = c2.get().parse().unwrap_or(1.494);
     let inputs_val: Value = serde_json::from_str(target_inputs).unwrap_or(serde_json::json!([]));
     let outputs_val: Value = serde_json::from_str(target_outputs).unwrap_or(serde_json::json!([]));
     loading.set(true);
@@ -3552,7 +3758,7 @@ fn run_pso_preset(
     let e2 = err.clone();
     let sid2 = system_id;
     spawn_async(async move {
-        match run_pso_optimization(&sid2, &inputs_val, &outputs_val, pop_val, iter_val).await {
+        match run_pso_optimization(&sid2, &inputs_val, &outputs_val, pop_val, iter_val, nr_val, seed_val, w_val, c1_val, c2_val).await {
             Some(res) => { r2.set(Some(res)); e2.set(String::new()); }
             None => { e2.set("Erro na otimização. Verifique se o sistema tem variáveis e regras.".into()); }
         }
