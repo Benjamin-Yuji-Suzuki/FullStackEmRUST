@@ -177,13 +177,15 @@ async fn process_batch(
             })
             .unwrap_or(50.0);
 
+        // Armazena inputs mapeados (com nomes de variáveis do fuzzy) para o PSO auto ler
+        let mapped_inputs = serde_json::to_value(&engine_input).unwrap_or_else(|_| json!({}));
         let record = sqlx::query_as::<_, BatchResult>(
             "INSERT INTO batch_results (system_id, source_file, row_index, inputs, output) \
              VALUES ($1, 'batch-api', $2, $3::jsonb, $4) RETURNING *"
         )
         .bind(req.system_id)
         .bind(i as i32)
-        .bind(json!(input_row))
+        .bind(mapped_inputs)
         .bind(target)
         .fetch_one(&state.pool)
         .await?;
