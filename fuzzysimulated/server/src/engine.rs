@@ -650,6 +650,21 @@ impl PsoRng {
     }
 }
 
+/// Parâmetros de configuração do PSO.
+#[derive(Debug, Clone)]
+pub struct PsoConfigParams {
+    pub seed: u64,
+    pub w: f64,
+    pub c1: f64,
+    pub c2: f64,
+}
+
+impl Default for PsoConfigParams {
+    fn default() -> Self {
+        Self { seed: 42, w: 0.729, c1: 1.494, c2: 1.494 }
+    }
+}
+
 /// Otimiza parâmetros de MF usando PSO (UC17).
 /// Retorna (best_position, best_fitness, history[(iter, fitness)]).
 pub fn optimize_with_pso(
@@ -659,6 +674,7 @@ pub fn optimize_with_pso(
     target_outputs: &[HashMap<String, f64>],
     population_size: usize,
     max_iterations: usize,
+    config: &PsoConfigParams,
 ) -> Result<(Vec<f64>, f64, Vec<(f64, f64)>), String> {
     if target_inputs.is_empty() || target_outputs.is_empty() {
         return Err("Dados de referência vazios".into());
@@ -739,10 +755,10 @@ pub fn optimize_with_pso(
 
     // ── PSO loop manual com captura de histórico ──
     let dim = all_params.len();
-    let mut rng = PsoRng::new(42);
-    let w = 0.729;
-    let c1 = 1.494;
-    let c2 = 1.494;
+    let mut rng = PsoRng::new(config.seed);
+    let w = config.w;
+    let c1 = config.c1;
+    let c2 = config.c2;
 
     // Inicializa partículas
     let mut pos: Vec<Vec<f64>> = (0..population_size)
@@ -790,6 +806,67 @@ pub fn optimize_with_pso(
     }
 
     Ok((gbest_pos, gbest_fit, history))
+}
+
+/// Executa PSO múltiplas vezes com sementes diferentes e retorna estatísticas agregadas.
+pub fn multi_run_pso(
+    variables: &[VarInfo],
+    rules: &[RuleInfo],
+    target_inputs: &[HashMap<String, f64>],
+    target_outputs: &[HashMap<String, f64>],
+    population_size: usize,
+    max_iterations: usize,
+    num_runs: usize,
+    base_config: &PsoConfigParams,
+) -> Result<(Vec<f64>, f64, Vec<[f64; 2]>, Vec<serde_json::Value>), String> {
+    let mut all_fitness: Vec<f64> = Vec::with_capacity(num_runs);
+    let mut all_histories: Vec<Vec<(f64, f64)>> = Vec::with_capacity(num_runs);
+    let mut best_overall_pos = Vec::new();
+    let mut best_overall_fit = f64::MAX;
+
+    for run in 0..num_runs {
+        let mut cfg = base_config.clone();
+        cfg.seed = base_config.seed.wrapping_add(run as u64);
+        let (pos, fit, history) = optimize_with_pso(
+            variables, rules, target_inputs, target_outputs,
+            population_size, max_iterations, &cfg,
+        )?;
+        all_fitness.push(fit);
+        all_histories.push(history);
+        if fit < best_overall_fit {
+            best_overall_fit = fit;
+            best_overall_pos = pos;
+        }
+    }
+
+    let mean = all_fitness.iter().sum::<f64>() / all_fitness.len() as f64;
+    let variance = all_fitness.iter().map(|f| (f - mean).powi(2)).sum::<f64>() / all_fitness.len() as f64;
+    let _std_dev = variance.sqrt();
+    let _min_fit = all_fitness.iter().cloned().fold(f64::MAX, f64::min);
+    let _max_fit = all_fitness.iter().cloned().fold(f64::MIN, f64::max);
+
+    let runs_json: Vec<serde_json::Value> = (0..num_runs).map(|i| {
+        let h: Vec<[f64; 2]> = all_histories[i].iter().map(|&(a, b)| [a, b]).collect();
+        serde_json::json!({
+            "run": i,
+            "seed": base_config.seed.wrapping_add(i as u64),
+            "best_fitness": all_fitness[i],
+            "history": h,
+        })
+    }).collect();
+
+    let best_history = all_histories.into_iter()
+        .min_by(|a, b| {
+            let a_last = a.last().map(|&(_, f)| f).unwrap_or(f64::MAX);
+            let b_last = b.last().map(|&(_, f)| f).unwrap_or(f64::MAX);
+            a_last.partial_cmp(&b_last).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(a, b)| [a, b])
+        .collect();
+
+    Ok((best_overall_pos, best_overall_fit, best_history, runs_json))
 }
 
 /// Explora a superfície de saída de um sistema fuzzy usando PSO.

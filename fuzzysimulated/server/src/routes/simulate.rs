@@ -451,6 +451,11 @@ pub struct OptimizePsoRequest {
     pub target_outputs: Vec<std::collections::HashMap<String, f64>>,
     pub population_size: Option<usize>,
     pub max_iterations: Option<usize>,
+    pub num_runs: Option<usize>,
+    pub seed: Option<u64>,
+    pub w: Option<f64>,
+    pub c1: Option<f64>,
+    pub c2: Option<f64>,
 }
 
 async fn simulate_tsk(
@@ -546,12 +551,30 @@ async fn optimize_pso(
     let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
     let pop = req.population_size.unwrap_or(20);
     let iters = req.max_iterations.unwrap_or(50);
+    let num_runs = req.num_runs.unwrap_or(1);
 
-    let (best_pos, best_fit, history) = engine::optimize_with_pso(
-        &var_infos, &rule_infos,
-        &req.target_inputs, &req.target_outputs,
-        pop, iters,
-    ).map_err(AppError::Validation)?;
+    let config = engine::PsoConfigParams {
+        seed: req.seed.unwrap_or(42),
+        w: req.w.unwrap_or(0.729),
+        c1: req.c1.unwrap_or(1.494),
+        c2: req.c2.unwrap_or(1.494),
+    };
+
+    let (best_pos, best_fit, history, runs_data) = if num_runs > 1 {
+        engine::multi_run_pso(
+            &var_infos, &rule_infos,
+            &req.target_inputs, &req.target_outputs,
+            pop, iters, num_runs, &config,
+        ).map_err(AppError::Validation)?
+    } else {
+        let (pos, fit, hist) = engine::optimize_with_pso(
+            &var_infos, &rule_infos,
+            &req.target_inputs, &req.target_outputs,
+            pop, iters, &config,
+        ).map_err(AppError::Validation)?;
+        let hist_json: Vec<[f64; 2]> = hist.iter().map(|&(iter, fit)| [iter, fit]).collect();
+        (pos, fit, hist_json, Vec::new())
+    };
 
     let term_rows = sqlx::query_as::<_, FuzzyTermWithVar>(
         "SELECT ft.*, fv.name as variable_name FROM fuzzy_terms ft \
@@ -572,16 +595,22 @@ async fn optimize_pso(
         })
     }).collect();
 
-    let history_json: Vec<[f64; 2]> = history.iter().map(|&(iter, fit)| [iter, fit]).collect();
-
     Ok(Json(json!({
         "system_id": system_id,
         "best_position": best_pos,
         "best_fitness": best_fit,
-        "history": history_json,
+        "history": history,
+        "runs": runs_data,
+        "num_runs": num_runs,
         "terms_info": terms_info,
         "population_size": pop,
         "max_iterations": iters,
+        "pso_config": {
+            "seed": config.seed,
+            "w": config.w,
+            "c1": config.c1,
+            "c2": config.c2
+        },
         "trained_on": req.target_inputs.len(),
         "training_inputs": req.target_inputs,
         "training_outputs": req.target_outputs,
@@ -663,7 +692,7 @@ async fn optimize_pso_auto(
     let (best_pos, best_fit, history) = engine::optimize_with_pso(
         &var_infos, &rule_infos,
         &target_inputs, &target_outputs,
-        pop, iters,
+        pop, iters, &engine::PsoConfigParams::default(),
     ).map_err(AppError::Validation)?;
 
     let history_json: Vec<[f64; 2]> = history.iter().map(|&(iter, fit)| [iter, fit]).collect();
