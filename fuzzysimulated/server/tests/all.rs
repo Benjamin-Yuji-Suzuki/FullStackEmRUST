@@ -17,7 +17,7 @@ async fn get_test_pool() -> PgPool {
         return pool.clone();
     }
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres@localhost/fuzzysimulated_test".into());
+        .unwrap_or_else(|_| "postgres://ben:1234@localhost/fuzzysimulated_test".into());
     let pool = PgPoolOptions::new()
         .max_connections(10)
         .connect(&database_url)

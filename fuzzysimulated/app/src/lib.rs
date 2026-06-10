@@ -649,9 +649,9 @@ fn OptimizePage() -> impl IntoView {
                         let pop = pso_pop.clone(); let iters = pso_iters.clone();
                         let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
                         move |_| run_pso_preset(&ss, &pop, &iters, &pr, &pl, &pe,
-                            r#"[{"probabilidade":10,"impacto":10},{"probabilidade":50,"impacto":50},{"probabilidade":90,"impacto":90}]"#,
-                            r#"[{"risco":10},{"risco":50},{"risco":90}]"#)
-                    }>"Análise de Risco"</button>
+                            r#"[{"pacotes_suspeitos":10,"conexoes_anomalas":10,"trafego_noturno":10},{"pacotes_suspeitos":50,"conexoes_anomalas":50,"trafego_noturno":50},{"pacotes_suspeitos":90,"conexoes_anomalas":90,"trafego_noturno":90}]"#,
+                            r#"[{"nivel_ameaca":5},{"nivel_ameaca":50},{"nivel_ameaca":95}]"#)
+                    }>"Detecção de Intrusão"</button>
                     <button class="btn btn-primary" style="font-size:10px;padding:4px 12px" on:click={
                         let ss = selected_sys.clone();
                         let pop = pso_pop.clone(); let iters = pso_iters.clone();

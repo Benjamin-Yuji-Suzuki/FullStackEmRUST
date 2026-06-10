@@ -551,6 +551,15 @@ pub async fn delete_batch_result(id: &str) -> bool {
     api_delete(&format!("/api/batch/{id}")).await
 }
 
+pub async fn get_surface_3d(system_id: &str, x_var: Option<&str>, y_var: Option<&str>, resolution: Option<usize>) -> Option<Value> {
+    let body = serde_json::json!({
+        "x": x_var,
+        "y": y_var,
+        "resolution": resolution,
+    });
+    api_post(&format!("/api/systems/{system_id}/surface-3d"), &body).await
+}
+
 pub async fn analyze_surface(system_id: &str, x_var: &str, y_var: &str) -> Option<Value> {
     let body = serde_json::json!({
         "x_var": x_var,

@@ -45,6 +45,7 @@ pub fn routes() -> Router<AppState> {
         .route("/systems/{id}/optimize-pso-auto", post(optimize_pso_auto))
         .route("/systems/{id}/apply-pso-params", post(apply_pso_params))
         .route("/systems/{id}/analyze-surface", post(analyze_surface))
+        .route("/systems/{id}/surface-3d", post(surface_3d))
 }
 
 #[derive(Deserialize)]
@@ -910,6 +911,72 @@ async fn surface(
     }
 
     Ok(Json(json!({ "grid": grid, "x_var": x_name, "y_var": y_name })))
+}
+
+#[derive(Deserialize)]
+pub struct Surface3DRequest {
+    pub x: Option<String>,
+    pub y: Option<String>,
+    pub resolution: Option<usize>,
+}
+
+async fn surface_3d(
+    State(state): State<AppState>,
+    Path(system_id): Path<Uuid>,
+    Json(req): Json<Surface3DRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let _system = sqlx::query_as::<_, FuzzySystem>(
+        "SELECT * FROM fuzzy_systems WHERE id = $1"
+    )
+    .bind(system_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Sistema não encontrado".into()))?;
+
+    let (var_infos, rule_infos) = load_engine_data(&state.pool, system_id).await?;
+
+    let ante: Vec<&engine::VarInfo> = var_infos.iter()
+        .filter(|v| v.role == "antecedent" || v.role == "input")
+        .collect();
+
+    if ante.len() != 2 {
+        return Err(AppError::Validation(
+            format!("O gráfico 3D requer exatamente 2 variáveis de entrada. Este sistema tem {}.", ante.len())
+        ));
+    }
+
+    let x_name = req.x.as_deref().unwrap_or(&ante[0].name).to_string();
+    let y_name = req.y.as_deref().unwrap_or(&ante[1].name).to_string();
+
+    if !ante.iter().any(|v| v.name == x_name) {
+        return Err(AppError::Validation(format!("Variável X '{}' não encontrada entre as entradas", x_name)));
+    }
+    if !ante.iter().any(|v| v.name == y_name) {
+        return Err(AppError::Validation(format!("Variável Y '{}' não encontrada entre as entradas", y_name)));
+    }
+
+    let cons: Vec<&engine::VarInfo> = var_infos.iter()
+        .filter(|v| v.role == "consequent" || v.role == "output")
+        .collect();
+    let out_name = cons.first().map(|v| v.name.clone()).unwrap_or_else(|| "saída".to_string());
+
+    let res = req.resolution.unwrap_or(25).min(50);
+
+    let svg = engine::generate_surface_svg_3d(
+        &var_infos, &rule_infos,
+        &x_name, &y_name, &out_name,
+        res,
+    );
+
+    Ok(Json(json!({
+        "system_id": system_id,
+        "x_var": x_name,
+        "y_var": y_name,
+        "out_var": out_name,
+        "resolution": res,
+        "svg": svg,
+        "has_two_inputs": true,
+    })))
 }
 
 /// PSO Surface Analyzer — explora superfície de saída com PSO e classifica (min/max/sela)

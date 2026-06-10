@@ -338,6 +338,280 @@ pub fn generate_diagnostic(
     }))
 }
 
+/// Gera um gráfico 3D SVG de superfície de controle para sistemas com exatamente 2 entradas.
+/// X e Y varrem os universos das duas variáveis antecedentes, Z é o valor defuzzificado.
+/// Usa projeção isométrica com gradiente de cor mapeado em Z.
+pub fn generate_surface_svg_3d(
+    variables: &[VarInfo],
+    rules: &[RuleInfo],
+    x_name: &str,
+    y_name: &str,
+    out_name: &str,
+    resolution: usize,
+) -> String {
+    let x_res = resolution.max(5).min(50);
+    let y_res = resolution.max(5).min(50);
+
+    let x_var = match variables.iter().find(|v| v.name == x_name) {
+        Some(v) => v,
+        None => return r#"<svg width="400" height="200" viewBox="0 0 400 200"><text x="200" y="100" text-anchor="middle" fill="red" font-size="12">Variável X não encontrada</text></svg>"#.to_string(),
+    };
+    let y_var = match variables.iter().find(|v| v.name == y_name) {
+        Some(v) => v,
+        None => return r#"<svg width="400" height="200" viewBox="0 0 400 200"><text x="200" y="100" text-anchor="middle" fill="red" font-size="12">Variável Y não encontrada</text></svg>"#.to_string(),
+    };
+
+    let x_lo = x_var.universe_min;
+    let x_hi = x_var.universe_max;
+    let y_lo = y_var.universe_min;
+    let y_hi = y_var.universe_max;
+
+    let mut grid: Vec<Vec<[f64; 3]>> = Vec::with_capacity(x_res);
+    let mut z_min = f64::MAX;
+    let mut z_max = f64::MIN;
+
+    for xi in 0..x_res {
+        let mut row = Vec::with_capacity(y_res);
+        for yi in 0..y_res {
+            let xv = x_lo + (xi as f64 / (x_res - 1) as f64) * (x_hi - x_lo);
+            let yv = y_lo + (yi as f64 / (y_res - 1) as f64) * (y_hi - y_lo);
+            let mut inputs = HashMap::new();
+            inputs.insert(x_name.to_string(), xv);
+            inputs.insert(y_name.to_string(), yv);
+            let outputs = evaluate_mamdani(variables, rules, &inputs);
+            let zv = outputs.get(out_name).copied().unwrap_or_else(|| {
+                outputs.values().copied().sum::<f64>() / outputs.len().max(1) as f64
+            });
+            z_min = z_min.min(zv);
+            z_max = z_max.max(zv);
+            row.push([xv, yv, zv]);
+        }
+        grid.push(row);
+    }
+
+    let z_range = (z_max - z_min).max(1.0);
+
+    let w = 620.0;
+    let h = 480.0;
+    let pad = 70.0;
+    let plot_w = w - 2.0 * pad;
+    let plot_h = h - 2.0 * pad;
+
+    let scale = f64::min(plot_w, plot_h) / 2.5;
+
+    let cx = w / 2.0;
+    let cy = h / 2.0 + 30.0;
+
+    let angle = std::f64::consts::PI / 6.0;
+    let cos_a = angle.cos();
+    let sin_a = angle.sin();
+
+    let norm_x = |v: f64| -> f64 { (v - x_lo) / (x_hi - x_lo).max(1.0) };
+    let norm_y = |v: f64| -> f64 { (v - y_lo) / (y_hi - y_lo).max(1.0) };
+    let norm_z = |v: f64| -> f64 { (v - z_min) / z_range };
+
+    let project = |xv: f64, yv: f64, zv: f64| -> (f64, f64) {
+        let nx = norm_x(xv) * 2.0 - 1.0;
+        let ny = norm_y(yv) * 2.0 - 1.0;
+        let nz = norm_z(zv);
+        let sx = (nx - ny) * cos_a * scale;
+        let sy = (nx + ny) * sin_a * scale - nz * scale * 0.8;
+        (cx + sx, cy - sy)
+    };
+
+    let heat_color = |t: f64| -> String {
+        let t = t.clamp(0.0, 1.0);
+        let (r, g, b) = if t < 0.25 {
+            let v = (t * 4.0 * 255.0) as u8;
+            (0, v, 255)
+        } else if t < 0.5 {
+            let v = ((t - 0.25) * 4.0 * 255.0) as u8;
+            (0, 255, (255 - v))
+        } else if t < 0.75 {
+            let v = ((t - 0.5) * 4.0 * 255.0) as u8;
+            (v, 255, 0)
+        } else {
+            let v = ((t - 0.75) * 4.0 * 255.0) as u8;
+            (255, (255 - v), 0)
+        };
+        format!("#{:02x}{:02x}{:02x}", r, g, b)
+    };
+
+    let mut faces: Vec<(f64, String)> = Vec::new();
+
+    for xi in 0..x_res - 1 {
+        for yi in 0..y_res - 1 {
+            let p00 = grid[xi][yi];
+            let p10 = grid[xi + 1][yi];
+            let p01 = grid[xi][yi + 1];
+            let p11 = grid[xi + 1][yi + 1];
+
+            let pts = [
+                project(p00[0], p00[1], p00[2]),
+                project(p10[0], p10[1], p10[2]),
+                project(p11[0], p11[1], p11[2]),
+                project(p01[0], p01[1], p01[2]),
+            ];
+
+            let avg_z = (p00[2] + p10[2] + p01[2] + p11[2]) / 4.0;
+            let color_t = (avg_z - z_min) / z_range;
+            let fill = heat_color(color_t);
+
+            let poly = format!(
+                r#"<polygon points="{:.1},{:.1} {:.1},{:.1} {:.1},{:.1} {:.1},{:.1}" fill="{}" stroke="rgba(0,0,0,0.08)" stroke-width="0.3"/>"#,
+                pts[0].0, pts[0].1,
+                pts[1].0, pts[1].1,
+                pts[2].0, pts[2].1,
+                pts[3].0, pts[3].1,
+                fill
+            );
+            faces.push((avg_z, poly));
+        }
+    }
+
+    faces.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let faces_svg: String = faces.iter().map(|(_, s)| s.as_str()).collect();
+
+    let mut axis_paths = String::new();
+    let mut axis_labels = String::new();
+
+    let origin = project(x_lo, y_lo, z_min);
+    let x_end = project(x_hi, y_lo, z_min);
+    let y_end = project(x_lo, y_hi, z_min);
+    let z_top = project(x_lo, y_lo, z_max);
+
+    axis_paths.push_str(&format!(
+        r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--amber)" stroke-width="1.5"/>"#,
+        origin.0, origin.1, x_end.0, x_end.1
+    ));
+    axis_paths.push_str(&format!(
+        r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--amber)" stroke-width="1.5"/>"#,
+        origin.0, origin.1, y_end.0, y_end.1
+    ));
+    axis_paths.push_str(&format!(
+        r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--amber)" stroke-width="1.5"/>"#,
+        origin.0, origin.1, z_top.0, z_top.1
+    ));
+
+    let x_mid = project((x_lo + x_hi) / 2.0, y_lo, z_min);
+    let y_mid = project(x_lo, (y_lo + y_hi) / 2.0, z_min);
+    let _z_mid = project(x_lo, y_lo, (z_min + z_max) / 2.0);
+
+    axis_labels.push_str(&format!(
+        r#"<text x="{:.1}" y="{:.1}" fill="var(--amber)" font-size="9" text-anchor="middle" font-weight="600">{}</text>"#,
+        x_mid.0, x_mid.1 + 16.0, x_name
+    ));
+    axis_labels.push_str(&format!(
+        r#"<text x="{:.1}" y="{:.1}" fill="var(--amber)" font-size="9" text-anchor="middle" font-weight="600">{}</text>"#,
+        y_mid.0 + 16.0, y_mid.1, y_name
+    ));
+    axis_labels.push_str(&format!(
+        r#"<text x="{:.1}" y="{:.1}" fill="var(--amber)" font-size="9" text-anchor="middle" font-weight="600">{}</text>"#,
+        z_top.0, z_top.1 + 16.0, out_name
+    ));
+
+    let mut tick_labels = String::new();
+    for i in 0..=4 {
+        let t = i as f64 / 4.0;
+        let xv = x_lo + t * (x_hi - x_lo);
+        let yv = y_lo + t * (y_hi - y_lo);
+        let zv = z_min + t * z_range;
+
+        let xp = project(xv, y_lo, z_min);
+        let yp = project(x_lo, yv, z_min);
+        let zp = project(x_lo, y_lo, zv);
+
+        tick_labels.push_str(&format!(
+            r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="7" text-anchor="end">{}</text>"#,
+            xp.0 - 6.0, xp.1 + 3.0, format_value(xv)
+        ));
+        tick_labels.push_str(&format!(
+            r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="7" text-anchor="start">{}</text>"#,
+            yp.0 + 4.0, yp.1 + 3.0, format_value(yv)
+        ));
+        tick_labels.push_str(&format!(
+            r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="7" text-anchor="end">{}</text>"#,
+            zp.0 - 6.0, zp.1 + 3.0, format_value(zv)
+        ));
+
+        let xt = project(xv, y_lo, z_min);
+        let yt = project(x_lo, yv, z_min);
+        let zt = project(x_lo, y_lo, zv);
+        tick_labels.push_str(&format!(
+            r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--border)" stroke-width="0.3"/>"#,
+            xt.0, xt.1, origin.0, origin.1
+        ));
+        tick_labels.push_str(&format!(
+            r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--border)" stroke-width="0.3"/>"#,
+            yt.0, yt.1, origin.0, origin.1
+        ));
+        tick_labels.push_str(&format!(
+            r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="var(--border)" stroke-width="0.3"/>"#,
+            zt.0, zt.1, origin.0, origin.1
+        ));
+    }
+
+    let color_bar_w = 12.0;
+    let color_bar_h = 180.0;
+    let cb_x = w - pad - color_bar_w - 10.0;
+    let cb_y = pad + 20.0;
+
+    let mut color_bar = String::new();
+    let n_steps = 40;
+    for i in 0..n_steps {
+        let t = i as f64 / (n_steps - 1) as f64;
+        let y_pos = cb_y + (1.0 - t) * color_bar_h;
+        let h_step = color_bar_h / n_steps as f64;
+        color_bar.push_str(&format!(
+            r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}"/>"#,
+            cb_x, y_pos, color_bar_w, h_step + 0.5, heat_color(t)
+        ));
+    }
+    color_bar.push_str(&format!(
+        r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="7" text-anchor="middle">{}</text>"#,
+        cb_x + color_bar_w / 2.0, cb_y - 5.0, format_value(z_max)
+    ));
+    color_bar.push_str(&format!(
+        r#"<text x="{:.1}" y="{:.1}" fill="var(--text3)" font-size="7" text-anchor="middle">{}</text>"#,
+        cb_x + color_bar_w / 2.0, cb_y + color_bar_h + 10.0, format_value(z_min)
+    ));
+    color_bar.push_str(&format!(
+        r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="none" stroke="var(--border)" stroke-width="0.5"/>"#,
+        cb_x, cb_y, color_bar_w, color_bar_h
+    ));
+
+    format!(
+        r#"<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" style="background:var(--surface1);border-radius:4px;width:100%;max-width:{w}px">
+            <rect width="100%" height="100%" fill="transparent"/>
+            {tick_labels}
+            {faces_svg}
+            {axis_paths}
+            {axis_labels}
+            {color_bar}
+            <text x="{title_x:.1}" y="{title_y:.1}" fill="var(--text3)" font-size="8" text-anchor="middle">Superfície 3D — {x_name} × {y_name} → {out_name}</text>
+        </svg>"#,
+        w = w, h = h,
+        title_x = w / 2.0, title_y = pad - 10.0,
+        tick_labels = tick_labels, faces_svg = faces_svg,
+        axis_paths = axis_paths, axis_labels = axis_labels,
+        color_bar = color_bar,
+        x_name = x_name, y_name = y_name, out_name = out_name,
+    )
+}
+
+fn format_value(v: f64) -> String {
+    if v.abs() >= 1_000_000.0 {
+        format!("{:.1}M", v / 1_000_000.0)
+    } else if v.abs() >= 1_000.0 {
+        format!("{:.1}k", v / 1_000.0)
+    } else if (v - v.round()).abs() < 0.01 {
+        format!("{:.0}", v)
+    } else {
+        format!("{:.1}", v)
+    }
+}
+
 /// Gera SVG das funções de pertinência de um sistema (UC19).
 pub fn generate_svg(variables: &[VarInfo]) -> Vec<(String, String)> {
     let mut svgs = Vec::new();
