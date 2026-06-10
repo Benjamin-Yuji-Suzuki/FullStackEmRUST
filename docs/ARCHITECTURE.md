@@ -138,13 +138,15 @@ Na primeira execução, `server/migrations/002_seed.sql` insere automaticamente 
 
 ```
 FullStackEmRUST/
-├── USE_CASES.md         # 20 casos de uso
-├── TEST_CASES.md # 44 casos de teste (30 inline + 16 unit + 64 HTTP + 6 integração)
-├── FUZZY_MODEL.md       # Modelos Mamdani + TSK + PSO
-├── ARCHITECTURE.md      # Este documento
+├── docs/
+│   ├── USE_CASES.md         # 20 casos de uso
+│   ├── FUZZY_MODEL.md       # Modelos Mamdani + TSK + PSO
+│   ├── ARCHITECTURE.md      # Este documento
+│   ├── RELATORIO_ENTREGA.md # Relatório de entrega
+│   ├── DECLARACAO_IA.md     # Declaração de uso de IA
+│   ├── SLIDES.md            # Slides de apresentação
+│   └── ...                  # Demais documentos
 ├── README.md
-├── roteiro-apresentacao.md  # Slides de apresentação
-├── coverage.sh              # Script de cobertura (cargo-llvm-cov)
 └── fuzzysimulated/
     ├── Cargo.toml        # workspace Rust (serial_test, Leptos, Axum, SQLx, reqwest)
     ├── app/              # crate compartilhada Leptos (SSR + CSR)

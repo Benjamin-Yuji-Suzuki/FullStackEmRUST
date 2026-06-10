@@ -44,10 +44,16 @@ O projeto é composto por dois repositórios:
 
 ```
 FullStackEmRUST/
-├── USE_CASES.md              # 20 casos de uso
-├── TEST_CASES.md             # 55 casos de teste
-├── FUZZY_MODEL.md            # Modelo fuzzy de demonstração
-├── ARCHITECTURE.md           # Arquitetura técnica
+├── docs/
+│   ├── USE_CASES.md          # 20 casos de uso
+│   ├── FUZZY_MODEL.md        # Modelo fuzzy de demonstração
+│   ├── ARCHITECTURE.md       # Arquitetura técnica
+│   ├── DECLARACAO_IA.md      # Declaração de uso de IA
+│   ├── RELATORIO_FUZZY.md    # Relatório do motor fuzzy
+│   ├── RELATORIO_ENTREGA.md  # Relatório de entrega
+│   ├── SLIDES.md             # Slides de apresentação
+│   ├── CENARIOS_TESTE.md     # Cenários de teste
+│   └── Lauda_Atividade_IA_AV2_Parte_1.md  # Regras de negócio (Atividade AV2)
 ├── README.md
 └── fuzzysimulated/
     ├── Cargo.toml             # workspace Rust
@@ -109,7 +115,7 @@ FullStackEmRUST/
 
 ## Casos de Uso (20)
 
-Especificação completa em **[USE_CASES.md](./USE_CASES.md)**.
+Especificação completa em **[USE_CASES.md](./docs/USE_CASES.md)**.
 
 | ID | Nome | Ator(es) |
 |---|---|---|
@@ -197,10 +203,10 @@ Todos os testes HTTP usam `#[serial_test::serial]` para evitar deadlocks do `TRU
 
 | Documento | Conteúdo |
 |---|---|
-| [USE_CASES.md](./USE_CASES.md) | Especificação dos 20 casos de uso |
-| [RELATORIO_ENTREGA.md](./fuzzysimulated/RELATORIO_ENTREGA.md) | Relatório de entrega (testes, cobertura, qualidade) |
-| [FUZZY_MODEL.md](./FUZZY_MODEL.md) | Modelos Mamdani, TSK e Otimização PSO |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Banco de dados, integrações e fluxos |
+| [USE_CASES.md](./docs/USE_CASES.md) | Especificação dos 20 casos de uso |
+| [RELATORIO_ENTREGA.md](./docs/RELATORIO_ENTREGA.md) | Relatório de entrega (testes, cobertura, qualidade) |
+| [FUZZY_MODEL.md](./docs/FUZZY_MODEL.md) | Modelos Mamdani, TSK e Otimização PSO |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Banco de dados, integrações e fluxos |
 
 ---
 
