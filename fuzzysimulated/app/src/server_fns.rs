@@ -510,11 +510,21 @@ pub async fn run_pso_auto_optimization(
     system_id: &str,
     population_size: usize,
     max_iterations: usize,
+    num_runs: usize,
+    seed: u64,
+    w: f64,
+    c1: f64,
+    c2: f64,
     max_samples: Option<usize>,
 ) -> Option<Value> {
     let mut body = serde_json::json!({
         "population_size": population_size,
         "max_iterations": max_iterations,
+        "num_runs": num_runs,
+        "seed": seed,
+        "w": w,
+        "c1": c1,
+        "c2": c2,
     });
     if let Some(ms) = max_samples {
         body["max_samples"] = serde_json::json!(ms);

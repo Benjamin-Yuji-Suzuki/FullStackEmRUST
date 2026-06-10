@@ -708,6 +708,8 @@ fn OptimizePage() -> impl IntoView {
                     <button class="btn" style="font-size:10px;padding:4px 12px" on:click={
                         let ss = selected_sys.clone();
                         let pop = pso_pop.clone(); let iters = pso_iters.clone();
+                        let nr = pso_num_runs.clone(); let sd = pso_seed.clone();
+                        let wv = pso_w.clone(); let c1v = pso_c1.clone(); let c2v = pso_c2.clone();
                         let pr = pso_result.clone(); let pl = pso_loading.clone(); let pe = pso_err.clone();
                         move |_| {
                             let sid = ss.get();
@@ -715,10 +717,17 @@ fn OptimizePage() -> impl IntoView {
                             pe.set(String::new());
                             let pop_val: usize = pop.get().parse().unwrap_or(30);
                             let iter_val: usize = iters.get().parse().unwrap_or(100);
+                            let nr_val: usize = nr.get().parse().unwrap_or(3);
+                            let seed_val: u64 = sd.get().parse().unwrap_or(42);
+                            let w_val: f64 = wv.get().parse().unwrap_or(0.729);
+                            let c1_val: f64 = c1v.get().parse().unwrap_or(1.494);
+                            let c2_val: f64 = c2v.get().parse().unwrap_or(1.494);
                             pl.set(true);
                             let r2 = pr.clone(); let l2 = pl.clone(); let e2 = pe.clone();
                             spawn_async(async move {
-                                match run_pso_auto_optimization(&sid, pop_val, iter_val, Some(200)).await {
+                                match run_pso_auto_optimization(
+                                    &sid, pop_val, iter_val, nr_val, seed_val, w_val, c1_val, c2_val, Some(200)
+                                ).await {
                                     Some(res) => { r2.set(Some(res)); e2.set(String::new()); }
                                     None => { e2.set("Erro. Execute o batch primeiro.".into()); }
                                 }
