@@ -708,39 +708,94 @@ pub fn optimize_with_pso(
         return Err("Nenhum parâmetro para otimizar".into());
     }
 
+    // Pré-constrói as regras uma única vez (não dependem dos parâmetros das MFs)
+    let var_names: Vec<String> = variables.iter().map(|v| v.name.clone()).collect();
+    let prebuilt_rules: Vec<_> = rules.iter().filter_map(|rule| {
+        let conditions = parse_rule_conditions(&rule.rule_text, &var_names);
+        if conditions.len() < 2 { return None; }
+        let ante = &conditions[..conditions.len() - 1];
+        let conseq = &conditions[conditions.len() - 1];
+        let mut builder = RuleBuilder::new();
+        builder = builder.when(&ante[0].0, &ante[0].1);
+        for (var_name, term_label) in &ante[1..] {
+            builder = builder.and(var_name, term_label);
+        }
+        builder = builder.then(&conseq.0, &conseq.1);
+        if (rule.weight - 1.0).abs() > f64::EPSILON {
+            builder = builder.weight(rule.weight);
+        }
+        Some(builder.build())
+    }).collect();
+
     let fitness_fn = |params: &[f64]| {
         let mut param_idx = 0;
         let mut mse = 0.0_f64;
 
-        for (i, input_row) in target_inputs.iter().enumerate() {
-            let mut temp_vars = variables.to_vec();
-            for var in &mut temp_vars {
-                for term in &mut var.terms {
-                    let n_params = match term.mf_type.as_str() {
-                        "trimf" => 3,
-                        "trapmf" => 4,
-                        "gaussmf" => 2,
-                        _ => 0,
-                    };
-                    if n_params > 0 && param_idx + n_params <= params.len() {
-                        let mut new_params = params[param_idx..param_idx + n_params].to_vec();
-                        match term.mf_type.as_str() {
-                            "trimf" if new_params.len() >= 3 => {
-                                new_params.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-                            }
-                            "trapmf" if new_params.len() >= 4 => {
-                                new_params.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-                            }
-                            _ => {}
+        // Constrói engine UMA VEZ com os parâmetros desta partícula
+        let mut temp_vars = variables.to_vec();
+        for var in &mut temp_vars {
+            for term in &mut var.terms {
+                let n_params = match term.mf_type.as_str() {
+                    "trimf" => 3,
+                    "trapmf" => 4,
+                    "gaussmf" => 2,
+                    _ => 0,
+                };
+                if n_params > 0 && param_idx + n_params <= params.len() {
+                    let mut new_params = params[param_idx..param_idx + n_params].to_vec();
+                    match term.mf_type.as_str() {
+                        "trimf" if new_params.len() >= 3 => {
+                            new_params.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
                         }
-                        term.params = new_params;
-                        param_idx += n_params;
+                        "trapmf" if new_params.len() >= 4 => {
+                            new_params.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                        }
+                        _ => {}
                     }
+                    term.params = new_params;
+                    param_idx += n_params;
                 }
             }
-            param_idx = 0;
+        }
 
-            let outputs = evaluate_mamdani(&temp_vars, rules, input_row);
+        // Constrói engine com as variáveis atualizadas e as regras pré-construídas
+        let mut engine = MamdaniEngine::new();
+        for var in &temp_vars {
+            let resolution = var.resolution.max(2);
+            let uni = Universe::new(var.universe_min, var.universe_max, resolution);
+            let mut fv = FuzzyVariable::new(&var.name, uni);
+            for term in &var.terms {
+                if let Some(mf) = mf_from_params(&term.mf_type, &term.params) {
+                    fv.add_term(Term::new(&term.label, mf));
+                }
+            }
+            match var.role.as_str() {
+                "antecedent" | "input" => engine.add_antecedent(fv),
+                "consequent" | "output" => engine.add_consequent(fv),
+                _ => {}
+            }
+        }
+        for rule in &prebuilt_rules {
+            engine.add_rule(rule.clone());
+        }
+
+        // Avalia TODAS as amostras com o mesmo motor, só trocando inputs
+        for (i, input_row) in target_inputs.iter().enumerate() {
+            for (name, value) in input_row {
+                let _ = engine.set_input(name, *value);
+            }
+            let outputs = match engine.compute() {
+                Ok(o) => o,
+                Err(_) => {
+                    let mut fallback = std::collections::HashMap::new();
+                    for var in &temp_vars {
+                        if var.role == "consequent" || var.role == "output" {
+                            fallback.insert(var.name.clone(), (var.universe_min + var.universe_max) / 2.0);
+                        }
+                    }
+                    fallback
+                }
+            };
             if let Some(expected) = target_outputs.get(i) {
                 for (k, v) in &outputs {
                     if let Some(ev) = expected.get(k) {
